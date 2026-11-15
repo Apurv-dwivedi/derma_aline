@@ -6,7 +6,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
 import java.util.Map;
 
 @RestController
@@ -20,7 +19,6 @@ public class ContactController {
     @PostMapping
     public ResponseEntity<?> submitContactMessage(@RequestBody ContactMessage contactMessage) {
         try {
-            contactMessage.setCreatedAt(LocalDateTime.now());
             contactRepository.save(contactMessage);
             return ResponseEntity.ok(Map.of("message", "Message received successfully!"));
         } catch (Exception e) {
