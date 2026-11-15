@@ -1,0 +1,7 @@
+{
+  "name": "derma-aline-master",
+  "private": true,
+  "scripts": {
+    "dev": "cd frontend && npm run dev"
+  }
+}

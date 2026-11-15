@@ -1,0 +1,66 @@
+﻿/* --- INTERNAL PAGES STYLES --- */
+.page-header {
+  background-color: #7AB2D3;
+  color: var(--color-secondary);
+  padding: 60px 20px;
+  text-align: center;
+  border-radius: var(--radius-lg);
+  margin-bottom: 50px;
+}
+
+.page-header h1 {
+  color: var(--color-secondary);
+  font-size: 2.8rem;
+  margin-bottom: 15px;
+}
+
+.page-header p {
+  font-size: 1.1rem;
+  opacity: 0.9;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* About Page */
+.about-content {
+  display: flex;
+  gap: 50px;
+  align-items: center;
+  margin-bottom: 60px;
+}
+
+.about-text {
+  flex: 1;
+}
+
+.about-text h2 {
+  font-size: 2.2rem;
+  margin-bottom: 20px;
+  color: var(--color-primary);
+}
+
+.about-text p {
+  color: var(--text-light);
+  line-height: 1.8;
+  margin-bottom: 15px;
+  font-size: 1.05rem;
+}
+
+.about-image {
+  flex: 1;
+  aspect-ratio: 4/3;
+  background-color: rgba(128, 102, 87, 0.05);
+  border: 1px dashed var(--color-primary);
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  font-family: var(--font-heading);
+}
+
+@media (max-width: 768px) {
+  .about-content {
+    flex-direction: column;
+  }
+}

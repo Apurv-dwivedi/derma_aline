@@ -1,0 +1,79 @@
+﻿/* --- HOME PAGE STYLES --- */
+.hero-section { display: flex; align-items: center; justify-content: space-between; padding: 40px 0 80px 0; gap: 50px; }
+.hero-content { flex: 1; max-width: 600px; }
+.hero-title { font-size: 3.5rem; margin-bottom: 20px; color: var(--color-primary); line-height: 1.15; }
+.hero-subtitle { font-size: 1.1rem; color: var(--text-light); margin-bottom: 40px; line-height: 1.8; }
+.hero-buttons { display: flex; gap: 20px; align-items: center; }
+
+.btn-secondary {
+  background-color: transparent; color: var(--color-primary); padding: 10px 24px;
+  border-radius: var(--radius-md); font-weight: 500; font-family: var(--font-body); font-size: 0.95rem;
+  border: 1px solid var(--color-primary); cursor: pointer; transition: var(--transition);
+  display: flex; align-items: center; gap: 8px; justify-content: center;
+}
+.btn-secondary:hover { background-color: rgba(128, 102, 87, 0.05); }
+
+.hero-image-wrapper { flex: 1; display: flex; justify-content: flex-end; }
+.hero-image-placeholder {
+  width: 100%; max-width: 450px; aspect-ratio: 4/5; background-color: rgba(128, 102, 87, 0.05);
+  border-radius: 200px 200px 0 0; border: 1px dashed var(--color-primary);
+  display: flex; align-items: center; justify-content: center; color: var(--color-primary); font-family: var(--font-heading);
+}
+
+/* --- SECTION HEADERS --- */
+.section-header { text-align: center; margin-bottom: 50px; }
+.section-header h2 { font-size: 2.5rem; margin-bottom: 15px; }
+.section-header p { color: var(--text-light); max-width: 600px; margin: 0 auto; }
+
+/* --- TREATMENTS GRID --- */
+.treatments-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; }
+.treatment-card {
+  background-color: var(--bg-white); border-radius: var(--radius-lg); overflow: hidden;
+  box-shadow: var(--shadow-soft); transition: var(--transition); border: 1px solid rgba(128, 102, 87, 0.1);
+}
+.treatment-card:hover { transform: translateY(-5px); box-shadow: 0 10px 30px rgba(128, 102, 87, 0.1); }
+.treatment-img-placeholder { height: 200px; background-color: var(--color-secondary); display: flex; align-items: center; justify-content: center; color: var(--color-primary); opacity: 0.7; }
+.treatment-info { padding: 25px; }
+.treatment-info h3 { font-size: 1.3rem; margin-bottom: 10px; }
+.treatment-info p { font-size: 0.9rem; color: var(--text-light); margin-bottom: 20px; line-height: 1.6; }
+
+/* --- FEATURES GRID --- */
+.features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 40px; text-align: center; }
+.feature-card { padding: 30px 20px; background-color: var(--color-secondary); border-radius: var(--radius-lg); }
+.feature-icon-wrapper {
+  width: 60px; height: 60px; background-color: var(--bg-white); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto;
+  color: var(--color-primary); box-shadow: var(--shadow-soft);
+}
+.feature-card h3 { font-size: 1.2rem; margin-bottom: 15px; }
+.feature-card p { font-size: 0.9rem; color: var(--text-light); }
+
+/* --- CONTACT SECTION --- */
+.contact-section { display: flex; gap: 50px; align-items: center; }
+.contact-info { flex: 1; }
+.contact-info h3 { font-size: 2rem; margin-bottom: 20px; color: var(--color-primary); }
+.contact-details p { display: flex; align-items: flex-start; gap: 15px; margin-bottom: 20px; color: var(--text-light); font-size: 0.95rem; line-height: 1.6; }
+.contact-icon { color: var(--color-primary); flex-shrink: 0; margin-top: 3px; }
+.contact-map-placeholder {
+  flex: 1; height: 350px; background-color: var(--bg-white); border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg); display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: var(--text-light); box-shadow: var(--shadow-soft);
+}
+
+/* --- CTA SECTION --- */
+.cta-section {
+  text-align: center; padding: 60px 20px; background-color: #806657;
+  color: var(--color-secondary); border-radius: var(--radius-lg); margin: 40px 0;
+}
+.cta-section h2 { color: var(--color-secondary); margin-bottom: 15px; font-size: 2.2rem; }
+.cta-section p { max-width: 600px; margin: 0 auto 30px auto; opacity: 0.9; }
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hero-section, .contact-section { flex-direction: column; text-align: center; }
+  .hero-title { font-size: 2.5rem; }
+  .hero-image-wrapper, .contact-map-placeholder { width: 100%; }
+  .hero-buttons { flex-direction: column; width: 100%; }
+  .btn-secondary { width: 100%; }
+  .contact-details p { flex-direction: column; align-items: center; text-align: center; }
+}

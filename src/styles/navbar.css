@@ -1,0 +1,60 @@
+/* --- NAVBAR STYLES --- */
+.navbar {
+    background-color: var(--bg-white);
+    border-bottom: 1px solid var(--border-light);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--shadow-soft);
+}
+
+.nav-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    height: 80px;
+}
+
+.nav-logo {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    color: var(--color-primary);
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.nav-links {
+    display: flex;
+    gap: 30px;
+    align-items: center;
+}
+
+.nav-link {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-main);
+    transition: var(--transition);
+}
+
+.nav-link:hover {
+    color: var(--color-primary);
+}
+
+/* Primary Button Style (Reusable) */
+.btn-primary {
+    background-color: var(--color-primary);
+    color: var(--text-white);
+    padding: 10px 24px;
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    border: none;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-primary:hover {
+    background-color: #6a5346; /* Slightly darker Mocha Brown */
+    box-shadow: var(--shadow-soft);
+}

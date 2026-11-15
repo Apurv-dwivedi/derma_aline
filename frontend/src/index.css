@@ -1,0 +1,82 @@
+﻿/* --- DERMA ALINE GLOBAL LUXURY STYLES & BUTTON HOVER EFFECTS --- */
+:root {
+  --color-primary: #2C221E;         /* Deep Mocha Brown */
+  --color-accent: #7AB2D3;          /* Soft Baby Blue for Clickable Buttons */
+  --color-accent-hover: #639ABF;    /* Darker Baby Blue for Hover */
+  --bg-cream: #F5F2EC;              /* Warm Cream Background */
+  --bg-white: #FFFFFF;              
+  --text-main: #2C221E;             
+  --text-light: #6E5B52;            
+  --border-light: #E6E0D5;          
+  --shadow-soft: 0 10px 30px rgba(44, 34, 30, 0.06);
+  --shadow-hover: 0 12px 25px rgba(122, 178, 211, 0.4);
+  --radius-lg: 16px;
+  --radius-md: 10px;
+  --radius-sm: 6px;
+  --font-heading: 'Playfair Display', serif;
+  --font-body: 'Plus Jakarta Sans', sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-cream);
+  color: var(--text-main);
+  line-height: 1.6;
+}
+
+/* --- UNIVERSAL BUTTON HOVER EFFECTS --- */
+button, .btn-primary, button[type="submit"], .cta-button {
+  background-color: var(--color-accent) !important;
+  color: #2C221E !important;
+  font-weight: 700;
+  padding: 14px 28px;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(122, 178, 211, 0.25);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 0.9rem;
+}
+
+button:hover, .btn-primary:hover, button[type="submit"]:hover, .cta-button:hover {
+  background-color: var(--color-accent-hover) !important;
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-hover);
+}
+
+button:active, .btn-primary:active, button[type="submit"]:active, .cta-button:active {
+  transform: translateY(-1px);
+}
+
+/* Secondary Buttons */
+.btn-secondary {
+  background-color: transparent !important;
+  color: var(--color-primary) !important;
+  border: 1.5px solid var(--color-primary) !important;
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-secondary:hover {
+  background-color: var(--color-primary) !important;
+  color: var(--bg-cream) !important;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(44, 34, 30, 0.15);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
