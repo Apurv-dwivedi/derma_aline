@@ -1,8 +1,8 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 
-// Use environment variable for production, fallback to localhost for development
+// Use environment variable for production, fallback to live Render backend for development/production safety
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'https://derma-aline.onrender.com/api',
 });
 
 // Intercept requests to attach the JWT token
@@ -24,7 +24,7 @@ API.interceptors.response.use((response) => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
     localStorage.removeItem('fullName');
-    
+
     const currentPath = window.location.pathname;
     if (currentPath.startsWith('/admin')) {
       window.location.href = '/admin-login';
