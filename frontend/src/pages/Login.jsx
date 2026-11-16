@@ -123,10 +123,15 @@ const Login = () => {
             />
           </div>
 
-          <div className="form-group" style={{ marginBottom: '25px' }}>
-            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontWeight: '600', fontSize: '0.9rem', color: '#4a3b30' }}>
-              <Lock size={16} color="#7c6a5d" /> Password
-            </label>
+          <div className="form-group" style={{ marginBottom: '20px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0, fontWeight: '600', fontSize: '0.9rem', color: '#4a3b30' }}>
+                <Lock size={16} color="#7c6a5d" /> Password
+              </label>
+              <a href="/auth?mode=forgot" style={{ fontSize: '0.82rem', color: '#7c6a5d', textDecoration: 'none', fontWeight: '500' }}>
+                Forgot Password?
+              </a>
+            </div>
             <input 
               type="password" 
               className="form-input" 

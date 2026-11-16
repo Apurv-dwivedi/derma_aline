@@ -4,6 +4,7 @@ import com.dermaaline.backend.dto.RegisterRequest;
 import com.dermaaline.backend.entity.User;
 import com.dermaaline.backend.repository.UserRepository;
 import com.dermaaline.backend.security.JwtTokenProvider;
+import com.dermaaline.backend.service.EmailService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +41,9 @@ public class AuthControllerTest {
 
     @Mock
     private JwtTokenProvider jwtTokenProvider;
+
+    @Mock
+    private EmailService emailService;
 
     @InjectMocks
     private AuthController authController;
@@ -226,5 +230,52 @@ public class AuthControllerTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Patient accounts cannot access internal")));
+    }
+
+    @Test
+    void testForgotPasswordSuccess() throws Exception {
+        User user = new User();
+        user.setEmail("user@example.com");
+        user.setFullName("User Test");
+
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(emailService.sendPasswordResetEmail(anyString(), anyString(), anyString())).thenReturn(true);
+
+        Map<String, String> payload = Map.of("email", "user@example.com");
+
+        mockMvc.perform(post("/api/auth/forgot-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Password reset instructions")));
+
+        verify(userRepository, times(1)).save(any(User.class));
+        verify(emailService, times(1)).sendPasswordResetEmail(eq("user@example.com"), eq("User Test"), anyString());
+    }
+
+    @Test
+    void testResetPasswordSuccess() throws Exception {
+        User user = new User();
+        user.setEmail("user@example.com");
+        user.setResetToken("valid-token-123");
+        user.setResetTokenExpiry(java.time.LocalDateTime.now().plusHours(1));
+
+        when(userRepository.findByResetToken("valid-token-123")).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("NewSecret123")).thenReturn("encodedNewSecret");
+
+        Map<String, String> payload = Map.of(
+            "token", "valid-token-123",
+            "newPassword", "NewSecret123"
+        );
+
+        mockMvc.perform(post("/api/auth/reset-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("reset successfully")));
+
+        verify(userRepository, times(1)).save(user);
     }
 }
