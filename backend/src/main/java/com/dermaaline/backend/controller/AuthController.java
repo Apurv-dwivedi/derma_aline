@@ -175,36 +175,44 @@ public class AuthController {
      */
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> payload) {
-        String email = payload.get("email");
-        if (email == null || email.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Email is required."));
-        }
-
-        String cleanEmail = email.trim().toLowerCase();
-        Optional<User> userOpt = userRepository.findByEmail(cleanEmail);
-
-        if (userOpt.isPresent()) {
-            User user = userOpt.get();
-            String token = UUID.randomUUID().toString();
-            user.setResetToken(token);
-            user.setResetTokenExpiry(LocalDateTime.now().plusHours(1));
-            userRepository.save(user);
-
-            String resetUrl = frontendUrl + "/auth?resetToken=" + token;
-            boolean sent = emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), resetUrl);
-            
-            if (!sent) {
-                return ResponseEntity.status(500).body(Map.of(
-                    "success", false,
-                    "message", "Unable to send password reset email at this moment. Please check server email settings or contact support."
-                ));
+        try {
+            String email = payload.get("email");
+            if (email == null || email.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Email is required."));
             }
-        }
 
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "message", "Password reset instructions have been sent to your email address. Please check your inbox and spam folder."
-        ));
+            String cleanEmail = email.trim().toLowerCase();
+            Optional<User> userOpt = userRepository.findByEmail(cleanEmail);
+
+            if (userOpt.isPresent()) {
+                User user = userOpt.get();
+                String token = UUID.randomUUID().toString();
+                user.setResetToken(token);
+                user.setResetTokenExpiry(LocalDateTime.now().plusHours(1));
+                userRepository.save(user);
+
+                String resetUrl = frontendUrl + "/auth?resetToken=" + token;
+                boolean sent = emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), resetUrl);
+                
+                if (!sent) {
+                    String errDetail = emailService.getLastError() != null ? emailService.getLastError() : "SMTP dispatch failure";
+                    return ResponseEntity.status(500).body(Map.of(
+                        "success", false,
+                        "message", "Unable to send reset email: " + errDetail
+                    ));
+                }
+            }
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Password reset instructions have been sent to your email address. Please check your inbox and spam folder."
+            ));
+        } catch (Throwable t) {
+            return ResponseEntity.status(500).body(Map.of(
+                "success", false,
+                "message", "Server error processing reset request: " + t.getMessage()
+            ));
+        }
     }
 
     /**
