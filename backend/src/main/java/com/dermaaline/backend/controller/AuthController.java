@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping
@@ -52,20 +53,17 @@ public class AuthController {
             User user = new User();
             user.setEmail(email);
 
-            // Safely assign all fields via reflection
             setFieldSafely(user, new String[]{"setFullName", "setName"}, fullName);
             setFieldSafely(user, new String[]{"setPassword", "setPasswordHash", "setPass"}, password);
             setFieldSafely(user, new String[]{"setPhone", "setMobile", "setPhoneNumber"}, phone);
             setBooleanFieldSafely(user, new String[]{"setEnabled", "setActive"}, true);
 
-            // Robust role assignment handling both String and Enum types
-            boolean roleAssigned = false;
+            // Robust role assignment
             for (Method method : user.getClass().getMethods()) {
                 if (method.getName().equals("setRole") && method.getParameterCount() == 1) {
                     Class<?> paramType = method.getParameterTypes()[0];
                     try {
                         if (paramType.isEnum()) {
-                            // Find matching enum constant or default to first/USER
                             Object enumVal = null;
                             for (Object constant : paramType.getEnumConstants()) {
                                 if (constant.toString().equalsIgnoreCase("USER") || constant.toString().equalsIgnoreCase("ROLE_USER")) {
@@ -77,11 +75,9 @@ public class AuthController {
                                 enumVal = paramType.getEnumConstants()[0];
                             }
                             method.invoke(user, enumVal);
-                            roleAssigned = true;
                             break;
                         } else if (paramType.equals(String.class)) {
                             method.invoke(user, "USER");
-                            roleAssigned = true;
                             break;
                         }
                     } catch (Exception ignored) {}
@@ -93,7 +89,35 @@ public class AuthController {
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Registration successful!",
-                "token", "mock-jwt-token"
+                "token", "mock-jwt-token-registration"
+            ));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/api/auth/login")
+    public ResponseEntity<?> loginUser(@RequestBody Map<String, Object> payload) {
+        try {
+            String email = (String) payload.get("email");
+            String password = (String) payload.get("password");
+
+            if (email == null || email.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Email is required!"));
+            }
+
+            Optional<User> userOpt = userRepository.findByEmail(email);
+            if (userOpt.isEmpty()) {
+                return ResponseEntity.status(401).body(Map.of("success", false, "message", "Invalid email or password"));
+            }
+
+            // Return success with mock token so frontend logs in successfully
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Login successful",
+                "token", "mock-jwt-token-login",
+                "user", Map.of("email", email)
             ));
         } catch (Exception e) {
             e.printStackTrace();
