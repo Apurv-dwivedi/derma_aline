@@ -1,110 +1,114 @@
 package com.dermaaline.backend.controller;
 
 import com.dermaaline.backend.entity.Appointment;
-import com.dermaaline.backend.entity.AppointmentStatus;
-import com.dermaaline.backend.entity.User;
 import com.dermaaline.backend.repository.AppointmentRepository;
-import com.dermaaline.backend.repository.UserRepository;
-import com.dermaaline.backend.service.EmailService;
-import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/appointments")
+@CrossOrigin(origins = "*")
 public class AppointmentController {
 
-    private final AppointmentRepository appointmentRepository;
-    private final UserRepository userRepository;
-    private final EmailService emailService;
-
-    public AppointmentController(AppointmentRepository appointmentRepository, UserRepository userRepository, EmailService emailService) {
-        this.appointmentRepository = appointmentRepository;
-        this.userRepository = userRepository;
-        this.emailService = emailService;
-    }
+    @Autowired
+    private AppointmentRepository appointmentRepository;
 
     @GetMapping
-    public List<Appointment> getAllAppointments() {
-        return appointmentRepository.findAll();
-    }
-    
-    @GetMapping("/my")
-    public ResponseEntity<List<Appointment>> getMyAppointments() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || !auth.isAuthenticated() || auth.getPrincipal().equals("anonymousUser")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        
-        Optional<User> user = userRepository.findByEmail(auth.getName());
-        if (user.isEmpty()) return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        
-        return ResponseEntity.ok(appointmentRepository.findByUserId(user.get().getId()));
+    public ResponseEntity<List<Appointment>> getAllAppointments() {
+        return ResponseEntity.ok(appointmentRepository.findAll());
     }
 
     @PostMapping
-    public ResponseEntity<?> createAppointment(@RequestBody Appointment appointment) {
-        // 1. Prevent Double Booking
-        if (appointmentRepository.existsByAppointmentDateAndAppointmentTimeAndTreatmentName(
-                appointment.getAppointmentDate(), appointment.getAppointmentTime(), appointment.getTreatmentName())) {
-            return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("This time slot is already booked for this treatment. Please select another time.");
-        }
+    public ResponseEntity<?> createAppointment(@RequestBody Map<String, Object> payload) {
+        try {
+            Appointment appointment = new Appointment();
+            
+            // Map fields safely supporting multiple naming conventions
+            String customerName = getString(payload, new String[]{"customerName", "patientName", "name"});
+            String customerEmail = getString(payload, new String[]{"customerEmail", "email"});
+            String customerPhone = getString(payload, new String[]{"customerPhone", "phone", "mobile"});
+            String treatmentName = getString(payload, new String[]{"treatmentName", "treatment", "service"});
+            
+            appointment.setCustomerName(customerName != null ? customerName : "Valued Patient");
+            appointment.setCustomerEmail(customerEmail != null ? customerEmail : "patient@dermaaline.com");
+            appointment.setCustomerPhone(customerPhone != null ? customerPhone : "0000000000");
+            appointment.setTreatmentName(treatmentName != null ? treatmentName : "General Consultation");
 
-        // 2. Link to authenticated user if logged in
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.isAuthenticated() && !auth.getPrincipal().equals("anonymousUser")) {
-            userRepository.findByEmail(auth.getName()).ifPresent(user -> appointment.setUserId(user.getId()));
-        }
-
-        appointment.setStatus(AppointmentStatus.PENDING);
-        Appointment savedAppointment = appointmentRepository.save(appointment);
-        
-        // 3. Asynchronous Email Handling (Swallow exception safely without blocking the response)
-        new Thread(() -> {
-            try {
-                String subject = "New Appointment Booking - " + savedAppointment.getPatientName();
-                String body = "You have a new appointment booking!\n\n" +
-                              "Patient Name: " + savedAppointment.getPatientName() + "\n" +
-                              "Phone: " + savedAppointment.getPhone() + "\n" +
-                              "Treatment: " + savedAppointment.getTreatmentName() + "\n" +
-                              "Date: " + savedAppointment.getAppointmentDate() + "\n" +
-                              "Time: " + savedAppointment.getAppointmentTime() + "\n" +
-                              "Status: " + savedAppointment.getStatus();
-                emailService.sendEmail("admin@dermaaline.com", subject, body);
-            } catch (Exception e) {
-                System.err.println("Email Delivery Failed: " + e.getMessage());
+            String dateStr = getString(payload, new String[]{"appointmentDate", "date"});
+            if (dateStr != null && !dateStr.isEmpty()) {
+                appointment.setAppointmentDate(LocalDate.parse(dateStr));
+            } else {
+                appointment.setAppointmentDate(LocalDate.now());
             }
-        }).start();
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedAppointment);
-    }
+            String timeStr = getString(payload, new String[]{"startTime", "appointmentTime", "time"});
+            if (timeStr != null && !timeStr.isEmpty()) {
+                try {
+                    appointment.setStartTime(LocalTime.parse(timeStr));
+                } catch (Exception e) {
+                    appointment.setStartTime(LocalTime.of(10, 0));
+                }
+            } else {
+                appointment.setStartTime(LocalTime.of(10, 0));
+            }
+            appointment.setEndTime(appointment.getStartTime().plusMinutes(30));
 
-    @PutMapping("/{id}")
-    public ResponseEntity<Appointment> updateAppointment(@PathVariable Long id, @RequestBody Appointment appointmentDetails) {
-        Appointment appointment = appointmentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Appointment not found"));
+            appointment.setStatus(Appointment.AppointmentStatus.PENDING);
+            appointment.setPaymentStatus(Appointment.PaymentStatus.PENDING);
 
-        appointment.setPatientName(appointmentDetails.getPatientName());
-        appointment.setTreatmentName(appointmentDetails.getTreatmentName());
-        appointment.setAppointmentDate(appointmentDetails.getAppointmentDate());
-        appointment.setAppointmentTime(appointmentDetails.getAppointmentTime());
-        appointment.setStatus(appointmentDetails.getStatus());
+            String message = getString(payload, new String[]{"customerMessage", "message", "notes"});
+            if (message != null) {
+                appointment.setCustomerMessage(message);
+            }
 
-        return ResponseEntity.ok(appointmentRepository.save(appointment));
-    }
+            Appointment savedAppointment = appointmentRepository.save(appointment);
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> deleteAppointment(@PathVariable Long id) {
-        if (appointmentRepository.existsById(id)) {
-            appointmentRepository.deleteById(id);
-            return ResponseEntity.ok().body("Deleted successfully");
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Appointment booked successfully!",
+                "appointmentId", savedAppointment.getId()
+            ));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", e.getMessage()));
         }
-        return ResponseEntity.notFound().build();
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<?> updateAppointmentStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {
+        try {
+            Optional<Appointment> appointmentOpt = appointmentRepository.findById(id);
+            if (appointmentOpt.isEmpty()) {
+                return ResponseEntity.status(404).body(Map.of("success", false, "message", "Appointment not found"));
+            }
+
+            Appointment appointment = appointmentOpt.get();
+            String statusStr = payload.get("status");
+            if (statusStr != null) {
+                appointment.setStatus(Appointment.AppointmentStatus.valueOf(statusStr.toUpperCase()));
+                appointmentRepository.save(appointment);
+            }
+
+            return ResponseEntity.ok(Map.of("success", true, "message", "Appointment status updated successfully"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    private String getString(Map<String, Object> map, String[] keys) {
+        for (String key : keys) {
+            if (map.containsKey(key) && map.get(key) != null) {
+                return map.get(key).toString();
+            }
+        }
+        return null;
     }
 }
