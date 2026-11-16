@@ -13,6 +13,9 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     List<Appointment> findByAppointmentDate(LocalDate appointmentDate);
     List<Appointment> findByCustomerEmail(String customerEmail);
     
-    // Added missing helper method to satisfy test and query requirements
+    // Exact method signature expected by AppointmentControllerTest
+    boolean existsByAppointmentDateAndAppointmentTimeAndTreatmentName(LocalDate appointmentDate, String appointmentTime, String treatmentName);
+    
+    // Overloaded alternative supporting LocalTime if needed
     boolean existsByAppointmentDateAndStartTimeAndTreatmentName(LocalDate appointmentDate, LocalTime startTime, String treatmentName);
 }
