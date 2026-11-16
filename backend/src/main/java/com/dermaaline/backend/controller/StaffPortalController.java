@@ -18,18 +18,9 @@ public class StaffPortalController {
     private AppointmentRepository appointmentRepository;
 
     @GetMapping("/appointments")
-    public ResponseEntity<?> getAssignedAppointments(@RequestParam(required = false) String staffName) {
-        try {
-            List<Appointment> appointments = appointmentRepository.findAll();
-            if (staffName != null && !staffName.isEmpty()) {
-                appointments = appointments.stream()
-                    .filter(a -> staffName.equalsIgnoreCase(a.getId() != null))
-                    .toList();
-            }
-            return ResponseEntity.ok(Map.of("success", true, "data", appointments));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of("success", false, "message", e.getMessage()));
-        }
+    public ResponseEntity<List<Appointment>> getStaffAppointments() {
+        // Return all appointments for the shared global queue model
+        List<Appointment> appointments = appointmentRepository.findAll();
+        return ResponseEntity.ok(appointments);
     }
 }
