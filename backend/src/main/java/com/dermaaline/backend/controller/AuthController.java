@@ -99,6 +99,7 @@ public class AuthController {
         }
 
         boolean isInternalAccount = (user.getRole() == User.Role.SUPER_ADMIN || 
+                                     user.getRole() == User.Role.ADMIN || 
                                      user.getRole() == User.Role.STAFF || 
                                      "ADMIN".equalsIgnoreCase(user.getRole().name()));
 
@@ -122,7 +123,7 @@ public class AuthController {
             new UsernamePasswordAuthenticationToken(user.getEmail(), null, Collections.emptyList())
         );
 
-        String roleStr = (user.getRole() == User.Role.SUPER_ADMIN) ? "ADMIN" : user.getRole().name();
+        String roleStr = (user.getRole() == User.Role.SUPER_ADMIN || user.getRole() == User.Role.ADMIN) ? "ADMIN" : user.getRole().name();
 
         return ResponseEntity.ok(Map.of(
             "success", true,

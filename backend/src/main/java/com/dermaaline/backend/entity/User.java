@@ -33,8 +33,8 @@ public class User {
     private LocalDateTime resetTokenExpiry;
 
     public enum Role {
-        SUPER_ADMIN, STAFF, CUSTOMER
-    , PATIENT}
+        SUPER_ADMIN, ADMIN, STAFF, CUSTOMER, PATIENT
+    }
 
     // Getters and Setters
     public Long getId() { return id; }
