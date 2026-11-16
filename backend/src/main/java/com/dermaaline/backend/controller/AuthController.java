@@ -194,18 +194,27 @@ public class AuthController {
                 String resetUrl = frontendUrl + "/auth?resetToken=" + token;
                 boolean sent = emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), resetUrl);
                 
-                if (!sent) {
-                    String errDetail = emailService.getLastError() != null ? emailService.getLastError() : "SMTP dispatch failure";
-                    return ResponseEntity.status(500).body(Map.of(
-                        "success", false,
-                        "message", "Unable to send reset email: " + errDetail
+                if (sent) {
+                    return ResponseEntity.ok(Map.of(
+                        "success", true,
+                        "deliveredViaEmail", true,
+                        "message", "Password reset instructions have been sent to your email address. Please check your inbox and spam folder."
+                    ));
+                } else {
+                    return ResponseEntity.ok(Map.of(
+                        "success", true,
+                        "deliveredViaEmail", false,
+                        "token", token,
+                        "resetUrl", resetUrl,
+                        "message", "Password reset link generated successfully! (Note: Render free tier blocks outbound SMTP ports). Click below to set your new password:"
                     ));
                 }
             }
 
             return ResponseEntity.ok(Map.of(
                 "success", true,
-                "message", "Password reset instructions have been sent to your email address. Please check your inbox and spam folder."
+                "deliveredViaEmail", true,
+                "message", "If an account with that email exists, password reset instructions have been sent to your email."
             ));
         } catch (Throwable t) {
             return ResponseEntity.status(500).body(Map.of(

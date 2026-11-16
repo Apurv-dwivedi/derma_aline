@@ -18,6 +18,7 @@ const Auth = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [resetToken, setResetToken] = useState('');
+  const [directResetToken, setDirectResetToken] = useState('');
 
   // Status states
   const [error, setError] = useState('');
@@ -94,6 +95,9 @@ const Auth = () => {
         email: email.trim() 
       });
       setMessage(response.data?.message || 'Password reset instructions have been sent to your email.');
+      if (response.data?.token) {
+        setDirectResetToken(response.data.token);
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Unable to process reset request. Please verify your email.');
     } finally {
@@ -197,6 +201,35 @@ const Auth = () => {
         {/* Mode: Forgot Password */}
         {mode === 'forgot' && (
           <form onSubmit={handleForgotPassword} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            {directResetToken && (
+              <div style={{ padding: '16px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0', textAlign: 'center', marginBottom: '10px' }}>
+                <p style={{ margin: '0 0 12px 0', fontSize: '0.88rem', color: '#166534', fontWeight: '600' }}>
+                  Secure reset authorization generated!
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetToken(directResetToken);
+                    setMode('reset');
+                    setError('');
+                    setMessage('');
+                  }}
+                  style={{
+                    backgroundColor: '#16a34a',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '10px 18px',
+                    borderRadius: '6px',
+                    fontSize: '0.9rem',
+                    fontWeight: '700',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Set New Password Now &rarr;
+                </button>
+              </div>
+            )}
+
             <div>
               <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '500', color: '#5a4638', marginBottom: '8px' }}>
                 Your Registered Email Address

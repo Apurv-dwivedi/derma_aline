@@ -6,10 +6,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.stereotype.Service;
 
-import java.util.Properties;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 
 @Service
 public class EmailService {
@@ -22,8 +24,11 @@ public class EmailService {
     @Value("${spring.mail.username:dermaalineskinaesthetics@gmail.com}")
     private String fromEmail;
 
-    @Value("${spring.mail.password:iwtcifcnykbtljgz}")
-    private String mailPassword;
+    @Value("${RESEND_API_KEY:}")
+    private String resendApiKey;
+
+    @Value("${BREVO_API_KEY:}")
+    private String brevoApiKey;
 
     private String lastError;
 
@@ -32,53 +37,118 @@ public class EmailService {
     }
 
     public boolean sendEmail(String to, String subject, String body) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(to);
-        message.setSubject(subject);
-        message.setText(body);
-        message.setFrom(fromEmail);
+        lastError = null;
 
-        // Attempt 1: Primary MailSender (port 587 STARTTLS)
-        if (mailSender != null) {
-            try {
-                mailSender.send(message);
-                logger.info("Email dispatched successfully via primary mail sender to {}", to);
-                lastError = null;
+        // 1. Try Resend HTTP API (Port 443 - Never blocked by Render free tier)
+        if (resendApiKey != null && !resendApiKey.trim().isEmpty()) {
+            if (sendViaResendHttpApi(to, subject, body)) {
                 return true;
-            } catch (Exception e) {
-                logger.warn("Primary mail sender failed ({}), attempting SSL fallback on port 465...", e.getMessage());
-                lastError = e.getMessage();
             }
         }
 
-        // Attempt 2: Fallback to Port 465 SSL (SMTPS)
-        try {
-            JavaMailSenderImpl sslSender = new JavaMailSenderImpl();
-            sslSender.setHost("smtp.gmail.com");
-            sslSender.setPort(465);
-            sslSender.setUsername(fromEmail);
-            sslSender.setPassword(mailPassword);
-
-            Properties sslProps = sslSender.getJavaMailProperties();
-            sslProps.put("mail.transport.protocol", "smtps");
-            sslProps.put("mail.smtp.auth", "true");
-            sslProps.put("mail.smtp.ssl.enable", "true");
-            sslProps.put("mail.smtp.ssl.trust", "*");
-            sslProps.put("mail.smtp.connectiontimeout", "7000");
-            sslProps.put("mail.smtp.timeout", "7000");
-            sslProps.put("mail.smtp.writetimeout", "7000");
-
-            sslSender.send(message);
-            logger.info("Email dispatched successfully via SSL port 465 fallback to {}", to);
-            lastError = null;
-            return true;
-        } catch (Exception ex2) {
-            String combinedError = "Primary error: " + (lastError != null ? lastError : "not configured") + 
-                    " | SSL Fallback error: " + ex2.getMessage();
-            lastError = combinedError;
-            logger.error("Failed to send email to {}: {}", to, combinedError);
-            return false;
+        // 2. Try Brevo HTTP API (Port 443 - Never blocked by Render free tier)
+        if (brevoApiKey != null && !brevoApiKey.trim().isEmpty()) {
+            if (sendViaBrevoHttpApi(to, subject, body)) {
+                return true;
+            }
         }
+
+        // 3. Try standard SMTP (Works on paid Render, VPS, or local development)
+        if (mailSender != null) {
+            try {
+                SimpleMailMessage message = new SimpleMailMessage();
+                message.setTo(to);
+                message.setSubject(subject);
+                message.setText(body);
+                message.setFrom(fromEmail);
+
+                mailSender.send(message);
+                logger.info("Email dispatched successfully via SMTP to {}", to);
+                return true;
+            } catch (Exception e) {
+                lastError = e.getMessage();
+                logger.warn("SMTP send failed (Render free tier blocks ports 25, 465, 587): {}", e.getMessage());
+            }
+        } else {
+            lastError = "JavaMailSender not initialized";
+        }
+
+        return false;
+    }
+
+    private boolean sendViaResendHttpApi(String to, String subject, String body) {
+        try {
+            URL url = new URL("https://api.resend.com/emails");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("Authorization", "Bearer " + resendApiKey.trim());
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            conn.setDoOutput(true);
+
+            String jsonPayload = String.format(
+                "{\"from\":\"Derma Aline <onboarding@resend.dev>\",\"to\":[\"%s\"],\"subject\":\"%s\",\"text\":\"%s\"}",
+                to, escapeJson(subject), escapeJson(body)
+            );
+
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(jsonPayload.getBytes(StandardCharsets.UTF_8));
+            }
+
+            int code = conn.getResponseCode();
+            if (code >= 200 && code < 300) {
+                logger.info("Email dispatched successfully via Resend HTTPS API to {}", to);
+                return true;
+            } else {
+                logger.warn("Resend API returned status {}", code);
+            }
+        } catch (Exception e) {
+            logger.warn("Resend HTTP API error: {}", e.getMessage());
+        }
+        return false;
+    }
+
+    private boolean sendViaBrevoHttpApi(String to, String subject, String body) {
+        try {
+            URL url = new URL("https://api.brevo.com/v3/smtp/email");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("POST");
+            conn.setRequestProperty("api-key", brevoApiKey.trim());
+            conn.setRequestProperty("Content-Type", "application/json");
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            conn.setDoOutput(true);
+
+            String jsonPayload = String.format(
+                "{\"sender\":{\"name\":\"Derma Aline\",\"email\":\"%s\"},\"to\":[{\"email\":\"%s\"}],\"subject\":\"%s\",\"textContent\":\"%s\"}",
+                fromEmail, to, escapeJson(subject), escapeJson(body)
+            );
+
+            try (OutputStream os = conn.getOutputStream()) {
+                os.write(jsonPayload.getBytes(StandardCharsets.UTF_8));
+            }
+
+            int code = conn.getResponseCode();
+            if (code >= 200 && code < 300) {
+                logger.info("Email dispatched successfully via Brevo HTTPS API to {}", to);
+                return true;
+            } else {
+                logger.warn("Brevo API returned status {}", code);
+            }
+        } catch (Exception e) {
+            logger.warn("Brevo HTTP API error: {}", e.getMessage());
+        }
+        return false;
+    }
+
+    private String escapeJson(String raw) {
+        if (raw == null) return "";
+        return raw.replace("\\", "\\\\")
+                  .replace("\"", "\\\"")
+                  .replace("\n", "\\n")
+                  .replace("\r", "\\r")
+                  .replace("\t", "\\t");
     }
 
     public boolean sendPasswordResetEmail(String to, String recipientName, String resetLink) {
