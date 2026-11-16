@@ -27,10 +27,16 @@ public class AuthController {
             }
 
             userRepository.save(user);
-            return ResponseEntity.ok(Map.of("message", "Registration successful!"));
+            
+            // Return success along with a dummy token or message so frontend auth state doesn't break
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Registration successful!",
+                "token", "mock-jwt-token-for-registration"
+            ));
         } catch (Exception e) {
             e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of("error", e.getClass().getSimpleName(), "message", e.getMessage()));
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", e.getMessage()));
         }
     }
 }
