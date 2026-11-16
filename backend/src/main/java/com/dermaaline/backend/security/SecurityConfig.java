@@ -37,7 +37,7 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/", "/api/auth/**", "/api/contact", "/api/appointments", "/error").permitAll() // Added root "/" to permitAll
+                .requestMatchers("/", "/api/auth/**", "/api/contact", "/api/appointments", "/error", "api/health","health").permitAll() // Added root "/" to permitAll
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
