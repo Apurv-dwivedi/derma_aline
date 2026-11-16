@@ -17,14 +17,12 @@ public class AppointmentController {
     @Autowired
     private AppointmentRepository appointmentRepository;
 
-    // Get all appointments (Shared global queue for Admin and Staff)
     @GetMapping
     public ResponseEntity<List<Appointment>> getAllAppointments() {
         List<Appointment> appointments = appointmentRepository.findAll();
         return ResponseEntity.ok(appointments);
     }
 
-    // Create a new appointment from the public booking form
     @PostMapping
     public ResponseEntity<?> createAppointment(@RequestBody Appointment appointment) {
         try {
@@ -42,7 +40,6 @@ public class AppointmentController {
         }
     }
 
-    // Update appointment status (e.g., Confirmed, Completed, Cancelled)
     @PatchMapping("/{id}/status")
     public ResponseEntity<?> updateAppointmentStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {
         return appointmentRepository.findById(id).map(appointment -> {
