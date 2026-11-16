@@ -5,26 +5,20 @@ import com.dermaaline.backend.repository.UserRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
 @Configuration
 public class AdminBootstrap {
 
     @Bean
-    public CommandLineRunner initAdminUser(UserRepository userRepository, PasswordEncoder passwordEncoder, JdbcTemplate jdbcTemplate) {
+    public CommandLineRunner initAdminUser(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         return args -> {
-            try {
-                // Drop the restrictive check constraint on role column so any enum role can be saved safely
-                jdbcTemplate.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;");
-            } catch (Exception e) {
-                // Ignore if constraint doesn't exist
-            }
-
             try {
                 String adminEmail = "apurvdwivedi2205@gmail.com";
                 User admin = userRepository.findByEmail(adminEmail).orElse(null);
                 
-                String encodedPassword = passwordEncoder.encode("Apurv@2026");
+                String rawPassword = "Apurv@2026";
+                String encodedPassword = passwordEncoder.encode(rawPassword);
                 
                 if (admin == null) {
                     admin = new User();
@@ -43,19 +37,26 @@ public class AdminBootstrap {
                     userRepository.save(admin);
                     System.out.println("✅ Admin user created successfully!");
                 } else {
-                    admin.setPassword(encodedPassword);
-                    try {
-                        admin.setRole(User.Role.valueOf("SUPER_ADMIN"));
-                    } catch (Exception e) {
-                        try {
-                            admin.setRole(User.Role.valueOf("ADMIN"));
-                        } catch (Exception ex) {}
+                    boolean needsSave = false;
+                    if (!passwordEncoder.matches(rawPassword, admin.getPassword())) {
+                        admin.setPassword(encodedPassword);
+                        needsSave = true;
                     }
-                    userRepository.save(admin);
-                    System.out.println("✅ Admin password reset and role synchronized!");
+                    if (admin.getRole() == null || !admin.getRole().name().equals("SUPER_ADMIN")) {
+                        try {
+                            admin.setRole(User.Role.valueOf("SUPER_ADMIN"));
+                            needsSave = true;
+                        } catch (Exception ignored) {}
+                    }
+                    if (needsSave) {
+                        userRepository.save(admin);
+                        System.out.println("✅ Admin password reset and role synchronized!");
+                    } else {
+                        System.out.println("✅ Admin user already verified: " + admin.getEmail());
+                    }
                 }
             } catch (Throwable t) {
-                System.err.println("⚠️ AdminBootstrap non-fatal notice: " + t.getMessage());
+                System.err.println("⚠️ AdminBootstrap notice: " + t.getMessage());
             }
         };
     }
