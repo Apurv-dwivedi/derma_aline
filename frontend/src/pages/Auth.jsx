@@ -22,11 +22,20 @@ const Auth = () => {
     try {
       if (isLogin) {
         const response = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
-        localStorage.setItem('token', response.data.token || response.data.accessToken);
+        const { token, role, fullName } = response.data;
+        const tokenToStore = token || response.data.accessToken || 'authenticated';
+        localStorage.setItem('token', tokenToStore);
+        if (role) localStorage.setItem('role', role);
+        if (fullName) localStorage.setItem('fullName', fullName);
+
         alert('Login Successful!');
-        navigate('/');
+        if (role === 'ADMIN' || role === 'SUPER_ADMIN') {
+          navigate('/admin');
+        } else {
+          navigate('/');
+        }
       } else {
-        await axios.post(`${API_BASE_URL}/auth/register`, { name, email, password });
+        await axios.post(`${API_BASE_URL}/auth/register`, { fullName: name, name, email, password });
         setMessage('Registration successful! Please login.');
         setIsLogin(true);
       }

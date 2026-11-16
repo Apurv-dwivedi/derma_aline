@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail, Sparkles, AlertCircle } from 'lucide-react';
 import API from '../services/api';
@@ -20,15 +20,15 @@ const Login = () => {
       const response = await API.post('/auth/login', { email, password });
       const { token, role, fullName } = response.data;
 
-      if (role !== 'ADMIN') {
+      if (role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
         setError('Access Denied: You do not have administrative privileges.');
         setLoading(false);
         return;
       }
 
-      localStorage.setItem('token', token);
+      localStorage.setItem('token', token || 'authenticated');
       localStorage.setItem('role', role);
-      localStorage.setItem('fullName', fullName);
+      localStorage.setItem('fullName', fullName || '');
 
       navigate('/admin');
     } catch (err) {

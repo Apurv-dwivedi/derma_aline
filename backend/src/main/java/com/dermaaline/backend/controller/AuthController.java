@@ -3,11 +3,14 @@ package com.dermaaline.backend.controller;
 import com.dermaaline.backend.dto.RegisterRequest;
 import com.dermaaline.backend.entity.User;
 import com.dermaaline.backend.repository.UserRepository;
+import com.dermaaline.backend.security.JwtTokenProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 
@@ -21,6 +24,9 @@ public class AuthController {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
@@ -73,10 +79,17 @@ public class AuthController {
             return ResponseEntity.status(401).body(Map.of("success", false, "message", "Invalid email or password"));
         }
 
+        String token = jwtTokenProvider.generateToken(
+            new UsernamePasswordAuthenticationToken(user.getEmail(), null, Collections.emptyList())
+        );
+
+        String roleStr = (user.getRole() == User.Role.SUPER_ADMIN) ? "ADMIN" : user.getRole().name();
+
         return ResponseEntity.ok(Map.of(
             "success", true,
             "message", "Login successful",
-            "role", user.getRole(),
+            "token", token,
+            "role", roleStr,
             "email", user.getEmail(),
             "fullName", user.getFullName()
         ));

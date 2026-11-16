@@ -9,7 +9,7 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
     return <Navigate to={requireAdmin ? "/admin-login" : "/auth"} replace />;
   }
 
-  if (requireAdmin && role !== 'ADMIN') {
+  if (requireAdmin && role !== 'ADMIN' && role !== 'SUPER_ADMIN') {
     // If a patient tries to access admin routes, kick them to home
     return <Navigate to="/" replace />;
   }

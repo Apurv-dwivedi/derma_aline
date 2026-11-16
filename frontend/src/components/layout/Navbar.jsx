@@ -1,4 +1,4 @@
-﻿import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { UserCircle, LogOut } from 'lucide-react';
 import '../../styles/navbar.css';
 
@@ -18,6 +18,8 @@ const Navbar = () => {
     // Logout logic
     const handleLogout = () => {
         localStorage.removeItem('token');
+        localStorage.removeItem('role');
+        localStorage.removeItem('fullName');
         navigate("/auth");
     };
 

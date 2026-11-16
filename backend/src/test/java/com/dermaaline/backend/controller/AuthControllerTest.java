@@ -3,6 +3,7 @@ package com.dermaaline.backend.controller;
 import com.dermaaline.backend.dto.RegisterRequest;
 import com.dermaaline.backend.entity.User;
 import com.dermaaline.backend.repository.UserRepository;
+import com.dermaaline.backend.security.JwtTokenProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -35,6 +37,9 @@ public class AuthControllerTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private JwtTokenProvider jwtTokenProvider;
 
     @InjectMocks
     private AuthController authController;
@@ -102,6 +107,7 @@ public class AuthControllerTest {
 
         when(userRepository.findByEmail("admin@derma.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("Password123", "encodedPassword")).thenReturn(true);
+        when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("mock-jwt-token");
 
         Map<String, String> credentials = Map.of("email", "admin@derma.com", "password", "Password123");
 
@@ -110,7 +116,8 @@ public class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(credentials)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.role").value("SUPER_ADMIN"))
+                .andExpect(jsonPath("$.token").value("mock-jwt-token"))
+                .andExpect(jsonPath("$.role").value("ADMIN"))
                 .andExpect(jsonPath("$.fullName").value("Admin User"));
     }
 
