@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { Phone } from 'lucide-react';
 import '../../styles/footer.css';
 
 const Footer = () => {
@@ -49,8 +50,10 @@ const Footer = () => {
           <div className="footer-contact">
             <h4>Clinic Location & Contacts</h4>
             <p style={{ marginBottom: '10px' }}>First Floor, F-121, near Roshan di Kulfi, Main Market, Block F, Rajouri Garden, New Delhi, 110027</p>
-            <p style={{ marginBottom: '15px', color: '#ffffff' }}>
-              📞 <a href="tel:9319544704" style={{ color: '#ffffff', textDecoration: 'none' }}>+91 93195 44704</a>, <a href="tel:8700751880" style={{ color: '#ffffff', textDecoration: 'none' }}>87007 51880</a>
+            <p style={{ marginBottom: '15px', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <Phone size={15} color="var(--color-accent, #c5a880)" />
+              <a href="tel:9319544704" style={{ color: '#ffffff', textDecoration: 'none' }}>+91 93195 44704</a>, 
+              <a href="tel:8700751880" style={{ color: '#ffffff', textDecoration: 'none' }}>87007 51880</a>
             </p>
             
             <Link to="/admin-login" style={{ display: 'inline-block', backgroundColor: 'var(--color-accent, #c5a880)', color: '#2C221E', padding: '8px 16px', borderRadius: '8px', fontWeight: '700', fontSize: '0.82rem', textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '1px' }}>

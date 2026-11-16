@@ -2,6 +2,8 @@ package com.dermaaline.backend.config;
 
 import com.dermaaline.backend.entity.User;
 import com.dermaaline.backend.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
@@ -11,87 +13,76 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @Configuration
 public class AdminBootstrap {
 
-    @Value("${app.admin.email:apurvdwivedi2205@gmail.com}")
+    private static final Logger logger = LoggerFactory.getLogger(AdminBootstrap.class);
+
+    // Optional environment variables: No credentials hardcoded in the codebase
+    @Value("${app.admin.email:}")
     private String adminEmail;
 
-    @Value("${app.admin.password:Apurv@2026}")
+    @Value("${app.admin.password:}")
     private String adminPassword;
 
-    @Value("${app.staff.email:staff@dermaaline.com}")
+    @Value("${app.staff.email:}")
     private String staffEmail;
 
-    @Value("${app.staff.password:Staff@2026}")
+    @Value("${app.staff.password:}")
     private String staffPassword;
 
     @Bean
     public CommandLineRunner initAdminUser(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         return args -> {
-            // 1. Initialize / Synchronize Admin
-            try {
-                User admin = userRepository.findByEmail(adminEmail).orElse(null);
-                String encodedAdminPass = passwordEncoder.encode(adminPassword);
-                
-                if (admin == null) {
-                    admin = new User();
-                    admin.setEmail(adminEmail);
-                    admin.setFullName("Apurv Dwivedi");
-                    admin.setPassword(encodedAdminPass);
-                    try {
-                        admin.setRole(User.Role.valueOf("SUPER_ADMIN"));
-                    } catch (Exception e) {
-                        try {
-                            admin.setRole(User.Role.valueOf("ADMIN"));
-                        } catch (Exception ex) {
-                            admin.setRole(User.Role.STAFF);
-                        }
-                    }
-                    userRepository.save(admin);
-                    System.out.println("✅ Admin user created successfully!");
-                } else {
-                    boolean needsSave = false;
-                    if (!passwordEncoder.matches(adminPassword, admin.getPassword())) {
+            // 1. Optional Admin Provisioning (Only runs if explicit environment variables are provided)
+            if (adminEmail != null && !adminEmail.trim().isEmpty() && 
+                adminPassword != null && !adminPassword.trim().isEmpty()) {
+                try {
+                    String cleanEmail = adminEmail.trim().toLowerCase();
+                    User admin = userRepository.findByEmail(cleanEmail).orElse(null);
+                    String encodedAdminPass = passwordEncoder.encode(adminPassword.trim());
+
+                    if (admin == null) {
+                        admin = new User();
+                        admin.setEmail(cleanEmail);
+                        admin.setFullName("Clinic Administrator");
                         admin.setPassword(encodedAdminPass);
-                        needsSave = true;
-                    }
-                    if (admin.getRole() == null || !admin.getRole().name().equals("SUPER_ADMIN")) {
-                        try {
-                            admin.setRole(User.Role.valueOf("SUPER_ADMIN"));
-                            needsSave = true;
-                        } catch (Exception ignored) {}
-                    }
-                    if (needsSave) {
+                        admin.setRole(User.Role.SUPER_ADMIN);
                         userRepository.save(admin);
-                        System.out.println("✅ Admin password reset and role synchronized!");
-                    } else {
-                        System.out.println("✅ Admin user verified: " + admin.getEmail());
+                        logger.info("Admin user successfully initialized from environment variables: {}", cleanEmail);
+                    } else if (!passwordEncoder.matches(adminPassword.trim(), admin.getPassword())) {
+                        admin.setPassword(encodedAdminPass);
+                        userRepository.save(admin);
+                        logger.info("Admin password updated from environment variables for: {}", cleanEmail);
                     }
+                } catch (Throwable t) {
+                    logger.warn("Admin bootstrap notice: {}", t.getMessage());
                 }
-            } catch (Throwable t) {
-                System.err.println("⚠️ AdminBootstrap notice: " + t.getMessage());
+            } else {
+                logger.info("No ADMIN_EMAIL/ADMIN_PASSWORD environment variables set. Existing database credentials remain active.");
             }
 
-            // 2. Initialize / Synchronize Default Worker/Staff User
-            try {
-                User staff = userRepository.findByEmail(staffEmail).orElse(null);
-                String encodedStaffPass = passwordEncoder.encode(staffPassword);
+            // 2. Optional Staff Provisioning (Only runs if explicit environment variables are provided)
+            if (staffEmail != null && !staffEmail.trim().isEmpty() && 
+                staffPassword != null && !staffPassword.trim().isEmpty()) {
+                try {
+                    String cleanStaffEmail = staffEmail.trim().toLowerCase();
+                    User staff = userRepository.findByEmail(cleanStaffEmail).orElse(null);
+                    String encodedStaffPass = passwordEncoder.encode(staffPassword.trim());
 
-                if (staff == null) {
-                    staff = new User();
-                    staff.setEmail(staffEmail);
-                    staff.setFullName("Clinic Staff Worker");
-                    staff.setPassword(encodedStaffPass);
-                    staff.setRole(User.Role.STAFF);
-                    userRepository.save(staff);
-                    System.out.println("✅ Demo staff worker created successfully: " + staffEmail);
-                } else {
-                    if (staff.getRole() != User.Role.STAFF) {
+                    if (staff == null) {
+                        staff = new User();
+                        staff.setEmail(cleanStaffEmail);
+                        staff.setFullName("Salon Staff Worker");
+                        staff.setPassword(encodedStaffPass);
                         staff.setRole(User.Role.STAFF);
                         userRepository.save(staff);
+                        logger.info("Staff user successfully initialized from environment variables: {}", cleanStaffEmail);
+                    } else if (!passwordEncoder.matches(staffPassword.trim(), staff.getPassword())) {
+                        staff.setPassword(encodedStaffPass);
+                        userRepository.save(staff);
+                        logger.info("Staff password updated from environment variables for: {}", cleanStaffEmail);
                     }
-                    System.out.println("✅ Staff worker verified: " + staff.getEmail());
+                } catch (Throwable t) {
+                    logger.warn("Staff bootstrap notice: {}", t.getMessage());
                 }
-            } catch (Throwable t) {
-                System.err.println("⚠️ Staff bootstrap notice: " + t.getMessage());
             }
         };
     }
