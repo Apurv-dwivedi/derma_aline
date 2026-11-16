@@ -12,7 +12,7 @@ import java.util.List;
 public interface AppointmentRepository extends JpaRepository<Appointment, Long> {
     List<Appointment> findByAppointmentDate(LocalDate appointmentDate);
     List<Appointment> findByCustomerEmail(String customerEmail);
-    
+
+    // Strict LocalTime matching entity property type
     boolean existsByAppointmentDateAndStartTimeAndTreatmentName(LocalDate appointmentDate, LocalTime startTime, String treatmentName);
-    boolean existsByAppointmentDateAndStartTimeAndTreatmentName(LocalDate appointmentDate, String startTime, String treatmentName);
 }
