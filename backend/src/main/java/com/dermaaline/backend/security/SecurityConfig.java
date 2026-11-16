@@ -36,8 +36,8 @@ public class SecurityConfig {
             .cors(cors -> cors.disable())
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll() // CRITICAL: Allow all preflight OPTIONS requests
-                .requestMatchers("/api/auth/**", "/api/contact", "/api/appointments", "/error").permitAll()
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                .requestMatchers("/", "/api/auth/**", "/api/contact", "/api/appointments", "/error").permitAll() // Added root "/" to permitAll
                 .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
