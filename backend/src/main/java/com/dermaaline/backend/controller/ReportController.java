@@ -38,15 +38,15 @@ public class ReportController {
                 .count();
 
             long pendingAppointments = allAppointments.stream()
-                .filter(a -> a.getStatus().name().equalsIgnoreCase(Appointment.AppointmentStatus.PENDING))
+                .filter(a -> a.getStatus().name().equalsIgnoreCase(String.PENDING))
                 .count();
 
             long confirmedAppointments = allAppointments.stream()
-                .filter(a -> a.getStatus().name().equalsIgnoreCase(Appointment.AppointmentStatus.CONFIRMED))
+                .filter(a -> a.getStatus().name().equalsIgnoreCase(String.CONFIRMED))
                 .count();
 
             long completedAppointments = allAppointments.stream()
-                .filter(a -> a.getStatus().name().equalsIgnoreCase(Appointment.AppointmentStatus.COMPLETED))
+                .filter(a -> a.getStatus().name().equalsIgnoreCase(String.COMPLETED))
                 .count();
 
             long totalCustomers = customerRepository.count();
