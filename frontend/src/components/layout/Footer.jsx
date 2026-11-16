@@ -54,7 +54,6 @@ const Footer = () => {
             </p>
             
             <Link to="/admin-login" style={{ display: 'inline-block', backgroundColor: 'var(--color-accent)', color: '#2C221E', padding: '8px 16px', borderRadius: '8px', fontWeight: '700', fontSize: '0.85rem', textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              Admin Portal Login
             </Link>
           </div>
         </div>

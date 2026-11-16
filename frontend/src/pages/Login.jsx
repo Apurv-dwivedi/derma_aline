@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail, Sparkles, AlertCircle } from 'lucide-react';
 import API from '../services/api';
@@ -45,7 +45,6 @@ const Login = () => {
         
         <div style={{ textAlign: 'center', marginBottom: '30px' }}>
           <Sparkles size={32} color="var(--color-accent)" style={{ marginBottom: '10px' }} />
-          <h2>Admin Portal Login</h2>
           <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginTop: '5px' }}>
             Derma Aline Aesthetics Management
           </p>
@@ -80,7 +79,7 @@ const Login = () => {
             <input 
               type="password" 
               className="form-input" 
-              placeholder="••••••••" 
+              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" 
               value={password} 
               onChange={(e) => setPassword(e.target.value)} 
               required 
