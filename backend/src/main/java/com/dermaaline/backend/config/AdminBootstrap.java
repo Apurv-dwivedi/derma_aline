@@ -23,19 +23,19 @@ public class AdminBootstrap {
                 admin.setEmail(adminEmail);
                 admin.setFullName("Apurv Dwivedi");
                 admin.setPassword(encodedPassword);
-                // Set role safely based on your enum
+                admin.setEnabled(true); // Fix not-null constraint on enabled column
                 try {
                     admin.setRole(User.Role.valueOf("ADMIN"));
                 } catch (Exception e) {
-                    // Fallback if ADMIN enum name differs
+                    admin.setRole(User.Role.valueOf("STAFF"));
                 }
                 userRepository.save(admin);
-                System.out.println("✅ Admin user created successfully with hashed password!");
+                System.out.println("✅ Admin user created successfully with enabled=true!");
             } else {
-                // Force update password if it was null or empty
                 admin.setPassword(encodedPassword);
+                admin.setEnabled(true); // Ensure enabled is not null
                 userRepository.save(admin);
-                System.out.println("✅ Admin password reset and synchronized successfully!");
+                System.out.println("✅ Admin password reset and enabled status synchronized!");
             }
         };
     }
