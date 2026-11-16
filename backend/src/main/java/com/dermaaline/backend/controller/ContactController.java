@@ -10,7 +10,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/contact")
-@CrossOrigin(origins = {"https://derma-aline.vercel.app", "http://localhost:5173", "http://localhost:5174"}, allowCredentials = "true")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class ContactController {
 
     @Autowired
