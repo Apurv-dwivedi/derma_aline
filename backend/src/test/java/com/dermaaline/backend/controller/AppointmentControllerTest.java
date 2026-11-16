@@ -38,7 +38,7 @@ public class AppointmentControllerTest {
     @BeforeEach
     void setUp() {
         // Assume no duplicate bookings by default
-        Mockito.when(appointmentRepository.existsByAppointmentDateAndAppointmentTimeAndTreatmentName(
+        Mockito.when(appointmentRepository.existsByAppointmentDateAndStartTimeAndTreatmentName(
                 any(LocalDate.class), any(String.class), any(String.class)
         )).thenReturn(false);
 
@@ -67,7 +67,7 @@ public class AppointmentControllerTest {
     @Test
     public void testDoubleBookingConflict() throws Exception {
         // Force the mock to simulate an existing booking
-        Mockito.when(appointmentRepository.existsByAppointmentDateAndAppointmentTimeAndTreatmentName(
+        Mockito.when(appointmentRepository.existsByAppointmentDateAndStartTimeAndTreatmentName(
                 any(LocalDate.class), any(String.class), any(String.class)
         )).thenReturn(true);
 
