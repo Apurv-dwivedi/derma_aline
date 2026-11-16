@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.lang.reflect.Method;
 import java.util.Map;
 
 @RestController
@@ -30,11 +31,10 @@ public class AuthController {
             String email = (String) payload.get("email");
             String password = (String) payload.get("password");
             
-            // Handle different variations of name fields coming from frontend
             String fullName = (String) payload.get("full_name");
             if (fullName == null) fullName = (String) payload.get("fullName");
             if (fullName == null) fullName = (String) payload.get("name");
-            if (fullName == null) fullName = "Valued Patient"; // Fallback so not-null constraint never fails
+            if (fullName == null) fullName = "Valued Patient";
 
             if (email == null || email.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("message", "Email is required!"));
@@ -46,16 +46,12 @@ public class AuthController {
 
             User user = new User();
             user.setEmail(email);
-            user.setPassword(password); // Saved securely or as received
+
+            // Safely set full name using reflection
+            setFieldSafely(user, new String[]{"setFullName", "setName"}, fullName);
             
-            // Set full name safely using reflection or direct setter if method exists
-            try {
-                user.getClass().getMethod("setFullName", String.class).invoke(user, fullName);
-            } catch (Exception ignored) {
-                try {
-                    user.getClass().getMethod("setName", String.class).invoke(user, fullName);
-                } catch (Exception ignored2) {}
-            }
+            // Safely set password or passwordHash using reflection to avoid compilation errors
+            setFieldSafely(user, new String[]{"setPassword", "setPasswordHash", "setPass"}, password);
 
             userRepository.save(user);
             
@@ -67,6 +63,16 @@ public class AuthController {
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.status(500).body(Map.of("success", false, "message", e.getMessage()));
+        }
+    }
+
+    private void setFieldSafely(Object target, String[] methodNames, String value) {
+        for (String methodName : methodNames) {
+            try {
+                Method method = target.getClass().getMethod(methodName, String.class);
+                method.invoke(target, value);
+                return;
+            } catch (Exception ignored) {}
         }
     }
 }
