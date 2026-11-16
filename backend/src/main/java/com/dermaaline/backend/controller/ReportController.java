@@ -84,20 +84,21 @@ public class ReportController {
 
             long totalCustomers = customerRepository.count();
 
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "totalAppointments", totalAppointments,
-                "pendingAppointments", pendingAppointments,
-                "confirmedAppointments", confirmedAppointments,
-                "completedAppointments", completedAppointments,
-                "cancelledAppointments", cancelledAppointments,
-                "completedRevenue", completedRevenue,
-                "projectedRevenue", projectedRevenue,
-                "totalEstimatedValue", totalEstimatedValue,
-                "averageBookingValue", Math.round(avgBookingValue),
-                "totalCustomers", totalCustomers,
-                "treatmentCounts", treatmentCounts
-            ));
+            Map<String, Object> report = new HashMap<>();
+            report.put("success", true);
+            report.put("totalAppointments", totalAppointments);
+            report.put("pendingAppointments", pendingAppointments);
+            report.put("confirmedAppointments", confirmedAppointments);
+            report.put("completedAppointments", completedAppointments);
+            report.put("cancelledAppointments", cancelledAppointments);
+            report.put("completedRevenue", completedRevenue);
+            report.put("projectedRevenue", projectedRevenue);
+            report.put("totalEstimatedValue", totalEstimatedValue);
+            report.put("averageBookingValue", Math.round(avgBookingValue));
+            report.put("totalCustomers", totalCustomers);
+            report.put("treatmentCounts", treatmentCounts);
+
+            return ResponseEntity.ok(report);
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of(
                 "success", false,
