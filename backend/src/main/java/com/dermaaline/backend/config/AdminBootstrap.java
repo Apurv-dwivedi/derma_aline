@@ -15,10 +15,10 @@ public class AdminBootstrap {
     public CommandLineRunner initAdminUser(UserRepository userRepository, PasswordEncoder passwordEncoder, JdbcTemplate jdbcTemplate) {
         return args -> {
             try {
-                // Safely alter users table to give 'enabled' column a default value of true if it causes constraint issues
-                jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN enabled SET DEFAULT TRUE;");
+                // Drop not-null constraint on password_hash if present in database
+                jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;");
             } catch (Exception e) {
-                // Ignore if column doesn't exist or already has default
+                // Column might not exist or already nullable, ignore safely
             }
 
             String adminEmail = "apurvdwivedi2205@gmail.com";
