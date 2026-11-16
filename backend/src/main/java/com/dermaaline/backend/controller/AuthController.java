@@ -4,6 +4,7 @@ import com.dermaaline.backend.entity.User;
 import com.dermaaline.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.lang.reflect.Method;
@@ -16,6 +17,9 @@ public class AuthController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired(required = false)
+    private PasswordEncoder passwordEncoder;
 
     @GetMapping("/")
     public ResponseEntity<?> rootEndpoint() {
@@ -30,7 +34,7 @@ public class AuthController {
     public ResponseEntity<?> registerUser(@RequestBody Map<String, Object> payload) {
         try {
             String email = (String) payload.get("email");
-            String password = (String) payload.get("password");
+            String rawPassword = (String) payload.get("password");
             
             String fullName = (String) payload.get("full_name");
             if (fullName == null) fullName = (String) payload.get("fullName");
@@ -53,12 +57,15 @@ public class AuthController {
             User user = new User();
             user.setEmail(email);
 
+            // Hash password securely if encoder is available
+            String encodedPassword = (passwordEncoder != null && rawPassword != null) ? passwordEncoder.encode(rawPassword) : rawPassword;
+
             setFieldSafely(user, new String[]{"setFullName", "setName"}, fullName);
-            setFieldSafely(user, new String[]{"setPassword", "setPasswordHash", "setPass"}, password);
+            setFieldSafely(user, new String[]{"setPassword", "setPasswordHash", "setPass"}, encodedPassword);
             setFieldSafely(user, new String[]{"setPhone", "setMobile", "setPhoneNumber"}, phone);
             setBooleanFieldSafely(user, new String[]{"setEnabled", "setActive"}, true);
 
-            // Robust role assignment
+            // Assign default role safely
             for (Method method : user.getClass().getMethods()) {
                 if (method.getName().equals("setRole") && method.getParameterCount() == 1) {
                     Class<?> paramType = method.getParameterTypes()[0];
@@ -112,7 +119,6 @@ public class AuthController {
                 return ResponseEntity.status(401).body(Map.of("success", false, "message", "Invalid email or password"));
             }
 
-            // Return success with mock token so frontend logs in successfully
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Login successful",
