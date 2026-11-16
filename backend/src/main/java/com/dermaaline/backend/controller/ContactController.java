@@ -31,4 +31,12 @@ public class ContactController {
             return ResponseEntity.badRequest().body(Map.of("error", "Failed to save message"));
         }
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteContactMessage(@PathVariable Long id) {
+        return contactRepository.findById(id).map(msg -> {
+            contactRepository.delete(msg);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Message deleted successfully"));
+        }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Message not found")));
+    }
 }

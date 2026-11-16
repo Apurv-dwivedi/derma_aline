@@ -85,7 +85,18 @@ const AdminDashboard = () => {
 
   const handleEditClick = (appt) => {
     setEditingId(appt.id);
-    setEditForm(appt);
+    let dateStr = appt.appointmentDate || '';
+    if (typeof dateStr === 'string' && dateStr.includes('T')) {
+      dateStr = dateStr.split('T')[0];
+    }
+    setEditForm({
+      ...appt,
+      patientName: appt.patientName || appt.customerName || '',
+      customerName: appt.customerName || appt.patientName || '',
+      appointmentDate: dateStr,
+      appointmentTime: appt.appointmentTime || '10:00',
+      status: appt.status || 'PENDING'
+    });
   };
 
   const handleSaveEdit = async (id) => {
@@ -96,7 +107,7 @@ const AdminDashboard = () => {
       fetchData();
     } catch (err) {
       console.error("Failed to update appointment:", err);
-      alert('Error updating appointment');
+      alert(err.response?.data?.message || 'Error updating appointment');
     }
   };
 

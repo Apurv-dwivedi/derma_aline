@@ -108,4 +108,57 @@ public class AppointmentController {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Status is required"));
         }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Appointment not found")));
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateAppointment(@PathVariable Long id, @RequestBody Map<String, Object> payload) {
+        return appointmentRepository.findById(id).map(appointment -> {
+            String patientName = (String) payload.getOrDefault("patientName", payload.get("customerName"));
+            String email = (String) payload.getOrDefault("email", payload.get("customerEmail"));
+            String phone = (String) payload.getOrDefault("phone", payload.get("customerPhone"));
+            String treatmentName = (String) payload.get("treatmentName");
+            String dateStr = (String) payload.get("appointmentDate");
+            String timeStr = (String) payload.get("appointmentTime");
+            String status = (String) payload.get("status");
+            String notes = (String) payload.get("notes");
+
+            if (patientName != null && !patientName.trim().isEmpty()) {
+                appointment.setCustomerName(patientName.trim());
+                appointment.setPatientName(patientName.trim());
+            }
+            if (email != null && !email.trim().isEmpty()) {
+                appointment.setCustomerEmail(email.trim().toLowerCase());
+                appointment.setEmail(email.trim().toLowerCase());
+            }
+            if (phone != null) {
+                appointment.setCustomerPhone(phone.trim());
+                appointment.setPhone(phone.trim());
+            }
+            if (treatmentName != null && !treatmentName.trim().isEmpty()) {
+                appointment.setTreatmentName(treatmentName.trim());
+            }
+            if (status != null && !status.trim().isEmpty()) {
+                appointment.setStatus(status.trim().toUpperCase());
+            }
+            if (timeStr != null) {
+                appointment.setAppointmentTime(timeStr);
+            }
+            if (notes != null) {
+                appointment.setNotes(notes);
+            }
+            if (dateStr != null && !dateStr.trim().isEmpty()) {
+                appointment.setAppointmentDate(parseAppointmentDate(dateStr, timeStr));
+            }
+
+            appointmentRepository.save(appointment);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Appointment updated successfully"));
+        }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Appointment not found")));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteAppointment(@PathVariable Long id) {
+        return appointmentRepository.findById(id).map(appointment -> {
+            appointmentRepository.delete(appointment);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Appointment deleted successfully"));
+        }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Appointment not found")));
+    }
 }
