@@ -57,16 +57,13 @@ const Booking = () => {
     try {
       // Create a payload without the UI-only consent boolean
       const { consent, ...payload } = formData;
-      await API.post('/appointments', payload);
+      const res = await API.post('/appointments', payload);
       
-      setStatus({ type: 'success', message: 'Booking confirmed! We will contact you shortly.' });
+      setStatus({ type: 'success', message: res.data?.message || 'Booking confirmed! We will contact you shortly.' });
       setFormData({ ...formData, appointmentDate: '', appointmentTime: '10:00', notes: '', consent: false });
     } catch (error) {
-      if (error.response && error.response.status === 409) {
-        setStatus({ type: 'error', message: error.response.data }); // Double booking error
-      } else {
-        setStatus({ type: 'error', message: 'Failed to book appointment. Please try again later.' });
-      }
+      const errMsg = error.response?.data?.message || error.response?.data || 'Failed to book appointment. Please check your details.';
+      setStatus({ type: 'error', message: typeof errMsg === 'string' ? errMsg : 'Failed to book appointment. Please try again later.' });
     } finally {
       setLoading(false);
     }
