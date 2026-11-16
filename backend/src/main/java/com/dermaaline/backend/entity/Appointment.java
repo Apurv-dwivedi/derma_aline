@@ -24,7 +24,7 @@ public class Appointment {
     private LocalTime endTime;
 
     @Enumerated(EnumType.STRING)
-    private AppointmentStatus status = AppointmentStatus.PENDING;
+    private String status = AppointmentStatus.PENDING;
 
     @Enumerated(EnumType.STRING)
     private PaymentStatus paymentStatus = PaymentStatus.PENDING;
@@ -73,8 +73,8 @@ public class Appointment {
     public LocalTime getEndTime() { return endTime; }
     public void setEndTime(LocalTime endTime) { this.endTime = endTime; }
 
-    public AppointmentStatus getStatus() { return status; }
-    public void setStatus(AppointmentStatus status) { this.status = status; this.updatedAt = LocalDateTime.now(); }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; this.updatedAt = LocalDateTime.now(); }
 
     public PaymentStatus getPaymentStatus() { return paymentStatus; }
     public void setPaymentStatus(PaymentStatus paymentStatus) { this.paymentStatus = paymentStatus; }
