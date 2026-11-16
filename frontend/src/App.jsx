@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar.jsx';
 import Footer from './components/layout/Footer.jsx';
@@ -42,7 +42,7 @@ function App() {
               <Route path="/profile" element={<Profile />} />
               <Route path="/privacy" element={<Privacy />} />
 
-              {/* Admin Routes */}
+              
               <Route path="/admin-login" element={<Login />} />
               <Route path="/admin" element={ <ProtectedRoute requireAdmin={true}><AdminDashboard /></ProtectedRoute> } />
 
