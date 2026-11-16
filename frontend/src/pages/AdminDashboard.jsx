@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, CheckCircle, Clock, Edit2, Trash2, X, Save, LogOut, RefreshCw, MessageSquare, Mail, Phone, Search, XCircle } from 'lucide-react';
+import { 
+  Calendar, CheckCircle, Clock, Edit2, Trash2, X, Save, LogOut, 
+  RefreshCw, MessageSquare, Mail, Phone, Search, DollarSign, 
+  TrendingUp, Users, UserPlus, Shield, Briefcase, Award
+} from 'lucide-react';
 import API from '../services/api';
 import '../styles/pages.css';
 
@@ -12,6 +16,28 @@ const AdminDashboard = () => {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Financial & Report State
+  const [reports, setReports] = useState({
+    completedRevenue: 0,
+    projectedRevenue: 0,
+    totalEstimatedValue: 0,
+    averageBookingValue: 0,
+    totalCustomers: 0,
+    treatmentCounts: {}
+  });
+
+  // Staff State
+  const [staffInvitations, setStaffInvitations] = useState([]);
+  const [newStaff, setNewStaff] = useState({
+    fullName: '',
+    email: '',
+    designation: 'Skin Therapist',
+    password: ''
+  });
+  const [staffActionLoading, setStaffActionLoading] = useState(false);
+  const [staffSuccess, setStaffSuccess] = useState('');
+  const [staffError, setStaffError] = useState('');
   
   // Search and Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,12 +50,27 @@ const AdminDashboard = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const apptRes = await API.get('/appointments');
-      const msgRes = await API.get('/contact');
-      // Sort appointments by ID descending (newest first)
-      setAppointments(apptRes.data.sort((a, b) => b.id - a.id));
-      setMessages(msgRes.data.sort((a, b) => b.id - a.id));
       setError('');
+
+      const [apptRes, msgRes, reportRes, staffRes] = await Promise.allSettled([
+        API.get('/appointments'),
+        API.get('/contact'),
+        API.get('/admin/reports/overview'),
+        API.get('/admin/staff/invitations')
+      ]);
+
+      if (apptRes.status === 'fulfilled') {
+        setAppointments((apptRes.value.data || []).sort((a, b) => b.id - a.id));
+      }
+      if (msgRes.status === 'fulfilled') {
+        setMessages((msgRes.value.data || []).sort((a, b) => b.id - a.id));
+      }
+      if (reportRes.status === 'fulfilled' && reportRes.value.data) {
+        setReports(reportRes.value.data);
+      }
+      if (staffRes.status === 'fulfilled') {
+        setStaffInvitations(staffRes.value.data || []);
+      }
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
       setError('Failed to load data. Your session may have expired.');
@@ -50,7 +91,7 @@ const AdminDashboard = () => {
   const handleSaveEdit = async (id) => {
     const targetId = typeof id === 'object' ? id.id : id;
     try {
-      await API.put(/appointments/ + targetId, editForm);
+      await API.put('/appointments/' + targetId, editForm);
       setEditingId(null);
       fetchData();
     } catch (err) {
@@ -83,6 +124,48 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleEnrollStaff = async (e) => {
+    e.preventDefault();
+    if (!newStaff.email || !newStaff.fullName) {
+      setStaffError('Please provide both staff member name and work email.');
+      return;
+    }
+    try {
+      setStaffActionLoading(true);
+      setStaffError('');
+      setStaffSuccess('');
+
+      const res = await API.post('/admin/staff/invitations', newStaff);
+      if (res.data && res.data.success) {
+        setStaffSuccess(`Successfully enrolled ${newStaff.fullName} as ${newStaff.designation}!`);
+        setNewStaff({ fullName: '', email: '', designation: 'Skin Therapist', password: '' });
+        // Refresh staff list
+        const updatedStaff = await API.get('/admin/staff/invitations');
+        setStaffInvitations(updatedStaff.data || []);
+      } else {
+        setStaffError(res.data?.message || 'Failed to enroll staff member.');
+      }
+    } catch (err) {
+      console.error("Staff enrollment error:", err);
+      setStaffError(err.response?.data?.message || 'Server error while enrolling staff.');
+    } finally {
+      setStaffActionLoading(false);
+    }
+  };
+
+  const handleRevokeStaff = async (id) => {
+    if (window.confirm("Are you sure you want to revoke this staff member's credentials? They will no longer be able to log in to the staff portal.")) {
+      try {
+        await API.delete('/admin/staff/invitations/' + id);
+        setStaffSuccess('Staff account and access revoked.');
+        const updatedStaff = await API.get('/admin/staff/invitations');
+        setStaffInvitations(updatedStaff.data || []);
+      } catch (err) {
+        alert('Failed to revoke staff access.');
+      }
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('role');
@@ -105,7 +188,9 @@ const AdminDashboard = () => {
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
         <div>
           <h1>Admin Control Dashboard</h1>
-          <p style={{ color: 'var(--text-light)' }}>Manage live clinic appointments and incoming patient queries.</p>
+          <p style={{ color: 'var(--text-light)' }}>
+            Super Admin Suite: Financial revenues, clinic operations, live bookings, and staff management.
+          </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button className="btn-primary" onClick={fetchData} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px' }}>
@@ -117,58 +202,110 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {error && <div style={{ padding: '15px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '8px', marginBottom: '25px' }}>{error}</div>}
-
-      {/* Stats Cards */}
-      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', marginBottom: '30px' }}>
-        <div style={{ flex: 1, minWidth: '200px', backgroundColor: 'var(--bg-white)', padding: '25px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-            <Calendar size={24} color="var(--color-accent)" />
-            <h3 style={{ fontSize: '1.1rem', color: 'var(--text-light)' }}>Total Bookings</h3>
-          </div>
-          <p style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--color-primary)' }}>{appointments.length}</p>
+      {error && (
+        <div style={{ padding: '15px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '8px', marginBottom: '25px' }}>
+          {error}
         </div>
+      )}
 
-        <div style={{ flex: 1, minWidth: '200px', backgroundColor: 'var(--bg-white)', padding: '25px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-            <Clock size={24} color="#e0a800" />
-            <h3 style={{ fontSize: '1.1rem', color: 'var(--text-light)' }}>Pending</h3>
-          </div>
-          <p style={{ fontSize: '2rem', fontWeight: '700', color: '#e0a800' }}>
-            {appointments.filter(a => a.status === 'PENDING').length}
-          </p>
-        </div>
+      {/* Top Stats & Financial Summary Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '30px' }}>
         
-        <div style={{ flex: 1, minWidth: '200px', backgroundColor: 'var(--bg-white)', padding: '25px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-            <CheckCircle size={24} color="#28a745" />
-            <h3 style={{ fontSize: '1.1rem', color: 'var(--text-light)' }}>Confirmed</h3>
+        {/* Revenue Collected */}
+        <div style={{ backgroundColor: 'var(--bg-white)', padding: '22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Revenue Collected</span>
+            <TrendingUp size={22} color="#155724" />
           </div>
-          <p style={{ fontSize: '2rem', fontWeight: '700', color: '#28a745' }}>
-            {appointments.filter(a => a.status === 'CONFIRMED').length}
+          <p style={{ fontSize: '1.9rem', fontWeight: '800', color: '#155724', margin: '6px 0 2px' }}>
+            ₹{Number(reports.completedRevenue || 0).toLocaleString('en-IN')}
           </p>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>From completed sessions</span>
         </div>
 
-        <div style={{ flex: 1, minWidth: '200px', backgroundColor: 'var(--bg-white)', padding: '25px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-            <MessageSquare size={24} color="var(--color-accent)" />
-            <h3 style={{ fontSize: '1.1rem', color: 'var(--text-light)' }}>Messages</h3>
+        {/* Projected Pipeline */}
+        <div style={{ backgroundColor: 'var(--bg-white)', padding: '22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Projected Pipeline</span>
+            <DollarSign size={22} color="var(--color-primary)" />
           </div>
-          <p style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--color-primary)' }}>{messages.length}</p>
+          <p style={{ fontSize: '1.9rem', fontWeight: '800', color: 'var(--color-primary)', margin: '6px 0 2px' }}>
+            ₹{Number(reports.projectedRevenue || 0).toLocaleString('en-IN')}
+          </p>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>From confirmed bookings</span>
+        </div>
+
+        {/* Total Bookings */}
+        <div style={{ backgroundColor: 'var(--bg-white)', padding: '22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Bookings</span>
+            <Calendar size={22} color="var(--color-accent)" />
+          </div>
+          <p style={{ fontSize: '1.9rem', fontWeight: '800', color: 'var(--color-primary)', margin: '6px 0 2px' }}>
+            {appointments.length}
+          </p>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>
+            {appointments.filter(a => a.status === 'CONFIRMED').length} confirmed • {appointments.filter(a => a.status === 'PENDING').length} pending
+          </span>
+        </div>
+
+        {/* Staff Members */}
+        <div style={{ backgroundColor: 'var(--bg-white)', padding: '22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Staff Workers</span>
+            <Users size={22} color="var(--color-primary)" />
+          </div>
+          <p style={{ fontSize: '1.9rem', fontWeight: '800', color: 'var(--color-primary)', margin: '6px 0 2px' }}>
+            {staffInvitations.length}
+          </p>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>Active salon team members</span>
         </div>
       </div>
 
       {/* Navigation Tabs */}
-      <div style={{ display: 'flex', gap: '15px', marginBottom: '25px' }}>
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '25px', flexWrap: 'wrap' }}>
         <button 
           onClick={() => setActiveTab('appointments')} 
-          style={{ padding: '12px 24px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', backgroundColor: activeTab === 'appointments' ? 'var(--color-accent)' : 'var(--bg-white)', color: activeTab === 'appointments' ? '#fff' : 'var(--color-primary)', boxShadow: 'var(--shadow-soft)' }}>
-          Appointments ({appointments.length})
+          style={{ 
+            padding: '12px 20px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            backgroundColor: activeTab === 'appointments' ? 'var(--color-accent)' : 'var(--bg-white)', 
+            color: activeTab === 'appointments' ? '#fff' : 'var(--color-primary)', 
+            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
+          }}>
+          <Calendar size={16} /> Appointments ({appointments.length})
         </button>
+
+        <button 
+          onClick={() => setActiveTab('revenue')} 
+          style={{ 
+            padding: '12px 20px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            backgroundColor: activeTab === 'revenue' ? 'var(--color-accent)' : 'var(--bg-white)', 
+            color: activeTab === 'revenue' ? '#fff' : 'var(--color-primary)', 
+            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
+          }}>
+          <DollarSign size={16} /> Revenue & Financials
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('staff')} 
+          style={{ 
+            padding: '12px 20px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            backgroundColor: activeTab === 'staff' ? 'var(--color-accent)' : 'var(--bg-white)', 
+            color: activeTab === 'staff' ? '#fff' : 'var(--color-primary)', 
+            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
+          }}>
+          <Users size={16} /> Staff & Workers ({staffInvitations.length})
+        </button>
+
         <button 
           onClick={() => setActiveTab('messages')} 
-          style={{ padding: '12px 24px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', backgroundColor: activeTab === 'messages' ? 'var(--color-accent)' : 'var(--bg-white)', color: activeTab === 'messages' ? '#fff' : 'var(--color-primary)', boxShadow: 'var(--shadow-soft)' }}>
-          Client Messages ({messages.length})
+          style={{ 
+            padding: '12px 20px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            backgroundColor: activeTab === 'messages' ? 'var(--color-accent)' : 'var(--bg-white)', 
+            color: activeTab === 'messages' ? '#fff' : 'var(--color-primary)', 
+            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
+          }}>
+          <MessageSquare size={16} /> Inquiries ({messages.length})
         </button>
       </div>
 
@@ -177,9 +314,9 @@ const AdminDashboard = () => {
         <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
           
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '1.5rem', color: 'var(--color-primary)', fontFamily: 'var(--font-heading)', margin: 0 }}>Live Patient Appointments</h2>
+            <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', fontFamily: 'var(--font-heading)', margin: 0 }}>Live Patient Appointments</h2>
             
-            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
               <div style={{ position: 'relative' }}>
                 <Search size={18} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-light)' }} />
                 <input 
@@ -279,10 +416,287 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Tab 2: Client Messages Table */}
+      {/* Tab 2: Revenue & Financials */}
+      {activeTab === 'revenue' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+          {/* Revenue Metric Breakdown */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
+            <div style={{ backgroundColor: 'var(--bg-white)', padding: '24px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <TrendingUp size={20} color="#155724" />
+                <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Realized Revenue</h4>
+              </div>
+              <p style={{ fontSize: '2.2rem', fontWeight: '800', color: '#155724', margin: '8px 0' }}>
+                ₹{Number(reports.completedRevenue || 0).toLocaleString('en-IN')}
+              </p>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)' }}>
+                Total income collected from {reports.completedAppointments || 0} successfully completed client procedures.
+              </p>
+            </div>
+
+            <div style={{ backgroundColor: 'var(--bg-white)', padding: '24px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <DollarSign size={20} color="var(--color-primary)" />
+                <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Confirmed Pipeline</h4>
+              </div>
+              <p style={{ fontSize: '2.2rem', fontWeight: '800', color: 'var(--color-primary)', margin: '8px 0' }}>
+                ₹{Number(reports.projectedRevenue || 0).toLocaleString('en-IN')}
+              </p>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)' }}>
+                Expected revenue from {reports.confirmedAppointments || 0} confirmed client appointments.
+              </p>
+            </div>
+
+            <div style={{ backgroundColor: 'var(--bg-white)', padding: '24px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <Award size={20} color="var(--color-accent)" />
+                <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Average Ticket Value</h4>
+              </div>
+              <p style={{ fontSize: '2.2rem', fontWeight: '800', color: 'var(--color-primary)', margin: '8px 0' }}>
+                ₹{Number(reports.averageBookingValue || 0).toLocaleString('en-IN')}
+              </p>
+              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)' }}>
+                Average revenue generated per booked aesthetic treatment session.
+              </p>
+            </div>
+          </div>
+
+          {/* Treatment Distribution Table */}
+          <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+            <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', marginBottom: '15px', fontFamily: 'var(--font-heading)' }}>
+              Treatment Volume & Distribution
+            </h3>
+            <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '20px' }}>
+              Detailed breakdown of booking demand across all dermatology and aesthetic services.
+            </p>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border-light)', color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                    <th style={{ padding: '12px' }}>Treatment Name</th>
+                    <th style={{ padding: '12px', textAlign: 'center' }}>Total Bookings</th>
+                    <th style={{ padding: '12px', textAlign: 'right' }}>Volume Share</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reports.treatmentCounts && Object.keys(reports.treatmentCounts).length > 0 ? (
+                    Object.entries(reports.treatmentCounts).map(([name, count]) => {
+                      const percentage = reports.totalAppointments > 0 
+                        ? Math.round((count / reports.totalAppointments) * 100) 
+                        : 0;
+                      return (
+                        <tr key={name} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                          <td style={{ padding: '14px 12px', fontWeight: '600', color: 'var(--color-primary)' }}>
+                            {name}
+                          </td>
+                          <td style={{ padding: '14px 12px', textAlign: 'center', fontWeight: '700' }}>
+                            {count}
+                          </td>
+                          <td style={{ padding: '14px 12px', textAlign: 'right', color: 'var(--text-light)' }}>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                              <span>{percentage}%</span>
+                              <div style={{ width: '80px', height: '6px', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
+                                <div style={{ width: `${percentage}%`, height: '100%', backgroundColor: 'var(--color-accent)' }}></div>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="3" style={{ textAlign: 'center', padding: '25px', color: 'var(--text-light)' }}>
+                        No treatment data recorded yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Staff & Workers Management */}
+      {activeTab === 'staff' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+          
+          {/* Security & Role Policy Banner */}
+          <div style={{ backgroundColor: '#f8f9fa', padding: '18px 24px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <Shield size={28} color="var(--color-primary)" />
+            <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', lineHeight: '1.5' }}>
+              <strong>Role Access Boundary:</strong> Staff members are strictly restricted to the <code>/staff</code> operational queue. They can update appointment status (Confirm, Complete, Cancel) but <strong>cannot</strong> view financial revenue, customer medical notes, or manage accounts.
+            </div>
+          </div>
+
+          {/* Feedback alerts */}
+          {staffSuccess && (
+            <div style={{ padding: '14px 18px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '8px', border: '1px solid #c3e6cb' }}>
+              {staffSuccess}
+            </div>
+          )}
+          {staffError && (
+            <div style={{ padding: '14px 18px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '8px', border: '1px solid #f5c6cb' }}>
+              {staffError}
+            </div>
+          )}
+
+          {/* Enroll New Staff Form */}
+          <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+              <UserPlus size={22} color="var(--color-accent)" />
+              <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', margin: 0, fontFamily: 'var(--font-heading)' }}>
+                Enroll New Salon / Clinic Staff Worker
+              </h3>
+            </div>
+            <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '20px' }}>
+              Create credentials for your clinic therapists, aestheticians, and reception workers to manage daily bookings.
+            </p>
+
+            <form onSubmit={handleEnrollStaff} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
+                  Full Name *
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Priya Sharma" 
+                  value={newStaff.fullName}
+                  onChange={(e) => setNewStaff({ ...newStaff, fullName: e.target.value })}
+                  required
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
+                  Work Email *
+                </label>
+                <input 
+                  type="email" 
+                  placeholder="e.g. priya@dermaaline.com" 
+                  value={newStaff.email}
+                  onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
+                  required
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
+                  Designation / Role
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Skin Therapist, Aesthetician" 
+                  value={newStaff.designation}
+                  onChange={(e) => setNewStaff({ ...newStaff, designation: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
+                  Initial Password (Optional)
+                </label>
+                <input 
+                  type="password" 
+                  placeholder="Default: Staff@2026" 
+                  value={newStaff.password}
+                  onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <button 
+                  type="submit" 
+                  disabled={staffActionLoading}
+                  className="btn-primary" 
+                  style={{ width: '100%', padding: '11px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: '700' }}
+                >
+                  <UserPlus size={16} /> {staffActionLoading ? 'Enrolling...' : 'Enroll Staff Worker'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Active Staff List Table */}
+          <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+            <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', marginBottom: '15px', fontFamily: 'var(--font-heading)' }}>
+              Active Clinic Staff Team
+            </h3>
+            
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border-light)', color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                    <th style={{ padding: '12px' }}>Staff Worker</th>
+                    <th style={{ padding: '12px' }}>Email</th>
+                    <th style={{ padding: '12px' }}>Designation</th>
+                    <th style={{ padding: '12px' }}>Role Clearance</th>
+                    <th style={{ padding: '12px', textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {staffInvitations.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-light)' }}>
+                        No staff workers enrolled yet. Use the form above to enroll your first salon worker.
+                      </td>
+                    </tr>
+                  ) : (
+                    staffInvitations.map((staff) => (
+                      <tr key={staff.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                        <td style={{ padding: '14px 12px' }}>
+                          <div style={{ fontWeight: '600', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Briefcase size={16} color="var(--color-accent)" />
+                            {staff.fullName || 'Clinic Staff'}
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px 12px', color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Mail size={14} /> {staff.email}
+                          </div>
+                        </td>
+                        <td style={{ padding: '14px 12px', color: 'var(--color-primary)', fontWeight: '500' }}>
+                          {staff.designation || 'Skin Therapist'}
+                        </td>
+                        <td style={{ padding: '14px 12px' }}>
+                          <span style={{ 
+                            padding: '4px 10px', borderRadius: '15px', fontSize: '0.75rem', fontWeight: '700', 
+                            backgroundColor: '#e2e3e5', color: '#383d41', border: '1px solid #d6d8db'
+                          }}>
+                            OPERATIONAL STAFF
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                          <button 
+                            onClick={() => handleRevokeStaff(staff.id)}
+                            style={{ 
+                              backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', 
+                              borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' 
+                            }}
+                          >
+                            <Trash2 size={13} /> Revoke Access
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* Tab 4: Client Messages Table */}
       {activeTab === 'messages' && (
         <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)', overflowX: 'auto' }}>
-          <h2 style={{ fontSize: '1.5rem', color: 'var(--color-primary)', marginBottom: '20px', fontFamily: 'var(--font-heading)' }}>Client Contact Messages</h2>
+          <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', marginBottom: '20px', fontFamily: 'var(--font-heading)' }}>Client Contact Messages</h2>
           
           {loading ? (
             <p style={{ textAlign: 'center', padding: '30px', color: 'var(--text-light)' }}>Loading messages...</p>
