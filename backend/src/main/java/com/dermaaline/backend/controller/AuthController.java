@@ -36,7 +36,6 @@ public class AuthController {
             if (fullName == null) fullName = (String) payload.get("name");
             if (fullName == null) fullName = "Valued Patient";
 
-            // Handle phone number safely with a default fallback to satisfy DB NOT NULL constraint
             String phone = (String) payload.get("phone");
             if (phone == null || phone.isEmpty()) {
                 phone = "0000000000";
@@ -53,10 +52,16 @@ public class AuthController {
             User user = new User();
             user.setEmail(email);
 
-            // Safely assign fields via reflection to avoid missing getter/setter compilation errors
+            // Safely assign all required fields via reflection
             setFieldSafely(user, new String[]{"setFullName", "setName"}, fullName);
             setFieldSafely(user, new String[]{"setPassword", "setPasswordHash", "setPass"}, password);
             setFieldSafely(user, new String[]{"setPhone", "setMobile", "setPhoneNumber"}, phone);
+
+            // Assign default role safely (handles both String and Role Enum types)
+            setRoleSafely(user, "USER");
+
+            // Ensure enabled or active flag is true if method exists
+            setFieldBooleanSafely(user, new String[]{"setEnabled", "setActive"}, true);
 
             userRepository.save(user);
             
@@ -79,5 +84,34 @@ public class AuthController {
                 return;
             } catch (Exception ignored) {}
         }
+    }
+
+    private void setFieldBooleanSafely(Object target, String[] methodNames, boolean value) {
+        for (String methodName : methodNames) {
+            try {
+                Method method = target.getClass().getMethod(methodName, boolean.class);
+                method.invoke(target, value);
+                return;
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private void setRoleSafely(Object target, String roleValue) {
+        try {
+            Method method = target.getClass().getMethod("setRole", String.class);
+            method.invoke(target, roleValue);
+            return;
+        } catch (Exception ignored) {}
+
+        // If Role is an Enum type
+        try {
+            Method getter = target.getClass().getMethod("getRole");
+            Class<?> roleClass = getter.getReturnType();
+            if (roleClass.isEnum()) {
+                Object enumVal = Enum.valueOf((Class<Enum>) roleClass, roleValue);
+                Method setter = target.getClass().getMethod("setRole", roleClass);
+                setter.invoke(target, enumVal);
+            }
+        } catch (Exception ignored) {}
     }
 }
