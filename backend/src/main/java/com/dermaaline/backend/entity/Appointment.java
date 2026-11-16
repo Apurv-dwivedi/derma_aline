@@ -1,4 +1,5 @@
 package com.dermaaline.backend.entity;
+
 import jakarta.persistence.*;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -7,51 +8,86 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "appointments")
 public class Appointment {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Links to the registered User (nullable for guest bookings)
-    @Column(name = "user_id") private Long userId;
-
-    @Column(nullable = false) private String patientName;
-    @Column(nullable = false) private String email;
-    @Column(nullable = false) private String phone;
-
-    @Column(nullable = false) private String treatmentName;
+    private String customerName;
+    private String customerEmail;
+    private String customerPhone;
     
-    @Column(nullable = false) private LocalDate appointmentDate;
-    @Column(nullable = false) private String appointmentTime; // Using String temporarily to preserve frontend compatibility
+    private String treatmentName;
+    
+    private LocalDate appointmentDate;
+    private LocalTime startTime;
+    private LocalTime endTime;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false) private AppointmentStatus status = AppointmentStatus.PENDING;
+    private AppointmentStatus status = AppointmentStatus.PENDING;
 
-    @Column(length = 1000) private String notes;
+    @Enumerated(EnumType.STRING)
+    private PaymentStatus paymentStatus = PaymentStatus.PENDING;
 
-    @Column(updatable = false) private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private String assignedStaff;
+    
+    @Column(columnDefinition = "TEXT")
+    private String customerMessage;
 
-    @PrePersist protected void onCreate() { this.createdAt = LocalDateTime.now(); this.updatedAt = LocalDateTime.now(); }
-    @PreUpdate protected void onUpdate() { this.updatedAt = LocalDateTime.now(); }
+    @Column(columnDefinition = "TEXT")
+    private String internalNotes;
+
+    private LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
+    public enum AppointmentStatus {
+        PENDING, CONFIRMED, REJECTED, RESCHEDULED, CANCELLED, COMPLETED, NO_SHOW
+    }
+
+    public enum PaymentStatus {
+        PENDING, PAID, FAILED, PARTIALLY_PAID, REFUNDED
+    }
 
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-    public Long getUserId() { return userId; }
-    public void setUserId(Long userId) { this.userId = userId; }
-    public String getPatientName() { return patientName; }
-    public void setPatientName(String patientName) { this.patientName = patientName; }
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
-    public String getPhone() { return phone; }
-    public void setPhone(String phone) { this.phone = phone; }
+
+    public String getCustomerName() { return customerName; }
+    public void setCustomerName(String customerName) { this.customerName = customerName; }
+
+    public String getCustomerEmail() { return customerEmail; }
+    public void setCustomerEmail(String customerEmail) { this.customerEmail = customerEmail; }
+
+    public String getCustomerPhone() { return customerPhone; }
+    public void setCustomerPhone(String customerPhone) { this.customerPhone = customerPhone; }
+
     public String getTreatmentName() { return treatmentName; }
     public void setTreatmentName(String treatmentName) { this.treatmentName = treatmentName; }
+
     public LocalDate getAppointmentDate() { return appointmentDate; }
     public void setAppointmentDate(LocalDate appointmentDate) { this.appointmentDate = appointmentDate; }
-    public String getAppointmentTime() { return appointmentTime; }
-    public void setAppointmentTime(String appointmentTime) { this.appointmentTime = appointmentTime; }
+
+    public LocalTime getStartTime() { return startTime; }
+    public void setStartTime(LocalTime startTime) { this.startTime = startTime; }
+
+    public LocalTime getEndTime() { return endTime; }
+    public void setEndTime(LocalTime endTime) { this.endTime = endTime; }
+
     public AppointmentStatus getStatus() { return status; }
-    public void setStatus(AppointmentStatus status) { this.status = status; }
-    public String getNotes() { return notes; }
-    public void setNotes(String notes) { this.notes = notes; }
+    public void setStatus(AppointmentStatus status) { this.status = status; this.updatedAt = LocalDateTime.now(); }
+
+    public PaymentStatus getPaymentStatus() { return paymentStatus; }
+    public void setPaymentStatus(PaymentStatus paymentStatus) { this.paymentStatus = paymentStatus; }
+
+    public String getAssignedStaff() { return assignedStaff; }
+    public void setAssignedStaff(String assignedStaff) { this.assignedStaff = assignedStaff; }
+
+    public String getCustomerMessage() { return customerMessage; }
+    public void setCustomerMessage(String customerMessage) { this.customerMessage = customerMessage; }
+
+    public String getInternalNotes() { return internalNotes; }
+    public void setInternalNotes(String internalNotes) { this.internalNotes = internalNotes; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
 }
