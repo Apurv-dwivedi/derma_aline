@@ -2,43 +2,66 @@ package com.dermaaline.backend.controller;
 
 import com.dermaaline.backend.entity.Treatment;
 import com.dermaaline.backend.repository.TreatmentRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/treatments")
+@CrossOrigin(origins = "*")
 public class TreatmentController {
 
-    private final TreatmentRepository treatmentRepository;
+    @Autowired
+    private TreatmentRepository treatmentRepository;
 
-    public TreatmentController(TreatmentRepository treatmentRepository) {
-        this.treatmentRepository = treatmentRepository;
-    }
-
-    // Public Endpoint: Fetch all active treatments for the booking page
     @GetMapping
-    public List<Treatment> getActiveTreatments() {
-        return treatmentRepository.findByActiveTrue();
+    public ResponseEntity<List<Treatment>> getAllTreatments() {
+        return ResponseEntity.ok(treatmentRepository.findAll());
     }
 
-    // Admin Endpoint: Add a new treatment
+    @GetMapping("/active")
+    public ResponseEntity<List<Treatment>> getActiveTreatments() {
+        return ResponseEntity.ok(treatmentRepository.findByActiveTrue());
+    }
+
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Treatment> createTreatment(@RequestBody Treatment treatment) {
-        return ResponseEntity.ok(treatmentRepository.save(treatment));
+    public ResponseEntity<?> createTreatment(@RequestBody Treatment treatment) {
+        try {
+            Treatment saved = treatmentRepository.save(treatment);
+            return ResponseEntity.ok(Map.of("success", true, "message", "Treatment created successfully", "id", saved.getId()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", e.getMessage()));
+        }
     }
 
-    // Admin Endpoint: Toggle active status (Soft Delete)
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateTreatment(@PathVariable Long id, @RequestBody Treatment details) {
+        Optional<Treatment> opt = treatmentRepository.findById(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("success", false, "message", "Treatment not found"));
+        }
+        Treatment t = opt.get();
+        t.setName(details.getName());
+        t.setCategory(details.getCategory());
+        t.setDescription(details.getDescription());
+        t.setPrice(details.getPrice());
+        t.setDurationMinutes(details.getDurationMinutes());
+        t.setActive(details.isActive());
+        
+        treatmentRepository.save(t);
+        return ResponseEntity.ok(Map.of("success", true, "message", "Treatment updated successfully"));
+    }
+
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> deactivateTreatment(@PathVariable Long id) {
-        return treatmentRepository.findById(id).map(treatment -> {
-            treatment.setActive(false);
-            treatmentRepository.save(treatment);
-            return ResponseEntity.ok().build();
-        }).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> deleteTreatment(@PathVariable Long id) {
+        if (!treatmentRepository.existsById(id)) {
+            return ResponseEntity.status(404).body(Map.of("success", false, "message", "Treatment not found"));
+        }
+        treatmentRepository.deleteById(id);
+        return ResponseEntity.ok(Map.of("success", true, "message", "Treatment deleted successfully"));
     }
 }
