@@ -23,7 +23,7 @@ public class SecurityConfig {
             .cors(cors -> {})
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                .requestMatchers("/api/auth/**", "/api/appointments/**", "/api/treatments/**", "/api/customers/**", "/api/admin/**", "/api/staff/**", "/**").permitAll()
+                .requestMatchers("/api/auth/**", "/api/appointments/**", "/api/treatments/**", "/api/customers/**", "/api/admin/**", "/api/staff/**", "/api/**","/**").permitAll()
                 .anyRequest().permitAll()
             );
         return http.build();
