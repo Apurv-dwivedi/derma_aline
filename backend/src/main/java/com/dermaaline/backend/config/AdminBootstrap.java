@@ -15,11 +15,13 @@ public class AdminBootstrap {
     public CommandLineRunner initAdminUser(UserRepository userRepository, PasswordEncoder passwordEncoder, JdbcTemplate jdbcTemplate) {
         return args -> {
             try {
-                // Drop not-null constraint on password_hash if present in database
+                // Safely drop constraints on both password and password_hash if they exist
                 jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;");
-            } catch (Exception e) {
-                // Column might not exist or already nullable, ignore safely
-            }
+            } catch (Exception e) {}
+
+            try {
+                jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN password DROP NOT NULL;");
+            } catch (Exception e) {}
 
             String adminEmail = "apurvdwivedi2205@gmail.com";
             User admin = userRepository.findByEmail(adminEmail).orElse(null);
@@ -37,11 +39,11 @@ public class AdminBootstrap {
                     admin.setRole(User.Role.valueOf("STAFF"));
                 }
                 userRepository.save(admin);
-                System.out.println("✅ Admin user created successfully!");
+                System.out.println("✅ Admin user created safely!");
             } else {
                 admin.setPassword(encodedPassword);
                 userRepository.save(admin);
-                System.out.println("✅ Admin password reset successfully!");
+                System.out.println("✅ Admin password updated safely!");
             }
         };
     }
