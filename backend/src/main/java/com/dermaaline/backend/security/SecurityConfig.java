@@ -30,7 +30,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/", "/api/health", "/error").permitAll()
                 .requestMatchers("/api/auth/**", "/api/treatments/active").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/appointments").permitAll()
+                .requestMatchers("/api/appointments/**").permitAll()
                 .requestMatchers("/api/admin/**").permitAll()
                 .requestMatchers("/api/staff/**").permitAll()
                 .anyRequest().authenticated()
