@@ -15,10 +15,10 @@ public class AdminBootstrap {
     public CommandLineRunner initAdminUser(UserRepository userRepository, PasswordEncoder passwordEncoder, JdbcTemplate jdbcTemplate) {
         return args -> {
             try {
-                // Drop not-null constraint on phone column if present in database
-                jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN phone DROP NOT NULL;");
+                // Drop the restrictive check constraint on role column so any enum role can be saved safely
+                jdbcTemplate.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;");
             } catch (Exception e) {
-                // Ignore if already nullable or column doesn't exist
+                // Ignore if constraint doesn't exist
             }
 
             String adminEmail = "apurvdwivedi2205@gmail.com";
@@ -32,24 +32,19 @@ public class AdminBootstrap {
                 admin.setFullName("Apurv Dwivedi");
                 admin.setPassword(encodedPassword);
                 try {
-                    // Set phone if setter exists or let's handle safely via try-catch
-                    admin.getClass().getMethod("setPhone", String.class).invoke(admin, "0000000000");
-                } catch (Exception e) {}
-
-                try {
                     admin.setRole(User.Role.valueOf("ADMIN"));
                 } catch (Exception e) {
                     admin.setRole(User.Role.valueOf("STAFF"));
                 }
                 userRepository.save(admin);
-                System.out.println("✅ Admin user created successfully with default phone!");
+                System.out.println("✅ Admin user created successfully with role constraint dropped!");
             } else {
                 admin.setPassword(encodedPassword);
                 try {
-                    admin.getClass().getMethod("setPhone", String.class).invoke(admin, "0000000000");
+                    admin.setRole(User.Role.valueOf("ADMIN"));
                 } catch (Exception e) {}
                 userRepository.save(admin);
-                System.out.println("✅ Admin password reset and phone synchronized successfully!");
+                System.out.println("✅ Admin password reset and role synchronized!");
             }
         };
     }
