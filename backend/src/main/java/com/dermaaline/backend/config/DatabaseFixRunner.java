@@ -9,13 +9,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class DatabaseFixRunner {
 
     @Bean
-    public CommandLineRunner fixNullPasswords(JdbcTemplate jdbcTemplate) {
+    public CommandLineRunner ensurePasswordColumnExists(JdbcTemplate jdbcTemplate) {
         return args -> {
             try {
-                // Safely update any existing null passwords in users table to prevent startup crash
-                jdbcTemplate.execute("UPDATE users SET password = '\\\' WHERE password IS NULL;");
+                // Safely add password column to users table if it doesn't exist yet
+                jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS password VARCHAR(255);");
             } catch (Exception e) {
-                // Table might not exist yet during first creation, ignore safely
+                System.out.println("Could not alter table: " + e.getMessage());
             }
         };
     }
