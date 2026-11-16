@@ -28,7 +28,7 @@ public class User {
 
     public enum Role {
         SUPER_ADMIN, STAFF, CUSTOMER
-    }
+    , PATIENT}
 
     // Getters and Setters
     public Long getId() { return id; }
