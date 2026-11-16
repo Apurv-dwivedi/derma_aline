@@ -7,147 +7,63 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Optional;
 
 @RestController
-@RequestMapping
+@RequestMapping("/api/auth")
+@CrossOrigin(origins = "*")
 public class AuthController {
 
     @Autowired
     private UserRepository userRepository;
 
-    @Autowired(required = false)
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @GetMapping("/")
-    public ResponseEntity<?> rootEndpoint() {
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
+        String email = credentials.get("email");
+        String password = credentials.get("password");
+
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", "Invalid email or password"));
+        }
+
+        User user = userOpt.get();
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", "Invalid email or password"));
+        }
+
         return ResponseEntity.ok(Map.of(
-            "app", "Derma Aline Backend API",
-            "status", "Running successfully",
-            "version", "1.0.0"
+            "success", true,
+            "message", "Login successful",
+            "role", user.getRole(),
+            "email", user.getEmail(),
+            "fullName", user.getFullName()
         ));
     }
 
-    @PostMapping("/api/auth/register")
-    public ResponseEntity<?> registerUser(@RequestBody Map<String, Object> payload) {
-        try {
-            String email = (String) payload.get("email");
-            String rawPassword = (String) payload.get("password");
-            
-            String fullName = (String) payload.get("full_name");
-            if (fullName == null) fullName = (String) payload.get("fullName");
-            if (fullName == null) fullName = (String) payload.get("name");
-            if (fullName == null) fullName = "Valued Patient";
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody Map<String, String> payload) {
+        String email = payload.get("email");
+        String oldPassword = payload.get("oldPassword");
+        String newPassword = payload.get("newPassword");
 
-            String phone = (String) payload.get("phone");
-            if (phone == null || phone.isEmpty()) {
-                phone = "0000000000";
-            }
-
-            if (email == null || email.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Email is required!"));
-            }
-
-            if (userRepository.findByEmail(email).isPresent()) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Email is already registered!"));
-            }
-
-            User user = new User();
-            user.setEmail(email);
-
-            // Hash password securely if encoder is available
-            String encodedPassword = (passwordEncoder != null && rawPassword != null) ? passwordEncoder.encode(rawPassword) : rawPassword;
-
-            setFieldSafely(user, new String[]{"setFullName", "setName"}, fullName);
-            setFieldSafely(user, new String[]{"setPassword", "setPasswordHash", "setPass"}, encodedPassword);
-            setFieldSafely(user, new String[]{"setPhone", "setMobile", "setPhoneNumber"}, phone);
-            setBooleanFieldSafely(user, new String[]{"setEnabled", "setActive"}, true);
-
-            // Assign default role safely
-            for (Method method : user.getClass().getMethods()) {
-                if (method.getName().equals("setRole") && method.getParameterCount() == 1) {
-                    Class<?> paramType = method.getParameterTypes()[0];
-                    try {
-                        if (paramType.isEnum()) {
-                            Object enumVal = null;
-                            for (Object constant : paramType.getEnumConstants()) {
-                                if (constant.toString().equalsIgnoreCase("USER") || constant.toString().equalsIgnoreCase("ROLE_USER")) {
-                                    enumVal = constant;
-                                    break;
-                                }
-                            }
-                            if (enumVal == null && paramType.getEnumConstants().length > 0) {
-                                enumVal = paramType.getEnumConstants()[0];
-                            }
-                            method.invoke(user, enumVal);
-                            break;
-                        } else if (paramType.equals(String.class)) {
-                            method.invoke(user, "USER");
-                            break;
-                        }
-                    } catch (Exception ignored) {}
-                }
-            }
-
-            userRepository.save(user);
-            
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Registration successful!",
-                "token", "mock-jwt-token-registration"
-            ));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of("success", false, "message", e.getMessage()));
+        Optional<User> userOpt = userRepository.findByEmail(email);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("success", false, "message", "User not found"));
         }
-    }
 
-    @PostMapping("/api/auth/login")
-    public ResponseEntity<?> loginUser(@RequestBody Map<String, Object> payload) {
-        try {
-            String email = (String) payload.get("email");
-            String password = (String) payload.get("password");
-
-            if (email == null || email.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Email is required!"));
-            }
-
-            Optional<User> userOpt = userRepository.findByEmail(email);
-            if (userOpt.isEmpty()) {
-                return ResponseEntity.status(401).body(Map.of("success", false, "message", "Invalid email or password"));
-            }
-
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Login successful",
-                "token", "mock-jwt-token-login",
-                "user", Map.of("email", email)
-            ));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of("success", false, "message", e.getMessage()));
+        User user = userOpt.get();
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            return ResponseEntity.status(400).body(Map.of("success", false, "message", "Incorrect old password"));
         }
-    }
 
-    private void setFieldSafely(Object target, String[] methodNames, String value) {
-        for (String methodName : methodNames) {
-            try {
-                Method method = target.getClass().getMethod(methodName, String.class);
-                method.invoke(target, value);
-                return;
-            } catch (Exception ignored) {}
-        }
-    }
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
 
-    private void setBooleanFieldSafely(Object target, String[] methodNames, boolean value) {
-        for (String methodName : methodNames) {
-            try {
-                Method method = target.getClass().getMethod(methodName, boolean.class);
-                method.invoke(target, value);
-                return;
-            } catch (Exception ignored) {}
-        }
+        return ResponseEntity.ok(Map.of("success", true, "message", "Password changed successfully!"));
     }
 }
