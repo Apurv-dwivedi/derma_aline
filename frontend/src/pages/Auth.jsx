@@ -107,6 +107,11 @@ const Auth = () => {
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
+    const tokenToUse = resetToken || directResetToken;
+    if (!tokenToUse || !tokenToUse.trim()) {
+      setError('No active reset token found. Please request a new reset link.');
+      return;
+    }
     if (!password) {
       setError('Please enter a new password.');
       return;
@@ -126,7 +131,7 @@ const Auth = () => {
 
     try {
       const response = await axios.post(`${API_BASE_URL}/auth/reset-password`, { 
-        token: resetToken, 
+        token: tokenToUse.trim(), 
         newPassword: password 
       });
       setMessage(response.data?.message || 'Password reset successfully! Redirecting to login...');
@@ -134,6 +139,8 @@ const Auth = () => {
         setMode('login');
         setPassword('');
         setConfirmPassword('');
+        setResetToken('');
+        setDirectResetToken('');
       }, 1800);
     } catch (err) {
       setError(err.response?.data?.message || 'Reset link is invalid or has expired. Please request a new one.');
@@ -297,6 +304,29 @@ const Auth = () => {
 
         {/* Mode: Reset Password (From Email Link) */}
         {mode === 'reset' && (
+          (!resetToken && !directResetToken) ? (
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <p style={{ color: '#991b1b', marginBottom: '16px', fontSize: '0.92rem', lineHeight: '1.5' }}>
+                No active password reset token was found in your link. The link may be expired or already used.
+              </p>
+              <button
+                type="button"
+                onClick={() => { setMode('forgot'); setError(''); setMessage(''); }}
+                style={{
+                  backgroundColor: '#6ba8c9',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '12px 20px',
+                  borderRadius: '8px',
+                  fontSize: '0.95rem',
+                  fontWeight: '600',
+                  cursor: 'pointer'
+                }}
+              >
+                Request New Password Reset Link
+              </button>
+            </div>
+          ) : (
           <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '500', color: '#5a4638', marginBottom: '8px' }}>
@@ -423,6 +453,7 @@ const Auth = () => {
               <ArrowLeft size={16} /> Back to Sign In
             </button>
           </form>
+          )
         )}
 
         {/* Mode: Login or Register */}
