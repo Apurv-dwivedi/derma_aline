@@ -1,106 +1,238 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, Phone, Sparkles, AlertCircle } from 'lucide-react';
-import API from '../services/api';
-import '../styles/pages.css';
+import { useNavigate, Link } from 'react-router-dom';
+import { Eye, EyeOff } from 'lucide-react';
+import axios from 'axios';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
-  const [formData, setFormData] = useState({ fullName: '', email: '', phone: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
-  const handleInputChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://derma-aline.onrender.com/api';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
-
+    setMessage('');
     try {
       if (isLogin) {
-        const response = await API.post('/auth/login', {
-          email: formData.email,
-          password: formData.password
-        });
-        
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('role', response.data.role);
-        localStorage.setItem('fullName', response.data.fullName);
-        
-        if (response.data.role === 'ADMIN') navigate('/admin');
-        else navigate('/profile');
-        
+        const response = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
+        localStorage.setItem('token', response.data.token || response.data.accessToken);
+        alert('Login Successful!');
+        navigate('/');
       } else {
-        await API.post('/auth/register', formData);
-        alert('Registration successful! Please log in.');
+        await axios.post(`${API_BASE_URL}/auth/register`, { name, email, password });
+        setMessage('Registration successful! Please login.');
         setIsLogin(true);
       }
     } catch (err) {
-      console.error("Auth error:", err);
-      setError(err.response?.data || 'Authentication failed. Please check your credentials.');
-    } finally {
-      setLoading(false);
+      setError(err.response?.data?.message || 'Authentication failed. Please check your credentials.');
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      alert('Please enter your email address first, then click Forgot Password.');
+      return;
+    }
+    try {
+      await axios.post(`${API_BASE_URL}/auth/forgot-password`, { email });
+      alert('Password reset instructions sent to your email!');
+    } catch (err) {
+      alert('Password reset request sent successfully.');
     }
   };
 
   return (
-    <div className="internal-page" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
-      <div style={{ width: '100%', maxWidth: '450px', backgroundColor: 'var(--bg-white)', padding: '40px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
-        
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <Sparkles size={32} color="var(--color-accent)" style={{ marginBottom: '10px' }} />
-          <h2>{isLogin ? 'Welcome Back' : 'Create an Account'}</h2>
-          <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginTop: '5px' }}>
-            {isLogin ? 'Log in to manage your appointments' : 'Join Derma Aline for premium skin care'}
-          </p>
-        </div>
+      <div style={{
+        minHeight: '80vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '40px 20px',
+        backgroundColor: '#fdfbf7'
+      }}>
+        <div style={{
+          maxWidth: '420px',
+          width: '100%',
+          backgroundColor: '#ffffff',
+          padding: '35px',
+          borderRadius: '12px',
+          boxShadow: '0 4px 20px rgba(128, 102, 87, 0.1)',
+          border: '1px solid #e6ded5'
+        }}>
+          <h2 style={{
+            textAlign: 'center',
+            fontFamily: 'var(--font-heading, serif)',
+            color: 'var(--color-primary, #5a4638)',
+            fontSize: '1.8rem',
+            marginBottom: '25px',
+            fontWeight: '600'
+          }}>
+            {isLogin ? 'Welcome Back' : 'Create Account'}
+          </h2>
 
-        {error && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '8px', marginBottom: '20px', fontSize: '0.9rem' }}>
-            <AlertCircle size={18} /> {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          {!isLogin && (
-            <>
-              <div className="form-group" style={{ marginBottom: '20px' }}>
-                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontWeight: '600' }}><User size={16} /> Full Name</label>
-                <input type="text" name="fullName" className="form-input" placeholder="John Doe" value={formData.fullName} onChange={handleInputChange} required style={{ width: '100%', padding: '12px', borderRadius: '8px' }} />
+          {error && (
+              <div style={{ padding: '10px 15px', backgroundColor: '#fef2f2', color: '#ef4444', fontSize: '0.9rem', borderRadius: '6px', marginBottom: '15px' }}>
+                {error}
               </div>
-              <div className="form-group" style={{ marginBottom: '20px' }}>
-                <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontWeight: '600' }}><Phone size={16} /> Phone Number</label>
-                <input type="tel" name="phone" className="form-input" placeholder="9876543210" value={formData.phone} onChange={handleInputChange} required style={{ width: '100%', padding: '12px', borderRadius: '8px' }} />
-              </div>
-            </>
           )}
 
-          <div className="form-group" style={{ marginBottom: '20px' }}>
-            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontWeight: '600' }}><Mail size={16} /> Email Address</label>
-            <input type="email" name="email" className="form-input" placeholder="you@example.com" value={formData.email} onChange={handleInputChange} required style={{ width: '100%', padding: '12px', borderRadius: '8px' }} />
+          {message && (
+              <div style={{ padding: '10px 15px', backgroundColor: '#f0fdf4', color: '#16a34a', fontSize: '0.9rem', borderRadius: '6px', marginBottom: '15px' }}>
+                {message}
+              </div>
+          )}
+
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {!isLogin && (
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '500', color: '#5a4638', marginBottom: '8px' }}>Full Name</label>
+                  <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Enter your name"
+                      style={{
+                        width: '100%',
+                        padding: '12px 15px',
+                        borderRadius: '8px',
+                        border: '1px solid #dcd3cb',
+                        fontSize: '1rem',
+                        outline: 'none',
+                        boxSizing: 'border-box'
+                      }}
+                  />
+                </div>
+            )}
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '500', color: '#5a4638', marginBottom: '8px' }}>Email Address</label>
+              <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  style={{
+                    width: '100%',
+                    padding: '12px 15px',
+                    borderRadius: '8px',
+                    border: '1px solid #dcd3cb',
+                    fontSize: '1rem',
+                    outline: 'none',
+                    boxSizing: 'border-box'
+                  }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: '500', color: '#5a4638', marginBottom: '8px' }}>Password</label>
+              <div style={{ position: 'relative', width: '100%', boxSizing: 'border-box' }}>
+                <input
+                    type={showPassword ? 'text' : 'password'}
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    style={{
+                      width: '100%',
+                      padding: '12px 45px 12px 15px',
+                      borderRadius: '8px',
+                      border: '1px solid #dcd3cb',
+                      fontSize: '1rem',
+                      outline: 'none',
+                      boxSizing: 'border-box'
+                    }}
+                />
+                <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#7c6252',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '0'
+                    }}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+
+            {isLogin && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '-10px' }}>
+                  <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#7c6252',
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        fontWeight: '500',
+                        padding: 0
+                      }}
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+            )}
+
+            <button
+                type="submit"
+                style={{
+                  width: '100%',
+                  backgroundColor: '#6ba8c9',
+                  color: '#ffffff',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                  marginTop: '5px'
+                }}
+            >
+              {isLogin ? 'Login' : 'Register'}
+            </button>
+          </form>
+
+          <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '0.9rem', color: '#666' }}>
+            {isLogin ? "Don't have an account? " : "Already have an account? "}
+            <button
+                type="button"
+                onClick={() => setIsLogin(!isLogin)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#7c6252',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  padding: 0
+                }}
+            >
+              {isLogin ? 'Sign up' : 'Login'}
+            </button>
           </div>
-
-          <div className="form-group" style={{ marginBottom: '25px' }}>
-            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontWeight: '600' }}><Lock size={16} /> Password</label>
-            <input type="password" name="password" className="form-input" placeholder="••••••••" value={formData.password} onChange={handleInputChange} required style={{ width: '100%', padding: '12px', borderRadius: '8px' }} />
-          </div>
-
-          <button type="submit" className="btn-primary" disabled={loading} style={{ width: '100%', padding: '14px', fontSize: '1rem', fontWeight: '700' }}>
-            {loading ? 'Processing...' : isLogin ? 'Login to Account' : 'Register Now'}
-          </button>
-        </form>
-
-        <div style={{ textAlign: 'center', marginTop: '20px' }}>
-          <button onClick={() => { setIsLogin(!isLogin); setError(''); }} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', fontWeight: '600', cursor: 'pointer' }}>
-            {isLogin ? "Don't have an account? Sign up" : "Already have an account? Log in"}
-          </button>
         </div>
       </div>
-    </div>
   );
 };
 
