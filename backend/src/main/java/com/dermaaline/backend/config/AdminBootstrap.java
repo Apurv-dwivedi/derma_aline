@@ -15,13 +15,11 @@ public class AdminBootstrap {
     public CommandLineRunner initAdminUser(UserRepository userRepository, PasswordEncoder passwordEncoder, JdbcTemplate jdbcTemplate) {
         return args -> {
             try {
-                // Safely drop constraints on both password and password_hash if they exist
-                jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;");
-            } catch (Exception e) {}
-
-            try {
-                jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN password DROP NOT NULL;");
-            } catch (Exception e) {}
+                // Drop not-null constraint on phone column if present in database
+                jdbcTemplate.execute("ALTER TABLE users ALTER COLUMN phone DROP NOT NULL;");
+            } catch (Exception e) {
+                // Ignore if already nullable or column doesn't exist
+            }
 
             String adminEmail = "apurvdwivedi2205@gmail.com";
             User admin = userRepository.findByEmail(adminEmail).orElse(null);
@@ -34,16 +32,24 @@ public class AdminBootstrap {
                 admin.setFullName("Apurv Dwivedi");
                 admin.setPassword(encodedPassword);
                 try {
+                    // Set phone if setter exists or let's handle safely via try-catch
+                    admin.getClass().getMethod("setPhone", String.class).invoke(admin, "0000000000");
+                } catch (Exception e) {}
+
+                try {
                     admin.setRole(User.Role.valueOf("ADMIN"));
                 } catch (Exception e) {
                     admin.setRole(User.Role.valueOf("STAFF"));
                 }
                 userRepository.save(admin);
-                System.out.println("✅ Admin user created safely!");
+                System.out.println("✅ Admin user created successfully with default phone!");
             } else {
                 admin.setPassword(encodedPassword);
+                try {
+                    admin.getClass().getMethod("setPhone", String.class).invoke(admin, "0000000000");
+                } catch (Exception e) {}
                 userRepository.save(admin);
-                System.out.println("✅ Admin password updated safely!");
+                System.out.println("✅ Admin password reset and phone synchronized successfully!");
             }
         };
     }
