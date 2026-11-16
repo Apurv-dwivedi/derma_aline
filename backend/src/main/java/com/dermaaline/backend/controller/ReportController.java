@@ -1,15 +1,11 @@
 package com.dermaaline.backend.controller;
 
-import com.dermaaline.backend.entity.Appointment;
 import com.dermaaline.backend.repository.AppointmentRepository;
 import com.dermaaline.backend.repository.CustomerRepository;
-import com.dermaaline.backend.repository.TreatmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -23,49 +19,32 @@ public class ReportController {
     @Autowired
     private CustomerRepository customerRepository;
 
-    @Autowired
-    private TreatmentRepository treatmentRepository;
-
     @GetMapping("/overview")
-    public ResponseEntity<?> getDashboardOverview() {
+    public ResponseEntity<?> getOverviewReports() {
         try {
-            List<Appointment> allAppointments = appointmentRepository.findAll();
-            LocalDate today = LocalDate.now();
+            long totalAppointments = appointmentRepository.count();
+            long pendingAppointments = appointmentRepository.findAll().stream()
+                    .filter(a -> "PENDING".equalsIgnoreCase(a.getStatus()))
+                    .count();
+            long confirmedAppointments = appointmentRepository.findAll().stream()
+                    .filter(a -> "CONFIRMED".equalsIgnoreCase(a.getStatus()))
+                    .count();
+            long completedAppointments = appointmentRepository.findAll().stream()
+                    .filter(a -> "COMPLETED".equalsIgnoreCase(a.getStatus()))
+                    .count();
 
-            long totalAppointments = allAppointments.size();
-            long todaysAppointments = allAppointments.stream()
-                .filter(a -> a.getAppointmentDate() != null && a.getAppointmentDate().equals(today))
-                .count();
-
-            long pendingAppointments = allAppointments.stream()
-                .filter(a -> a.getStatus().name().equalsIgnoreCase(String.PENDING))
-                .count();
-
-            long confirmedAppointments = allAppointments.stream()
-                .filter(a -> a.getStatus().name().equalsIgnoreCase(String.CONFIRMED))
-                .count();
-
-            long completedAppointments = allAppointments.stream()
-                .filter(a -> a.getStatus().name().equalsIgnoreCase(String.COMPLETED))
-                .count();
-
-            long totalCustomers = customerRepository.count();
-            long totalTreatments = treatmentRepository.count();
-
-            Map<String, Object> stats = Map.of(
+            return ResponseEntity.ok(Map.of(
+                "success", true,
                 "totalAppointments", totalAppointments,
-                "todaysAppointments", todaysAppointments,
                 "pendingAppointments", pendingAppointments,
                 "confirmedAppointments", confirmedAppointments,
-                "completedAppointments", completedAppointments,
-                "totalCustomers", totalCustomers,
-                "totalTreatments", totalTreatments
-            );
-
-            return ResponseEntity.ok(Map.of("success", true, "data", stats));
+                "completedAppointments", completedAppointments
+            ));
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body(Map.of("success", false, "message", e.getMessage()));
+            return ResponseEntity.status(500).body(Map.of(
+                "success", false,
+                "message", "Failed to load reports: " + e.getMessage()
+            ));
         }
     }
 }

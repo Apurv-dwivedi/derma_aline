@@ -23,7 +23,7 @@ public class StaffPortalController {
             List<Appointment> appointments = appointmentRepository.findAll();
             if (staffName != null && !staffName.isEmpty()) {
                 appointments = appointments.stream()
-                    .filter(a -> staffName.equalsIgnoreCase(a.getAssignedStaff()))
+                    .filter(a -> staffName.equalsIgnoreCase(a.getId() != null))
                     .toList();
             }
             return ResponseEntity.ok(Map.of("success", true, "data", appointments));
