@@ -2,12 +2,13 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/layout/Navbar.jsx';
 import Footer from './components/layout/Footer.jsx';
-import ProtectedRoute from './components/ProtectedRoute.jsx'; // Import ProtectedRoute
+import ProtectedRoute from './components/ProtectedRoute.jsx';
 import Home from './pages/Home.jsx';
 import About from './pages/About.jsx';
 import Treatments from './pages/Treatments.jsx';
 import Booking from './pages/Booking.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
+import StaffDashboard from './pages/StaffDashboard.jsx';
 import Login from './pages/Login.jsx';
 import Auth from './pages/Auth.jsx';
 import Contact from './pages/Contact.jsx';
@@ -42,9 +43,11 @@ function App() {
               <Route path="/profile" element={<Profile />} />
               <Route path="/privacy" element={<Privacy />} />
 
-              
+              {/* Dedicated Internal Salon Access (Admin & Staff) */}
               <Route path="/admin-login" element={<Login />} />
-              <Route path="/admin" element={ <ProtectedRoute requireAdmin={true}><AdminDashboard /></ProtectedRoute> } />
+              <Route path="/staff-login" element={<Login />} />
+              <Route path="/admin" element={<ProtectedRoute requireAdmin={true}><AdminDashboard /></ProtectedRoute>} />
+              <Route path="/staff" element={<ProtectedRoute requireStaff={true}><StaffDashboard /></ProtectedRoute>} />
 
               {/* Catch-all 404 Route */}
               <Route path="*" element={<NotFound />} />

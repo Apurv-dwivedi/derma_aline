@@ -1,4 +1,4 @@
-﻿import { Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import '../../styles/footer.css';
 
 const Footer = () => {
@@ -53,7 +53,8 @@ const Footer = () => {
               📞 <a href="tel:9319544704" style={{ color: '#ffffff', textDecoration: 'none' }}>+91 93195 44704</a>, <a href="tel:8700751880" style={{ color: '#ffffff', textDecoration: 'none' }}>87007 51880</a>
             </p>
             
-            <Link to="/admin-login" style={{ display: 'inline-block', backgroundColor: 'var(--color-accent)', color: '#2C221E', padding: '8px 16px', borderRadius: '8px', fontWeight: '700', fontSize: '0.85rem', textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '1px' }}>
+            <Link to="/admin-login" style={{ display: 'inline-block', backgroundColor: 'var(--color-accent, #c5a880)', color: '#2C221E', padding: '8px 16px', borderRadius: '8px', fontWeight: '700', fontSize: '0.82rem', textDecoration: 'none', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              Salon Team Access
             </Link>
           </div>
         </div>

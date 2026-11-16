@@ -21,7 +21,11 @@ const Auth = () => {
     setMessage('');
     try {
       if (isLogin) {
-        const response = await axios.post(`${API_BASE_URL}/auth/login`, { email, password });
+        const response = await axios.post(`${API_BASE_URL}/auth/login`, { 
+          email, 
+          password, 
+          portal: 'public' 
+        });
         const { token, role, fullName } = response.data;
         const tokenToStore = token || response.data.accessToken || 'authenticated';
         localStorage.setItem('token', tokenToStore);
@@ -29,11 +33,7 @@ const Auth = () => {
         if (fullName) localStorage.setItem('fullName', fullName);
 
         alert('Login Successful!');
-        if (role === 'ADMIN' || role === 'SUPER_ADMIN') {
-          navigate('/admin');
-        } else {
-          navigate('/');
-        }
+        navigate('/');
       } else {
         await axios.post(`${API_BASE_URL}/auth/register`, { fullName: name, name, email, password });
         setMessage('Registration successful! Please login.');
@@ -239,6 +239,12 @@ const Auth = () => {
             >
               {isLogin ? 'Sign up' : 'Login'}
             </button>
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: '16px', paddingTop: '14px', borderTop: '1px solid #f0eae1' }}>
+            <Link to="/admin-login" style={{ fontSize: '0.82rem', color: '#8c7b70', textDecoration: 'none' }}>
+              Salon Therapist / Admin? <span style={{ color: '#5a4638', fontWeight: '600' }}>Team Portal &rarr;</span>
+            </Link>
           </div>
         </div>
       </div>

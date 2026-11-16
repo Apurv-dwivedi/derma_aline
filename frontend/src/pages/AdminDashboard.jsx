@@ -92,8 +92,10 @@ const AdminDashboard = () => {
 
   // Filtering Logic
   const filteredAppointments = appointments.filter(appt => {
-    const matchesSearch = appt.patientName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          appt.treatmentName.toLowerCase().includes(searchTerm.toLowerCase());
+    const name = appt.customerName || appt.patientName || '';
+    const treatment = appt.treatmentName || '';
+    const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          treatment.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'ALL' || appt.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -247,9 +249,9 @@ const AdminDashboard = () => {
                       ) : (
                         <>
                           <td style={{ padding: '15px 12px' }}>
-                            <div style={{ fontWeight: '600', color: 'var(--color-primary)' }}>{appt.patientName}</div>
-                            {appt.email && <div style={{ fontSize: '0.8rem', color: 'var(--text-light)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}><Mail size={12}/> {appt.email}</div>}
-                            {appt.phone && <div style={{ fontSize: '0.8rem', color: 'var(--text-light)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}><Phone size={12}/> {appt.phone}</div>}
+                            <div style={{ fontWeight: '600', color: 'var(--color-primary)' }}>{appt.customerName || appt.patientName}</div>
+                            {(appt.customerEmail || appt.email) && <div style={{ fontSize: '0.8rem', color: 'var(--text-light)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '4px' }}><Mail size={12}/> {appt.customerEmail || appt.email}</div>}
+                            {(appt.customerPhone || appt.phone) && <div style={{ fontSize: '0.8rem', color: 'var(--text-light)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}><Phone size={12}/> {appt.customerPhone || appt.phone}</div>}
                           </td>
                           <td style={{ padding: '15px 12px' }}>{appt.treatmentName}</td>
                           <td style={{ padding: '15px 12px', color: 'var(--text-light)' }}>{appt.appointmentDate}<br/><span style={{ fontSize: '0.9rem' }}>{appt.appointmentTime}</span></td>

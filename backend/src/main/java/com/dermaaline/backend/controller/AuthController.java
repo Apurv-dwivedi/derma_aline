@@ -5,6 +5,7 @@ import com.dermaaline.backend.entity.User;
 import com.dermaaline.backend.repository.UserRepository;
 import com.dermaaline.backend.security.JwtTokenProvider;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,6 +29,9 @@ public class AuthController {
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
+    /**
+     * Patient / Customer Registration (Public)
+     */
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         if (request == null || request.getEmail() == null || request.getEmail().trim().isEmpty()) {
@@ -60,10 +64,15 @@ public class AuthController {
         ));
     }
 
+    /**
+     * Public Patient Login (/auth route):
+     * Strictly blocks ADMIN and STAFF accounts from logging in through public patient portal.
+     */
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
         String email = credentials.get("email");
         String password = credentials.get("password");
+        String portal = credentials.getOrDefault("portal", "public");
 
         if (email == null || password == null) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Email and password are required"));
@@ -77,6 +86,26 @@ public class AuthController {
         User user = userOpt.get();
         if (!passwordEncoder.matches(password, user.getPassword())) {
             return ResponseEntity.status(401).body(Map.of("success", false, "message", "Invalid email or password"));
+        }
+
+        boolean isInternalAccount = (user.getRole() == User.Role.SUPER_ADMIN || 
+                                     user.getRole() == User.Role.STAFF || 
+                                     "ADMIN".equalsIgnoreCase(user.getRole().name()));
+
+        // If public portal (/auth), forbid admin and staff
+        if ("public".equalsIgnoreCase(portal) && isInternalAccount) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "success", false,
+                "message", "Access Restricted: Staff and Admin accounts must login via the Internal Salon Portal (/admin-login)."
+            ));
+        }
+
+        // If internal portal (/admin-login), forbid standard patients
+        if ("internal".equalsIgnoreCase(portal) && !isInternalAccount) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "success", false,
+                "message", "Access Denied: Patient accounts cannot access internal staff portals."
+            ));
         }
 
         String token = jwtTokenProvider.generateToken(
@@ -93,6 +122,15 @@ public class AuthController {
             "email", user.getEmail(),
             "fullName", user.getFullName()
         ));
+    }
+
+    /**
+     * Internal Staff & Admin Login (/admin-login route)
+     */
+    @PostMapping("/internal-login")
+    public ResponseEntity<?> internalLogin(@RequestBody Map<String, String> credentials) {
+        credentials.put("portal", "internal");
+        return login(credentials);
     }
 
     @PostMapping("/change-password")

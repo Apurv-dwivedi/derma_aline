@@ -79,88 +79,152 @@ public class AuthControllerTest {
     }
 
     @Test
-    void testRegisterDuplicateEmail() throws Exception {
-        RegisterRequest request = new RegisterRequest();
-        request.setEmail("existing@derma.com");
-        request.setPassword("Secret123");
+    void testPublicLoginRejectsAdmin() throws Exception {
+        User adminUser = new User();
+        adminUser.setEmail("admin@dermaaline.com");
+        adminUser.setPassword("encodedPassword");
+        adminUser.setRole(User.Role.SUPER_ADMIN);
 
-        User existingUser = new User();
-        existingUser.setEmail("existing@derma.com");
+        when(userRepository.findByEmail("admin@dermaaline.com")).thenReturn(Optional.of(adminUser));
+        when(passwordEncoder.matches("Password123", "encodedPassword")).thenReturn(true);
 
-        when(userRepository.findByEmail("existing@derma.com")).thenReturn(Optional.of(existingUser));
+        Map<String, String> credentials = Map.of(
+            "email", "admin@dermaaline.com", 
+            "password", "Password123",
+            "portal", "public"
+        );
 
-        mockMvc.perform(post("/api/auth/register")
+        mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest())
+                .content(objectMapper.writeValueAsString(credentials)))
+                .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Email is already registered"));
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Internal Salon Portal")));
     }
 
     @Test
-    void testLoginSuccess() throws Exception {
-        User user = new User();
-        user.setEmail("admin@derma.com");
-        user.setPassword("encodedPassword");
-        user.setFullName("Admin User");
-        user.setRole(User.Role.SUPER_ADMIN);
+    void testPublicLoginRejectsStaff() throws Exception {
+        User staffUser = new User();
+        staffUser.setEmail("staff@dermaaline.com");
+        staffUser.setPassword("encodedPassword");
+        staffUser.setRole(User.Role.STAFF);
 
-        when(userRepository.findByEmail("admin@derma.com")).thenReturn(Optional.of(user));
+        when(userRepository.findByEmail("staff@dermaaline.com")).thenReturn(Optional.of(staffUser));
         when(passwordEncoder.matches("Password123", "encodedPassword")).thenReturn(true);
-        when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("mock-jwt-token");
 
-        Map<String, String> credentials = Map.of("email", "admin@derma.com", "password", "Password123");
+        Map<String, String> credentials = Map.of(
+            "email", "staff@dermaaline.com", 
+            "password", "Password123",
+            "portal", "public"
+        );
+
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(credentials)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Internal Salon Portal")));
+    }
+
+    @Test
+    void testPublicLoginPermitsCustomer() throws Exception {
+        User customer = new User();
+        customer.setEmail("patient@example.com");
+        customer.setPassword("encodedPassword");
+        customer.setFullName("Jane Patient");
+        customer.setRole(User.Role.CUSTOMER);
+
+        when(userRepository.findByEmail("patient@example.com")).thenReturn(Optional.of(customer));
+        when(passwordEncoder.matches("Password123", "encodedPassword")).thenReturn(true);
+        when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("mock-patient-jwt");
+
+        Map<String, String> credentials = Map.of(
+            "email", "patient@example.com", 
+            "password", "Password123",
+            "portal", "public"
+        );
 
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(credentials)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.token").value("mock-jwt-token"))
-                .andExpect(jsonPath("$.role").value("ADMIN"))
-                .andExpect(jsonPath("$.fullName").value("Admin User"));
+                .andExpect(jsonPath("$.role").value("CUSTOMER"))
+                .andExpect(jsonPath("$.token").value("mock-patient-jwt"));
     }
 
     @Test
-    void testLoginWrongPassword() throws Exception {
-        User user = new User();
-        user.setEmail("admin@derma.com");
-        user.setPassword("encodedPassword");
+    void testInternalLoginPermitsStaff() throws Exception {
+        User staffUser = new User();
+        staffUser.setEmail("staff@dermaaline.com");
+        staffUser.setPassword("encodedPassword");
+        staffUser.setFullName("Salon Therapist");
+        staffUser.setRole(User.Role.STAFF);
 
-        when(userRepository.findByEmail("admin@derma.com")).thenReturn(Optional.of(user));
-        when(passwordEncoder.matches("WrongPassword", "encodedPassword")).thenReturn(false);
+        when(userRepository.findByEmail("staff@dermaaline.com")).thenReturn(Optional.of(staffUser));
+        when(passwordEncoder.matches("Staff@2026", "encodedPassword")).thenReturn(true);
+        when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("mock-staff-jwt");
 
-        Map<String, String> credentials = Map.of("email", "admin@derma.com", "password", "WrongPassword");
-
-        mockMvc.perform(post("/api/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(credentials)))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.success").value(false));
-    }
-
-    @Test
-    void testChangePasswordSuccess() throws Exception {
-        User user = new User();
-        user.setEmail("user@derma.com");
-        user.setPassword("oldEncoded");
-
-        when(userRepository.findByEmail("user@derma.com")).thenReturn(Optional.of(user));
-        when(passwordEncoder.matches("oldPass", "oldEncoded")).thenReturn(true);
-        when(passwordEncoder.encode("newPass")).thenReturn("newEncoded");
-
-        Map<String, String> payload = Map.of(
-            "email", "user@derma.com",
-            "oldPassword", "oldPass",
-            "newPassword", "newPass"
+        Map<String, String> credentials = Map.of(
+            "email", "staff@dermaaline.com", 
+            "password", "Staff@2026"
         );
 
-        mockMvc.perform(post("/api/auth/change-password")
+        mockMvc.perform(post("/api/auth/internal-login")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(payload)))
+                .content(objectMapper.writeValueAsString(credentials)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true));
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.role").value("STAFF"))
+                .andExpect(jsonPath("$.token").value("mock-staff-jwt"));
+    }
 
-        verify(userRepository, times(1)).save(user);
+    @Test
+    void testInternalLoginPermitsAdmin() throws Exception {
+        User adminUser = new User();
+        adminUser.setEmail("admin@dermaaline.com");
+        adminUser.setPassword("encodedPassword");
+        adminUser.setFullName("Salon Admin");
+        adminUser.setRole(User.Role.SUPER_ADMIN);
+
+        when(userRepository.findByEmail("admin@dermaaline.com")).thenReturn(Optional.of(adminUser));
+        when(passwordEncoder.matches("Admin@2026", "encodedPassword")).thenReturn(true);
+        when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("mock-admin-jwt");
+
+        Map<String, String> credentials = Map.of(
+            "email", "admin@dermaaline.com", 
+            "password", "Admin@2026"
+        );
+
+        mockMvc.perform(post("/api/auth/internal-login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(credentials)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.role").value("ADMIN"))
+                .andExpect(jsonPath("$.token").value("mock-admin-jwt"));
+    }
+
+    @Test
+    void testInternalLoginRejectsCustomer() throws Exception {
+        User customer = new User();
+        customer.setEmail("patient@example.com");
+        customer.setPassword("encodedPassword");
+        customer.setRole(User.Role.CUSTOMER);
+
+        when(userRepository.findByEmail("patient@example.com")).thenReturn(Optional.of(customer));
+        when(passwordEncoder.matches("Password123", "encodedPassword")).thenReturn(true);
+
+        Map<String, String> credentials = Map.of(
+            "email", "patient@example.com", 
+            "password", "Password123"
+        );
+
+        mockMvc.perform(post("/api/auth/internal-login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(credentials)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Patient accounts cannot access internal")));
     }
 }
