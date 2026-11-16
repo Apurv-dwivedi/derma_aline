@@ -52,16 +52,41 @@ public class AuthController {
             User user = new User();
             user.setEmail(email);
 
-            // Safely assign all required fields via reflection
+            // Safely assign all fields via reflection
             setFieldSafely(user, new String[]{"setFullName", "setName"}, fullName);
             setFieldSafely(user, new String[]{"setPassword", "setPasswordHash", "setPass"}, password);
             setFieldSafely(user, new String[]{"setPhone", "setMobile", "setPhoneNumber"}, phone);
+            setBooleanFieldSafely(user, new String[]{"setEnabled", "setActive"}, true);
 
-            // Assign default role safely (handles both String and Role Enum types)
-            setRoleSafely(user, "USER");
-
-            // Ensure enabled or active flag is true if method exists
-            setFieldBooleanSafely(user, new String[]{"setEnabled", "setActive"}, true);
+            // Robust role assignment handling both String and Enum types
+            boolean roleAssigned = false;
+            for (Method method : user.getClass().getMethods()) {
+                if (method.getName().equals("setRole") && method.getParameterCount() == 1) {
+                    Class<?> paramType = method.getParameterTypes()[0];
+                    try {
+                        if (paramType.isEnum()) {
+                            // Find matching enum constant or default to first/USER
+                            Object enumVal = null;
+                            for (Object constant : paramType.getEnumConstants()) {
+                                if (constant.toString().equalsIgnoreCase("USER") || constant.toString().equalsIgnoreCase("ROLE_USER")) {
+                                    enumVal = constant;
+                                    break;
+                                }
+                            }
+                            if (enumVal == null && paramType.getEnumConstants().length > 0) {
+                                enumVal = paramType.getEnumConstants()[0];
+                            }
+                            method.invoke(user, enumVal);
+                            roleAssigned = true;
+                            break;
+                        } else if (paramType.equals(String.class)) {
+                            method.invoke(user, "USER");
+                            roleAssigned = true;
+                            break;
+                        }
+                    } catch (Exception ignored) {}
+                }
+            }
 
             userRepository.save(user);
             
@@ -86,7 +111,7 @@ public class AuthController {
         }
     }
 
-    private void setFieldBooleanSafely(Object target, String[] methodNames, boolean value) {
+    private void setBooleanFieldSafely(Object target, String[] methodNames, boolean value) {
         for (String methodName : methodNames) {
             try {
                 Method method = target.getClass().getMethod(methodName, boolean.class);
@@ -94,24 +119,5 @@ public class AuthController {
                 return;
             } catch (Exception ignored) {}
         }
-    }
-
-    private void setRoleSafely(Object target, String roleValue) {
-        try {
-            Method method = target.getClass().getMethod("setRole", String.class);
-            method.invoke(target, roleValue);
-            return;
-        } catch (Exception ignored) {}
-
-        // If Role is an Enum type
-        try {
-            Method getter = target.getClass().getMethod("getRole");
-            Class<?> roleClass = getter.getReturnType();
-            if (roleClass.isEnum()) {
-                Object enumVal = Enum.valueOf((Class<Enum>) roleClass, roleValue);
-                Method setter = target.getClass().getMethod("setRole", roleClass);
-                setter.invoke(target, enumVal);
-            }
-        } catch (Exception ignored) {}
     }
 }
