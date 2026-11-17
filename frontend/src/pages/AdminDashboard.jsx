@@ -79,11 +79,17 @@ const AdminDashboard = () => {
   const [clientDetailLoading, setClientDetailLoading] = useState(false);
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshToast, setRefreshToast] = useState('');
   const [error, setError] = useState('');
 
-  const fetchData = async () => {
+  const fetchData = async (isManual = false) => {
     try {
-      setLoading(true);
+      if (isManual) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       setError('');
 
       const [apptRes, msgRes, reportRes, staffRes, clientsRes, settingsRes] = await Promise.allSettled([
@@ -113,11 +119,17 @@ const AdminDashboard = () => {
       if (settingsRes.status === 'fulfilled' && settingsRes.value.data) {
         setSettings(settingsRes.value.data);
       }
+
+      if (isManual) {
+        setRefreshToast('Clinic database synchronized.');
+        setTimeout(() => setRefreshToast(''), 3000);
+      }
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
       setError('Failed to load data. Your session may have expired.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -439,11 +451,22 @@ const AdminDashboard = () => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button 
             className="btn-secondary" 
-            onClick={fetchData} 
-            title="Refresh All Data"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 14px', fontSize: '0.85rem', fontWeight: '600' }}
+            onClick={() => fetchData(true)} 
+            disabled={refreshing || loading}
+            title="Refresh All Clinic Data"
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              padding: '10px 14px', 
+              fontSize: '0.85rem', 
+              fontWeight: '600',
+              cursor: (refreshing || loading) ? 'wait' : 'pointer',
+              opacity: (refreshing || loading) ? 0.75 : 1
+            }}
           >
-            <RefreshCw size={15} /> Refresh
+            <RefreshCw size={15} style={{ animation: (refreshing || loading) ? 'spin 0.8s linear infinite' : 'none' }} /> 
+            {refreshing ? 'Syncing...' : 'Refresh'}
           </button>
           
           <button 
@@ -455,6 +478,28 @@ const AdminDashboard = () => {
           </button>
         </div>
       </div>
+
+      {/* Floating Refresh Confirmation Toast */}
+      {refreshToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          backgroundColor: '#2c221e',
+          color: '#ffffff',
+          padding: '12px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '0.88rem',
+          fontWeight: '500'
+        }}>
+          <CheckCircle2 size={16} color="#4ade80" /> {refreshToast}
+        </div>
+      )}
 
       {error && (
         <div style={{ padding: '15px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '8px', marginBottom: '25px' }}>

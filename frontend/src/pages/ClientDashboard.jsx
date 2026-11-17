@@ -24,6 +24,10 @@ const ClientDashboard = () => {
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Refresh State
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshToast, setRefreshToast] = useState('');
+
   // Profile Picture Upload State
   const [photoUploading, setPhotoUploading] = useState(false);
 
@@ -51,8 +55,12 @@ const ClientDashboard = () => {
     fetchClientData();
   }, [navigate]);
 
-  const fetchClientData = async () => {
-    setLoading(true);
+  const fetchClientData = async (isManual = false) => {
+    if (isManual) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError('');
 
     try {
@@ -75,6 +83,11 @@ const ClientDashboard = () => {
       setTreatments(treatmentsRes.data || []);
       setEnquiries(enquiriesRes.data || []);
       setNotifications(notificationsRes.data || []);
+
+      if (isManual) {
+        setRefreshToast('Care suite records synchronized.');
+        setTimeout(() => setRefreshToast(''), 3000);
+      }
     } catch (err) {
       console.error("Failed to fetch client suite data:", err);
       if (err.response?.status === 401 || err.response?.status === 403) {
@@ -85,6 +98,7 @@ const ClientDashboard = () => {
       }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -353,23 +367,26 @@ const ClientDashboard = () => {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
-            onClick={fetchClientData}
-            title="Refresh records"
+            onClick={() => fetchClientData(true)}
+            disabled={refreshing || loading}
+            title="Refresh care suite records"
             style={{
               backgroundColor: '#fbf9f6',
               border: '1px solid #ebdcd0',
               color: '#6e5d53',
               padding: '10px 14px',
               borderRadius: '8px',
-              cursor: 'pointer',
+              cursor: (refreshing || loading) ? 'wait' : 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
               fontSize: '0.85rem',
-              fontWeight: '600'
+              fontWeight: '600',
+              opacity: (refreshing || loading) ? 0.75 : 1
             }}
           >
-            <RefreshCw size={14} /> Refresh
+            <RefreshCw size={14} style={{ animation: (refreshing || loading) ? 'spin 0.8s linear infinite' : 'none' }} />
+            {refreshing ? 'Syncing...' : 'Refresh'}
           </button>
           <button
             onClick={handleLogout}
@@ -391,6 +408,28 @@ const ClientDashboard = () => {
           </button>
         </div>
       </div>
+
+      {/* Floating Refresh Confirmation Toast */}
+      {refreshToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          backgroundColor: '#2c221e',
+          color: '#ffffff',
+          padding: '12px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '0.88rem',
+          fontWeight: '500'
+        }}>
+          <CheckCircle2 size={16} color="#4ade80" /> {refreshToast}
+        </div>
+      )}
 
       {/* Global Alerts */}
       {error && (

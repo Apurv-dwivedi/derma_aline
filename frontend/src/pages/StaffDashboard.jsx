@@ -47,6 +47,9 @@ const StaffDashboard = () => {
   const [customerForm, setCustomerForm] = useState({ fullName: '', email: '', phone: '', notes: '' });
   const [customerSaving, setCustomerSaving] = useState(false);
 
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshToast, setRefreshToast] = useState('');
+
   const staffName = localStorage.getItem('fullName') || 'Clinical Staff';
   const staffRole = localStorage.getItem('role') || 'STAFF';
 
@@ -54,8 +57,12 @@ const StaffDashboard = () => {
     fetchDashboardData();
   }, []);
 
-  const fetchDashboardData = async () => {
-    setLoading(true);
+  const fetchDashboardData = async (isManual = false) => {
+    if (isManual) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError('');
 
     try {
@@ -74,11 +81,17 @@ const StaffDashboard = () => {
       setEnquiries(enqRes.data || []);
       setAppointments(apptRes.data || []);
       setTreatmentsList(treatsRes.data || []);
+
+      if (isManual) {
+        setRefreshToast('Clinical workspace synchronized.');
+        setTimeout(() => setRefreshToast(''), 3000);
+      }
     } catch (err) {
       console.error("Failed to load staff workspace:", err);
       setError('Unable to load clinical workspace. Please check your authentication.');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -276,11 +289,26 @@ const StaffDashboard = () => {
             <Plus size={16} /> Add Client Profile
           </button>
           <button
-            onClick={fetchDashboardData}
-            title="Refresh"
-            style={{ backgroundColor: '#ffffff', border: '1px solid #ebdcd0', padding: '10px', borderRadius: '8px', cursor: 'pointer' }}
+            onClick={() => fetchDashboardData(true)}
+            disabled={refreshing || loading}
+            title="Refresh clinical records"
+            style={{ 
+              backgroundColor: '#ffffff', 
+              border: '1px solid #ebdcd0', 
+              padding: '10px 14px', 
+              borderRadius: '8px', 
+              cursor: (refreshing || loading) ? 'wait' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '0.85rem',
+              fontWeight: '600',
+              color: '#6e5d53',
+              opacity: (refreshing || loading) ? 0.75 : 1
+            }}
           >
-            <RefreshCw size={16} color="#6e5d53" />
+            <RefreshCw size={15} color="#6e5d53" style={{ animation: (refreshing || loading) ? 'spin 0.8s linear infinite' : 'none' }} />
+            {refreshing ? 'Syncing...' : 'Refresh'}
           </button>
           <button
             onClick={handleLogout}
@@ -290,6 +318,28 @@ const StaffDashboard = () => {
           </button>
         </div>
       </div>
+
+      {/* Floating Refresh Confirmation Toast */}
+      {refreshToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          backgroundColor: '#2c221e',
+          color: '#ffffff',
+          padding: '12px 20px',
+          borderRadius: '8px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          fontSize: '0.88rem',
+          fontWeight: '500'
+        }}>
+          <CheckCircle2 size={16} color="#4ade80" /> {refreshToast}
+        </div>
+      )}
 
       {/* Global Alerts */}
       {error && (
