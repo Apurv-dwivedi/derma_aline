@@ -32,6 +32,23 @@ public class ContactController {
         }
     }
 
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<?> updateContactStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {
+        return contactRepository.findById(id).map(msg -> {
+            String statusStr = payload.get("status");
+            if (statusStr != null) {
+                try {
+                    msg.setStatus(com.dermaaline.backend.entity.ContactStatus.valueOf(statusStr.trim().toUpperCase()));
+                    contactRepository.save(msg);
+                    return ResponseEntity.ok(Map.of("success", true, "message", "Message status updated successfully"));
+                } catch (IllegalArgumentException e) {
+                    return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid status value"));
+                }
+            }
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Status is required"));
+        }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Message not found")));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<?> deleteContactMessage(@PathVariable Long id) {
         return contactRepository.findById(id).map(msg -> {

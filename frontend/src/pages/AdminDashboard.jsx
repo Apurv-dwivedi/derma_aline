@@ -116,7 +116,18 @@ const AdminDashboard = () => {
       setEditingId(null);
       fetchData();
     } catch (err) {
-      console.error("Failed to update appointment:", err);
+      console.error("Failed to update appointment via PUT, attempting status patch fallback:", err);
+      // Fallback: if only status was updated or backend had transient PUT issues
+      if (editForm.status) {
+        try {
+          await API.patch('/appointments/' + targetId + '/status', { status: editForm.status });
+          setEditingId(null);
+          fetchData();
+          return;
+        } catch (patchErr) {
+          console.error("Status patch fallback also failed:", patchErr);
+        }
+      }
       alert(err.response?.data?.message || 'Error updating appointment');
     }
   };
@@ -229,13 +240,41 @@ const AdminDashboard = () => {
     navigate('/admin-login');
   };
 
+  // Active appointments needing clinic action (excludes COMPLETED, CANCELLED, REJECTED)
+  const activeAppointments = appointments.filter(a => {
+    const st = (a.status || 'PENDING').toUpperCase();
+    return st === 'PENDING' || st === 'CONFIRMED';
+  });
+
+  // Unread incoming patient inquiries
+  const unreadMessages = messages.filter(m => {
+    const st = (m.status || 'UNREAD').toUpperCase();
+    return st === 'UNREAD';
+  });
+
+  const handleToggleMessageStatus = async (id, currentStatus) => {
+    const nextStatus = currentStatus === 'READ' ? 'UNREAD' : 'READ';
+    try {
+      await API.patch(`/contact/${id}/status`, { status: nextStatus });
+      setMessages(prev => prev.map(m => m.id === id ? { ...m, status: nextStatus } : m));
+    } catch (err) {
+      console.error("Failed to update message status:", err);
+    }
+  };
+
   // Filtering Logic
   const filteredAppointments = appointments.filter(appt => {
     const name = appt.customerName || appt.patientName || '';
     const treatment = appt.treatmentName || '';
     const matchesSearch = name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           treatment.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'ALL' || appt.status === statusFilter;
+    
+    let matchesStatus = true;
+    if (statusFilter === 'ACTIVE') {
+      matchesStatus = appt.status === 'PENDING' || appt.status === 'CONFIRMED';
+    } else if (statusFilter !== 'ALL') {
+      matchesStatus = appt.status === statusFilter;
+    }
     return matchesSearch && matchesStatus;
   });
 
@@ -291,14 +330,14 @@ const AdminDashboard = () => {
           <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>From confirmed bookings</span>
         </div>
 
-        {/* Total Bookings */}
+        {/* Active Appointments */}
         <div style={{ backgroundColor: 'var(--bg-white)', padding: '22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Bookings</span>
+            <span style={{ fontSize: '0.9rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Appointments</span>
             <Calendar size={22} color="var(--color-accent)" />
           </div>
           <p style={{ fontSize: '1.9rem', fontWeight: '800', color: 'var(--color-primary)', margin: '6px 0 2px' }}>
-            {appointments.length}
+            {activeAppointments.length}
           </p>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>
             {appointments.filter(a => a.status === 'CONFIRMED').length} confirmed • {appointments.filter(a => a.status === 'PENDING').length} pending
@@ -328,7 +367,7 @@ const AdminDashboard = () => {
             color: activeTab === 'appointments' ? '#fff' : 'var(--color-primary)', 
             boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
           }}>
-          <Calendar size={16} /> Appointments ({appointments.length})
+          <Calendar size={16} /> Appointments ({activeAppointments.length})
         </button>
 
         <button 
@@ -361,7 +400,7 @@ const AdminDashboard = () => {
             color: activeTab === 'messages' ? '#fff' : 'var(--color-primary)', 
             boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
           }}>
-          <MessageSquare size={16} /> Inquiries ({messages.length})
+          <MessageSquare size={16} /> Inquiries ({unreadMessages.length})
         </button>
 
         <button 
@@ -400,6 +439,7 @@ const AdminDashboard = () => {
                 style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-light)', outline: 'none' }}
               >
                 <option value="ALL">All Statuses</option>
+                <option value="ACTIVE">Active (Pending & Confirmed)</option>
                 <option value="PENDING">Pending</option>
                 <option value="CONFIRMED">Confirmed</option>
                 <option value="COMPLETED">Completed</option>
@@ -776,25 +816,78 @@ const AdminDashboard = () => {
                   <th style={{ padding: '12px' }}>Sender Name</th>
                   <th style={{ padding: '12px' }}>Contact Info</th>
                   <th style={{ padding: '12px' }}>Message</th>
+                  <th style={{ padding: '12px', textAlign: 'center' }}>Status</th>
                   <th style={{ padding: '12px', textAlign: 'center' }}>Action</th>
                 </tr>
               </thead>
               <tbody>
-                {messages.map((msg) => (
-                  <tr key={msg.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <td style={{ padding: '15px 12px', fontWeight: '600', color: 'var(--color-primary)' }}>{msg.name}</td>
-                    <td style={{ padding: '15px 12px', color: 'var(--text-light)', fontSize: '0.9rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}><Mail size={14} /> {msg.email}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={14} /> {msg.phone}</div>
-                    </td>
-                    <td style={{ padding: '15px 12px', maxWidth: '300px', wordBreak: 'break-word' }}>{msg.message}</td>
-                    <td style={{ padding: '15px 12px', textAlign: 'center' }}>
-                      <button onClick={() => handleDeleteMessage(msg.id)} style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}>
-                        <Trash2 size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {messages.map((msg) => {
+                  const isRead = (msg.status || 'UNREAD').toUpperCase() === 'READ';
+                  return (
+                    <tr key={msg.id} style={{ borderBottom: '1px solid var(--border-light)', backgroundColor: isRead ? 'transparent' : 'rgba(217, 119, 6, 0.03)' }}>
+                      <td style={{ padding: '15px 12px', fontWeight: '600', color: 'var(--color-primary)' }}>{msg.name}</td>
+                      <td style={{ padding: '15px 12px', color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}><Mail size={14} /> {msg.email}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={14} /> {msg.phone}</div>
+                      </td>
+                      <td style={{ padding: '15px 12px', maxWidth: '300px', wordBreak: 'break-word' }}>{msg.message}</td>
+                      <td style={{ padding: '15px 12px', textAlign: 'center' }}>
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: '12px',
+                          fontSize: '0.75rem',
+                          fontWeight: '700',
+                          letterSpacing: '0.04em',
+                          backgroundColor: isRead ? '#f1f5f9' : '#fef3c7',
+                          color: isRead ? '#475569' : '#92400e',
+                          border: `1px solid ${isRead ? '#cbd5e1' : '#fde68a'}`
+                        }}>
+                          {isRead ? 'READ' : 'UNREAD'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '15px 12px', textAlign: 'center' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                          <button 
+                            onClick={() => handleToggleMessageStatus(msg.id, msg.status || 'UNREAD')} 
+                            title={isRead ? "Mark as unread" : "Mark as read"}
+                            style={{ 
+                              backgroundColor: isRead ? '#64748b' : '#059669', 
+                              color: '#fff', 
+                              border: 'none', 
+                              padding: '6px 12px', 
+                              borderRadius: '6px', 
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <CheckCircle2 size={13} /> {isRead ? 'Mark Unread' : 'Mark Read'}
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteMessage(msg.id)} 
+                            title="Delete message"
+                            style={{ 
+                              backgroundColor: '#dc3545', 
+                              color: '#fff', 
+                              border: 'none', 
+                              padding: '6px 12px', 
+                              borderRadius: '6px', 
+                              cursor: 'pointer',
+                              fontSize: '0.8rem',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
