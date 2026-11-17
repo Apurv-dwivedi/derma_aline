@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { 
   Calendar, CheckCircle, Clock, Edit2, Trash2, X, Save, LogOut, 
   RefreshCw, MessageSquare, Mail, Phone, Search, DollarSign, 
-  TrendingUp, Users, UserPlus, Shield, Briefcase, Award
+  TrendingUp, Users, UserPlus, Shield, Briefcase, Award,
+  KeyRound, Lock, Eye, EyeOff, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import API from '../services/api';
 import '../styles/pages.css';
@@ -38,6 +39,15 @@ const AdminDashboard = () => {
   const [staffActionLoading, setStaffActionLoading] = useState(false);
   const [staffSuccess, setStaffSuccess] = useState('');
   const [staffError, setStaffError] = useState('');
+
+  // Security & Password State
+  const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   // Search and Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -174,6 +184,41 @@ const AdminDashboard = () => {
       } catch (err) {
         alert('Failed to revoke staff access.');
       }
+    }
+  };
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (!passwordForm.oldPassword) {
+      setPasswordError('Please provide your current password.');
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordError('New password must be at least 6 characters long.');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('New password and confirmation do not match.');
+      return;
+    }
+
+    try {
+      setPasswordLoading(true);
+      const email = localStorage.getItem('email') || 'apurvdwivedi2205@gmail.com';
+      const response = await API.post('/auth/change-password', {
+        email: email,
+        oldPassword: passwordForm.oldPassword,
+        newPassword: passwordForm.newPassword
+      });
+      setPasswordSuccess(response.data?.message || 'Password changed successfully!');
+      setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      setPasswordError(err.response?.data?.message || 'Failed to change password. Please check your current password.');
+    } finally {
+      setPasswordLoading(false);
     }
   };
 
@@ -317,6 +362,17 @@ const AdminDashboard = () => {
             boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
           }}>
           <MessageSquare size={16} /> Inquiries ({messages.length})
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('security')} 
+          style={{ 
+            padding: '12px 20px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            backgroundColor: activeTab === 'security' ? 'var(--color-accent)' : 'var(--bg-white)', 
+            color: activeTab === 'security' ? '#fff' : 'var(--color-primary)', 
+            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
+          }}>
+          <KeyRound size={16} /> Security & Password
         </button>
       </div>
 
@@ -742,6 +798,136 @@ const AdminDashboard = () => {
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {/* Tab 5: Security & Admin Password */}
+      {activeTab === 'security' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', maxWidth: '650px', margin: '0 auto' }}>
+          
+          {/* Information Notice */}
+          <div style={{ backgroundColor: '#f8f9fa', padding: '18px 22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
+            <Shield size={24} color="var(--color-primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ fontSize: '0.88rem', color: 'var(--text-main)', lineHeight: '1.5' }}>
+              <strong>Administrator Credentials:</strong> You can update your master password anytime directly from this portal. Make sure to use at least 6 characters with a combination of letters, numbers, and symbols.
+            </div>
+          </div>
+
+          {/* Feedback alerts */}
+          {passwordSuccess && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 18px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '8px', border: '1px solid #c3e6cb' }}>
+              <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
+              <span>{passwordSuccess}</span>
+            </div>
+          )}
+          {passwordError && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 18px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '8px', border: '1px solid #f5c6cb' }}>
+              <AlertCircle size={18} style={{ flexShrink: 0 }} />
+              <span>{passwordError}</span>
+            </div>
+          )}
+
+          {/* Password Change Form */}
+          <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+              <KeyRound size={22} color="var(--color-accent)" />
+              <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', margin: 0, fontFamily: 'var(--font-heading)' }}>
+                Change Master Admin Password
+              </h3>
+            </div>
+            <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '22px' }}>
+              Updating password for account: <strong>{localStorage.getItem('email') || 'apurvdwivedi2205@gmail.com'}</strong>
+            </p>
+
+            <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
+                  Current Password *
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type={showOldPassword ? 'text' : 'password'}
+                    placeholder="Enter current password" 
+                    value={passwordForm.oldPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
+                    required
+                    style={{ width: '100%', padding: '11px 45px 11px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', boxSizing: 'border-box' }}
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowOldPassword(!showOldPassword)}
+                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#7c6252', padding: 0 }}
+                  >
+                    {showOldPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
+                  New Password * (Min. 6 characters)
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type={showNewPassword ? 'text' : 'password'}
+                    placeholder="Enter new strong password" 
+                    value={passwordForm.newPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                    required
+                    style={{ width: '100%', padding: '11px 45px 11px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', boxSizing: 'border-box' }}
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#7c6252', padding: 0 }}
+                  >
+                    {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
+                  Confirm New Password *
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Re-enter new password" 
+                    value={passwordForm.confirmPassword}
+                    onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                    required
+                    style={{ width: '100%', padding: '11px 45px 11px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', boxSizing: 'border-box' }}
+                  />
+                  <button 
+                    type="button" 
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#7c6252', padding: 0 }}
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={passwordLoading}
+                className="btn-primary" 
+                style={{ width: '100%', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: '700', marginTop: '10px' }}
+              >
+                <Lock size={16} /> {passwordLoading ? 'Updating Password...' : 'Save New Password'}
+              </button>
+            </form>
+          </div>
+
+          {/* Forgot Password Recovery Guidance */}
+          <div style={{ backgroundColor: '#fff', padding: '20px 24px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
+            <h4 style={{ margin: '0 0 8px 0', fontSize: '0.95rem', color: 'var(--color-primary)' }}>Forgot your password?</h4>
+            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)', lineHeight: '1.5' }}>
+              If you ever forget your password and cannot log in, navigate to <code>/admin-login</code>, click <strong>Forgot Password?</strong>, and enter your admin email. You can also override credentials anytime via the Render Dashboard environment variables (<code>ADMIN_EMAIL</code> & <code>ADMIN_PASSWORD</code>).
+            </p>
+          </div>
+
         </div>
       )}
     </div>

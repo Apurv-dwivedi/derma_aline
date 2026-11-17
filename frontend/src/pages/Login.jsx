@@ -35,6 +35,7 @@ const Login = () => {
       localStorage.setItem('token', token || 'authenticated');
       localStorage.setItem('role', role);
       localStorage.setItem('fullName', fullName || '');
+      localStorage.setItem('email', email);
 
       // Route workers to Staff Workspace, and managers to Full Admin Dashboard
       if (upperRole === 'STAFF') {
