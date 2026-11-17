@@ -23,11 +23,11 @@ public class User {
     private String phone;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "role")
     private Role role = Role.CUSTOMER;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(name = "status")
     private AccountStatus status = AccountStatus.ACTIVE;
 
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -62,11 +62,11 @@ public class User {
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
 
-    public Role getRole() { return role; }
-    public void setRole(Role role) { this.role = role; }
+    public Role getRole() { return role != null ? role : Role.CUSTOMER; }
+    public void setRole(Role role) { this.role = role != null ? role : Role.CUSTOMER; }
 
-    public AccountStatus getStatus() { return status; }
-    public void setStatus(AccountStatus status) { this.status = status; }
+    public AccountStatus getStatus() { return status != null ? status : AccountStatus.ACTIVE; }
+    public void setStatus(AccountStatus status) { this.status = status != null ? status : AccountStatus.ACTIVE; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
 

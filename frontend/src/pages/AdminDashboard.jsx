@@ -139,10 +139,35 @@ const AdminDashboard = () => {
     });
   };
 
+  const handleQuickStatusChange = async (id, newStatus) => {
+    const targetId = typeof id === 'object' ? id.id : id;
+    try {
+      setAppointments(prev => prev.map(a => a.id === targetId ? { ...a, status: newStatus } : a));
+      await API.patch(`/appointments/${targetId}/status`, { status: newStatus });
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      fetchData();
+      alert(err.response?.data?.message || 'Error updating status');
+    }
+  };
+
   const handleSaveEdit = async (id) => {
     const targetId = typeof id === 'object' ? id.id : id;
     try {
-      await API.put('/appointments/' + targetId, editForm);
+      const payload = {
+        patientName: editForm.patientName || editForm.customerName,
+        customerName: editForm.customerName || editForm.patientName,
+        email: editForm.email || editForm.customerEmail,
+        customerEmail: editForm.customerEmail || editForm.email,
+        phone: editForm.phone || editForm.customerPhone,
+        customerPhone: editForm.customerPhone || editForm.phone,
+        treatmentName: editForm.treatmentName,
+        appointmentDate: editForm.appointmentDate,
+        appointmentTime: editForm.appointmentTime,
+        status: editForm.status,
+        notes: editForm.notes
+      };
+      await API.put('/appointments/' + targetId, payload);
       setEditingId(null);
       fetchData();
     } catch (err) {
@@ -623,13 +648,28 @@ const AdminDashboard = () => {
                           <td style={{ padding: '15px 12px' }}>{appt.treatmentName}</td>
                           <td style={{ padding: '15px 12px', color: 'var(--text-light)' }}>{appt.appointmentDate ? String(appt.appointmentDate).split('T')[0] : '—'}<br/><span style={{ fontSize: '0.9rem' }}>{appt.appointmentTime}</span></td>
                           <td style={{ padding: '15px 12px' }}>
-                            <span style={{ 
-                              padding: '5px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700', 
-                              backgroundColor: appt.status === 'CONFIRMED' ? '#d4edda' : appt.status === 'COMPLETED' ? '#cce5ff' : appt.status === 'PENDING' ? '#fff3cd' : '#f8d7da', 
-                              color: appt.status === 'CONFIRMED' ? '#155724' : appt.status === 'COMPLETED' ? '#004085' : appt.status === 'PENDING' ? '#856404' : '#721c24' 
-                            }}>
-                              {appt.status}
-                            </span>
+                            <select
+                              value={appt.status || 'PENDING'}
+                              onChange={(e) => handleQuickStatusChange(appt.id, e.target.value)}
+                              title="Click to quickly change appointment status"
+                              style={{ 
+                                padding: '5px 10px', 
+                                borderRadius: '20px', 
+                                fontSize: '0.75rem', 
+                                fontWeight: '700', 
+                                cursor: 'pointer',
+                                border: '1px solid rgba(0,0,0,0.1)',
+                                backgroundColor: appt.status === 'CONFIRMED' ? '#d4edda' : appt.status === 'COMPLETED' ? '#cce5ff' : appt.status === 'PENDING' ? '#fff3cd' : '#f8d7da', 
+                                color: appt.status === 'CONFIRMED' ? '#155724' : appt.status === 'COMPLETED' ? '#004085' : appt.status === 'PENDING' ? '#856404' : '#721c24',
+                                outline: 'none'
+                              }}
+                            >
+                              <option value="PENDING">PENDING</option>
+                              <option value="CONFIRMED">CONFIRMED</option>
+                              <option value="COMPLETED">COMPLETED</option>
+                              <option value="CANCELLED">CANCELLED</option>
+                              <option value="REJECTED">REJECTED</option>
+                            </select>
                           </td>
                           <td style={{ padding: '15px 12px', textAlign: 'center' }}>
                             <button onClick={() => handleEditClick(appt)} className="btn-primary" style={{ padding: '6px 14px', fontSize: '0.8rem', marginRight: '8px' }}><Edit2 size={14} style={{ marginRight: '4px', verticalAlign: 'middle' }} /> Update</button>

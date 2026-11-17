@@ -20,13 +20,18 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        if (email == null || email.trim().isEmpty()) {
+            throw new UsernameNotFoundException("Empty email provided");
+        }
+
         User user = userRepository.findByEmail(email.trim().toLowerCase())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
         boolean enabled = user.getStatus() != User.AccountStatus.DISABLED;
 
         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
-        String roleName = user.getRole().name().toUpperCase();
+        User.Role role = user.getRole() != null ? user.getRole() : User.Role.CUSTOMER;
+        String roleName = role.name().toUpperCase();
         authorities.add(new SimpleGrantedAuthority("ROLE_" + roleName));
 
         if ("SUPER_ADMIN".equals(roleName)) {
@@ -39,7 +44,7 @@ public class CustomUserDetailsService implements UserDetailsService {
 
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(),
-                user.getPassword(),
+                user.getPassword() != null ? user.getPassword() : "",
                 enabled,
                 true,
                 true,

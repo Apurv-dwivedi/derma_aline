@@ -175,6 +175,18 @@ const StaffDashboard = () => {
     );
   });
 
+  // Active appointments needing clinic action (excludes COMPLETED, CANCELLED, REJECTED)
+  const activeAppointments = appointments.filter((a) => {
+    const st = (a.status || 'PENDING').toUpperCase();
+    return st === 'PENDING' || st === 'CONFIRMED';
+  });
+
+  // Unread patient enquiries
+  const unreadEnquiries = enquiries.filter((e) => {
+    const st = (e.status || 'UNREAD').toUpperCase();
+    return st === 'UNREAD';
+  });
+
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '10px 0 60px 0' }}>
       {/* Top Header Card */}
@@ -340,8 +352,8 @@ const StaffDashboard = () => {
         {[
           { id: 'treatments', label: `Clinical Treatment Records (${treatmentRecords.length})`, icon: HeartPulse },
           { id: 'customers', label: `Client Directory (${customers.length})`, icon: Users },
-          { id: 'enquiries', label: `Client Enquiries (${enquiries.length})`, icon: MessageSquare },
-          { id: 'queue', label: `Operations Queue (${appointments.length})`, icon: Calendar }
+          { id: 'enquiries', label: `Client Enquiries (${unreadEnquiries.length})`, icon: MessageSquare },
+          { id: 'queue', label: `Operations Queue (${activeAppointments.length})`, icon: Calendar }
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;

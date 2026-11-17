@@ -82,20 +82,32 @@ public class AppointmentController {
             return LocalDateTime.now().plusDays(1);
         }
         try {
-            if (dateStr.contains("T")) {
-                return LocalDateTime.parse(dateStr.trim());
-            }
-            LocalDate date = LocalDate.parse(dateStr.trim());
-            LocalTime time = LocalTime.of(10, 0);
-            if (timeStr != null) {
-                String cleanTime = timeStr.trim();
-                if (cleanTime.matches("\\d{1,2}:\\d{2}:\\d{2}")) {
-                    time = LocalTime.parse(cleanTime.substring(0, 5));
-                } else if (cleanTime.matches("\\d{1,2}:\\d{2}")) {
-                    time = LocalTime.parse(cleanTime);
+            String clean = dateStr.trim();
+            // Handle ISO string like 2026-11-19T10:00:00 or 2026-11-19T10:00:00.000Z
+            if (clean.contains("T")) {
+                String isoClean = clean.replace("Z", "");
+                if (isoClean.contains(".")) {
+                    isoClean = isoClean.substring(0, isoClean.indexOf('.'));
                 }
+                try {
+                    return LocalDateTime.parse(isoClean);
+                } catch (Exception ignored) {}
             }
-            return LocalDateTime.of(date, time);
+
+            if (clean.length() >= 10 && clean.contains("-")) {
+                LocalDate date = LocalDate.parse(clean.substring(0, 10));
+                LocalTime time = LocalTime.of(10, 0);
+                if (timeStr != null && !timeStr.trim().isEmpty()) {
+                    String cleanTime = timeStr.trim();
+                    if (cleanTime.matches("\\d{1,2}:\\d{2}:\\d{2}")) {
+                        time = LocalTime.parse(cleanTime.substring(0, 5));
+                    } else if (cleanTime.matches("\\d{1,2}:\\d{2}")) {
+                        time = LocalTime.parse(cleanTime);
+                    }
+                }
+                return LocalDateTime.of(date, time);
+            }
+            return LocalDateTime.now().plusDays(1);
         } catch (Exception e) {
             return LocalDateTime.now().plusDays(1);
         }
@@ -103,15 +115,19 @@ public class AppointmentController {
 
     @PatchMapping("/{id}/status")
     public ResponseEntity<?> updateAppointmentStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {
-        return appointmentRepository.findById(id).map(appointment -> {
-            String newStatus = payload.get("status");
-            if (newStatus != null) {
-                appointment.setStatus(newStatus.toUpperCase());
-                appointmentRepository.save(appointment);
-                return ResponseEntity.ok(Map.of("success", true, "message", "Appointment status updated successfully"));
-            }
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Status is required"));
-        }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Appointment not found")));
+        try {
+            return appointmentRepository.findById(id).map(appointment -> {
+                String newStatus = payload.get("status");
+                if (newStatus != null && !newStatus.trim().isEmpty()) {
+                    appointment.setStatus(newStatus.trim().toUpperCase());
+                    appointmentRepository.save(appointment);
+                    return ResponseEntity.ok(Map.of("success", true, "message", "Appointment status updated successfully"));
+                }
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Status is required"));
+            }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Appointment not found")));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Error updating appointment status: " + e.getMessage()));
+        }
     }
 
     @PutMapping("/{id}")

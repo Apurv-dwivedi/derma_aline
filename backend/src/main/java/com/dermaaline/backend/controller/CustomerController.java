@@ -42,7 +42,12 @@ public class CustomerController {
             map.put("notes", c.getNotes());
             map.put("createdAt", c.getCreatedAt());
 
-            long count = treatmentRecordRepository.findByCustomerEmailIgnoreCaseOrderByTreatmentDateDesc(c.getEmail()).size();
+            long count = 0;
+            if (c.getEmail() != null && !c.getEmail().trim().isEmpty()) {
+                try {
+                    count = treatmentRecordRepository.findByCustomerEmailIgnoreCaseOrderByTreatmentDateDesc(c.getEmail().trim()).size();
+                } catch (Exception ignored) {}
+            }
             map.put("treatmentCount", count);
             response.add(map);
         }
