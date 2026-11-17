@@ -20,12 +20,16 @@ public class TreatmentController {
 
     @GetMapping
     public ResponseEntity<List<Treatment>> getAllTreatments() {
-        return ResponseEntity.ok(treatmentRepository.findAll());
+        return ResponseEntity.ok()
+                .header("Cache-Control", "public, max-age=120, stale-while-revalidate=300")
+                .body(treatmentRepository.findAll());
     }
 
     @GetMapping("/active")
     public ResponseEntity<List<Treatment>> getActiveTreatments() {
-        return ResponseEntity.ok(treatmentRepository.findByActiveTrue());
+        return ResponseEntity.ok()
+                .header("Cache-Control", "public, max-age=120, stale-while-revalidate=300")
+                .body(treatmentRepository.findByActiveTrue());
     }
 
     @PostMapping
