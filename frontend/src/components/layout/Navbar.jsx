@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   UserCircle, LogOut, Menu, X, 
-  Home, Info, Sparkles, Mail, Calendar, Shield, ChevronRight
+  Home, Info, Sparkles, Mail, Shield, ChevronRight, User
 } from 'lucide-react';
 import '../../styles/navbar.css';
 
@@ -31,25 +31,19 @@ const Navbar = () => {
         };
     }, [isSidebarOpen]);
 
-    const handleBookingClick = (e) => {
-        if (!isLoggedIn) {
-            e.preventDefault();
-            alert("Please login first to book an appointment!");
-            navigate("/auth");
-        }
-    };
-
     const handleLogout = () => {
-        localStorage.removeItem('token');
-        localStorage.removeItem('role');
-        localStorage.removeItem('fullName');
+        localStorage.clear();
         setIsSidebarOpen(false);
-        navigate("/auth");
+        navigate("/");
     };
 
     const toggleSidebar = () => {
         setIsSidebarOpen(!isSidebarOpen);
     };
+
+    const isClient = userRole === 'CUSTOMER' || userRole === 'PATIENT';
+    const isOwner = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
+    const isStaff = userRole === 'STAFF';
 
     return (
         <header className="navbar">
@@ -108,32 +102,47 @@ const Navbar = () => {
                     <Link to="/treatments" className="nav-link">Treatments</Link>
                     <Link to="/contact" className="nav-link">Contact</Link>
 
-                    {/* Role-Specific Shortcuts for Internal Staff */}
-                    {isLoggedIn && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
-                        <Link to="/admin" className="nav-link" style={{ fontWeight: '600', color: '#806657' }}>
-                            Admin Center
+                    {/* Role-Specific Portal Shortcuts */}
+                    {isLoggedIn && isOwner && (
+                        <Link to="/admin" className="nav-link" style={{ fontWeight: '700', color: '#806657' }}>
+                            Executive Suite
                         </Link>
                     )}
-                    {isLoggedIn && userRole === 'STAFF' && (
-                        <Link to="/staff" className="nav-link" style={{ fontWeight: '600', color: '#0369a1' }}>
-                            Staff Queue
+                    {isLoggedIn && isStaff && (
+                        <Link to="/staff" className="nav-link" style={{ fontWeight: '700', color: '#0369a1' }}>
+                            Staff Workspace
+                        </Link>
+                    )}
+                    {isLoggedIn && isClient && (
+                        <Link to="/client/dashboard" className="nav-link" style={{ fontWeight: '700', color: '#806657' }}>
+                            Client Suite
                         </Link>
                     )}
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginLeft: '10px' }}>
                         {!isLoggedIn ? (
-                            <Link to="/auth" style={{ color: 'var(--color-primary, #806657)', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', fontWeight: '500' }}>
-                                <UserCircle size={20} /> Login
-                            </Link>
+                            <>
+                                <Link to="/client/login" style={{ color: 'var(--color-primary, #806657)', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', fontWeight: '600', fontSize: '0.9rem' }}>
+                                    <User size={17} /> Client Portal
+                                </Link>
+                                <Link to="/contact">
+                                    <button className="btn-primary" style={{ padding: '9px 18px', fontSize: '0.85rem' }}>
+                                        Enquire Consultation
+                                    </button>
+                                </Link>
+                            </>
                         ) : (
-                            <button onClick={handleLogout} style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '500', fontSize: '0.95rem' }}>
-                                <LogOut size={18} /> Logout
-                            </button>
+                            <>
+                                <button onClick={handleLogout} style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem' }}>
+                                    <LogOut size={16} /> Sign Out
+                                </button>
+                                <Link to={isOwner ? "/admin" : isStaff ? "/staff" : "/client/dashboard"}>
+                                    <button className="btn-primary" style={{ padding: '9px 18px', fontSize: '0.85rem' }}>
+                                        My Dashboard
+                                    </button>
+                                </Link>
+                            </>
                         )}
-
-                        <Link to="/booking" onClick={handleBookingClick}>
-                            <button className="btn-primary">Book Appointment</button>
-                        </Link>
                     </div>
                 </nav>
 
@@ -143,7 +152,7 @@ const Navbar = () => {
                     onClick={toggleSidebar} 
                     aria-label="Toggle Navigation Menu"
                     style={{
-                        display: 'none', // Controlled by CSS media query
+                        display: 'none',
                         background: 'none',
                         border: 'none',
                         cursor: 'pointer',
@@ -164,7 +173,7 @@ const Navbar = () => {
                 />
             )}
 
-            {/* Mobile Collapsible Sidebar Drawer (Slides from Right/Left) */}
+            {/* Mobile Collapsible Sidebar Drawer */}
             <aside className={`mobile-sidebar-drawer ${isSidebarOpen ? 'open' : ''}`}>
                 <div className="sidebar-header">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -192,14 +201,14 @@ const Navbar = () => {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <UserCircle size={18} color="#806657" />
                             <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#333' }}>
-                                {userName || 'Client Session'}
+                                {userName || 'Active Session'}
                             </span>
                         </div>
-                        <span className="sidebar-role-tag">{userRole || 'PATIENT'}</span>
+                        <span className="sidebar-role-tag">{userRole || 'CLIENT'}</span>
                     </div>
                 )}
 
-                {/* Navigation Links with Monochrome Icons */}
+                {/* Navigation Links */}
                 <div className="sidebar-nav-list">
                     <Link to="/" className={`sidebar-nav-item ${location.pathname === '/' ? 'active' : ''}`}>
                         <div className="sidebar-nav-label">
@@ -228,23 +237,23 @@ const Navbar = () => {
                     <Link to="/contact" className={`sidebar-nav-item ${location.pathname === '/contact' ? 'active' : ''}`}>
                         <div className="sidebar-nav-label">
                             <Mail size={18} />
-                            <span>Contact & Location</span>
+                            <span>Contact & Enquiries</span>
                         </div>
                         <ChevronRight size={16} className="chevron" />
                     </Link>
 
-                    {/* Role Workspaces */}
-                    {isLoggedIn && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+                    {/* Portals */}
+                    {isLoggedIn && isOwner && (
                         <Link to="/admin" className="sidebar-nav-item admin-link">
                             <div className="sidebar-nav-label">
                                 <Shield size={18} />
-                                <span>Admin Dashboard</span>
+                                <span>Owner Executive Suite</span>
                             </div>
                             <ChevronRight size={16} className="chevron" />
                         </Link>
                     )}
 
-                    {isLoggedIn && userRole === 'STAFF' && (
+                    {isLoggedIn && isStaff && (
                         <Link to="/staff" className="sidebar-nav-item staff-link">
                             <div className="sidebar-nav-label">
                                 <Shield size={18} />
@@ -253,34 +262,42 @@ const Navbar = () => {
                             <ChevronRight size={16} className="chevron" />
                         </Link>
                     )}
+
+                    {isLoggedIn && isClient && (
+                        <Link to="/client/dashboard" className="sidebar-nav-item client-link">
+                            <div className="sidebar-nav-label">
+                                <User size={18} />
+                                <span>My Client Suite</span>
+                            </div>
+                            <ChevronRight size={16} className="chevron" />
+                        </Link>
+                    )}
                 </div>
 
                 {/* Sidebar Bottom CTAs */}
                 <div className="sidebar-footer">
-                    <Link to="/booking" onClick={handleBookingClick} style={{ textDecoration: 'none' }}>
-                        <button className="btn-primary sidebar-booking-btn">
-                            <Calendar size={18} />
-                            <span>Book Appointment</span>
-                        </button>
-                    </Link>
-
-                    <div className="sidebar-auth-row">
-                        {!isLoggedIn ? (
-                            <Link to="/auth" className="sidebar-login-link">
-                                <UserCircle size={18} />
-                                <span>Patient Login / Sign Up</span>
+                    {!isLoggedIn ? (
+                        <>
+                            <Link to="/client/login" style={{ textDecoration: 'none' }}>
+                                <button className="btn-primary sidebar-booking-btn" style={{ width: '100%', marginBottom: '10px' }}>
+                                    <User size={18} />
+                                    <span>Client Portal Sign In</span>
+                                </button>
                             </Link>
-                        ) : (
-                            <button onClick={handleLogout} className="sidebar-logout-btn">
-                                <LogOut size={18} />
-                                <span>Sign Out</span>
-                            </button>
-                        )}
-                    </div>
+                            <Link to="/client/register" style={{ display: 'block', textAlign: 'center', fontSize: '0.85rem', color: '#806657', textDecoration: 'none', fontWeight: '600', padding: '8px 0' }}>
+                                New Client? Register with OTP &rarr;
+                            </Link>
+                        </>
+                    ) : (
+                        <button onClick={handleLogout} className="sidebar-logout-btn" style={{ width: '100%' }}>
+                            <LogOut size={18} />
+                            <span>Sign Out</span>
+                        </button>
+                    )}
 
-                    <div style={{ marginTop: '12px', textAlign: 'center' }}>
-                        <Link to="/admin-login" style={{ fontSize: '0.8rem', color: '#a39284', textDecoration: 'none' }}>
-                            Salon Team Workspace &rarr;
+                    <div style={{ marginTop: '16px', textAlign: 'center', borderTop: '1px solid #ebdcd0', paddingTop: '12px' }}>
+                        <Link to="/owner/login" style={{ fontSize: '0.78rem', color: '#a39284', textDecoration: 'none' }}>
+                            Clinic Administration Login &rarr;
                         </Link>
                     </div>
                 </div>

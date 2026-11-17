@@ -65,11 +65,31 @@ const Home = () => {
         <div style={{ display: 'flex', gap: '14px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <button 
             className="btn-primary" 
-            onClick={() => navigate('/booking')}
+            onClick={() => navigate('/contact')}
             style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 26px', fontSize: '1rem' }}
           >
-            <Calendar size={18} />
-            <span>Book Consultation</span>
+            <Mail size={18} />
+            <span>Enquire Consultation</span>
+          </button>
+
+          <button 
+            onClick={() => navigate('/client/login')}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px', 
+              padding: '12px 24px', 
+              fontSize: '1rem',
+              backgroundColor: '#ffffff',
+              color: '#5a4638',
+              border: '1px solid #d9cbbe',
+              borderRadius: '8px',
+              fontWeight: '600',
+              cursor: 'pointer'
+            }}
+          >
+            <span>Client Suite</span>
+            <ChevronRight size={16} />
           </button>
           
           <button 
@@ -80,7 +100,7 @@ const Home = () => {
               gap: '8px', 
               padding: '12px 24px', 
               fontSize: '1rem',
-              backgroundColor: '#ffffff',
+              backgroundColor: 'transparent',
               color: '#5a4638',
               border: '1px solid #d9cbbe',
               borderRadius: '8px',
@@ -193,10 +213,10 @@ const Home = () => {
               </p>
             </div>
             <button 
-              onClick={() => navigate('/booking')}
+              onClick={() => navigate('/contact')}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', backgroundColor: '#fcf9f5', border: '1px solid #ded4c9', color: '#5a4638', fontWeight: '600', fontSize: '0.88rem', cursor: 'pointer' }}
             >
-              <span>Schedule Session</span>
+              <span>Enquire Service</span>
               <ChevronRight size={16} />
             </button>
           </div>
@@ -212,10 +232,10 @@ const Home = () => {
               </p>
             </div>
             <button 
-              onClick={() => navigate('/booking')}
+              onClick={() => navigate('/contact')}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', backgroundColor: '#fcf9f5', border: '1px solid #ded4c9', color: '#5a4638', fontWeight: '600', fontSize: '0.88rem', cursor: 'pointer' }}
             >
-              <span>Schedule Session</span>
+              <span>Enquire Service</span>
               <ChevronRight size={16} />
             </button>
           </div>
@@ -231,10 +251,10 @@ const Home = () => {
               </p>
             </div>
             <button 
-              onClick={() => navigate('/booking')}
+              onClick={() => navigate('/contact')}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', backgroundColor: '#fcf9f5', border: '1px solid #ded4c9', color: '#5a4638', fontWeight: '600', fontSize: '0.88rem', cursor: 'pointer' }}
             >
-              <span>Schedule Session</span>
+              <span>Enquire Service</span>
               <ChevronRight size={16} />
             </button>
           </div>
@@ -250,10 +270,10 @@ const Home = () => {
               </p>
             </div>
             <button 
-              onClick={() => navigate('/booking')}
+              onClick={() => navigate('/contact')}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', backgroundColor: '#fcf9f5', border: '1px solid #ded4c9', color: '#5a4638', fontWeight: '600', fontSize: '0.88rem', cursor: 'pointer' }}
             >
-              <span>Schedule Session</span>
+              <span>Enquire Service</span>
               <ChevronRight size={16} />
             </button>
           </div>

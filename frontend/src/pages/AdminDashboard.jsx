@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Calendar, CheckCircle, Clock, Edit2, Trash2, X, Save, LogOut, 
-  RefreshCw, MessageSquare, Mail, Phone, Search, DollarSign, 
-  TrendingUp, Users, UserPlus, Shield, Briefcase, Award,
-  KeyRound, Lock, Eye, EyeOff, CheckCircle2, AlertCircle
+  RefreshCw, MessageSquare, Mail, Phone, Search, Users, UserPlus, 
+  Shield, Briefcase, Award, KeyRound, Lock, Eye, EyeOff, 
+  CheckCircle2, AlertCircle, Sparkles, HeartPulse, Settings, FileText
 } from 'lucide-react';
 import API from '../services/api';
 import '../styles/pages.css';
@@ -12,20 +12,22 @@ import '../styles/pages.css';
 const AdminDashboard = () => {
   const navigate = useNavigate();
 
+  // Active Tab: 'appointments' | 'clients' | 'reports' | 'staff' | 'messages' | 'settings' | 'security'
   const [activeTab, setActiveTab] = useState('appointments');
-  const [appointments, setAppointments] = useState([]);
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
-  // Financial & Report State
+  // Core Data States
+  const [appointments, setAppointments] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [messages, setMessages] = useState([]);
   const [reports, setReports] = useState({
-    completedRevenue: 0,
-    projectedRevenue: 0,
-    totalEstimatedValue: 0,
-    averageBookingValue: 0,
     totalCustomers: 0,
-    treatmentCounts: {}
+    totalTreatmentsRecorded: 0,
+    totalActiveServices: 0,
+    totalStaff: 0,
+    treatmentCounts: {},
+    totalEnquiries: 0,
+    unreadEnquiries: 0,
+    resolvedEnquiries: 0
   });
 
   // Staff State
@@ -34,11 +36,23 @@ const AdminDashboard = () => {
     fullName: '',
     email: '',
     designation: 'Skin Therapist',
-    password: ''
+    phone: ''
   });
   const [staffActionLoading, setStaffActionLoading] = useState(false);
   const [staffSuccess, setStaffSuccess] = useState('');
   const [staffError, setStaffError] = useState('');
+
+  // Clinic Settings State
+  const [settings, setSettings] = useState({
+    clinicName: 'DERMA ALINE AESTHÉTICS SKIN CLINIC',
+    contactEmail: 'dermaalineskinaesthetics@gmail.com',
+    contactPhone: '+91 6392194139',
+    address: 'Derma Aline Aesthétics Clinic, Luxury Care Suite',
+    openingHours: 'Mon - Sat: 10:00 AM - 08:00 PM',
+    generalInformation: 'Premier aesthetic skin clinic providing tailored clinical treatments, skin rejuvenation, and luxury dermatological care.'
+  });
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const [settingsSuccess, setSettingsSuccess] = useState('');
 
   // Security & Password State
   const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
@@ -52,21 +66,31 @@ const AdminDashboard = () => {
   // Search and Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [clientSearchTerm, setClientSearchTerm] = useState('');
 
   // State for editing appointment
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({ patientName: '', treatmentName: '', appointmentDate: '', appointmentTime: '', status: '' });
+
+  // Selected Client Details Modal
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [clientDetailLoading, setClientDetailLoading] = useState(false);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const fetchData = async () => {
     try {
       setLoading(true);
       setError('');
 
-      const [apptRes, msgRes, reportRes, staffRes] = await Promise.allSettled([
+      const [apptRes, msgRes, reportRes, staffRes, clientsRes, settingsRes] = await Promise.allSettled([
         API.get('/appointments'),
         API.get('/contact'),
         API.get('/admin/reports/overview'),
-        API.get('/admin/staff/invitations')
+        API.get('/admin/staff/invitations'),
+        API.get('/admin/clients'),
+        API.get('/admin/settings')
       ]);
 
       if (apptRes.status === 'fulfilled') {
@@ -80,6 +104,12 @@ const AdminDashboard = () => {
       }
       if (staffRes.status === 'fulfilled') {
         setStaffInvitations(staffRes.value.data || []);
+      }
+      if (clientsRes.status === 'fulfilled') {
+        setClients(clientsRes.value.data || []);
+      }
+      if (settingsRes.status === 'fulfilled' && settingsRes.value.data) {
+        setSettings(settingsRes.value.data);
       }
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
@@ -117,7 +147,6 @@ const AdminDashboard = () => {
       fetchData();
     } catch (err) {
       console.error("Failed to update appointment via PUT, attempting status patch fallback:", err);
-      // Fallback: if only status was updated or backend had transient PUT issues
       if (editForm.status) {
         try {
           await API.patch('/appointments/' + targetId + '/status', { status: editForm.status });
@@ -156,97 +185,130 @@ const AdminDashboard = () => {
     }
   };
 
+  // Staff Management: Invite
   const handleEnrollStaff = async (e) => {
     e.preventDefault();
-    if (!newStaff.email || !newStaff.fullName) {
-      setStaffError('Please provide both staff member name and work email.');
-      return;
-    }
-    try {
-      setStaffActionLoading(true);
-      setStaffError('');
-      setStaffSuccess('');
+    setStaffActionLoading(true);
+    setStaffSuccess('');
+    setStaffError('');
 
-      const res = await API.post('/admin/staff/invitations', newStaff);
-      if (res.data && res.data.success) {
-        setStaffSuccess(`Successfully enrolled ${newStaff.fullName} as ${newStaff.designation}!`);
-        setNewStaff({ fullName: '', email: '', designation: 'Skin Therapist', password: '' });
-        // Refresh staff list
-        const updatedStaff = await API.get('/admin/staff/invitations');
-        setStaffInvitations(updatedStaff.data || []);
-      } else {
-        setStaffError(res.data?.message || 'Failed to enroll staff member.');
-      }
+    try {
+      const response = await API.post('/admin/staff/invitations', newStaff);
+      setStaffSuccess(response.data.message || 'Staff invitation successfully dispatched!');
+      setNewStaff({ fullName: '', email: '', designation: 'Skin Therapist', phone: '' });
+      fetchData();
+      setTimeout(() => setStaffSuccess(''), 4000);
     } catch (err) {
-      console.error("Staff enrollment error:", err);
-      setStaffError(err.response?.data?.message || 'Server error while enrolling staff.');
+      console.error("Failed to invite staff worker:", err);
+      setStaffError(err.response?.data?.message || 'Failed to dispatch staff invitation.');
+      setTimeout(() => setStaffError(''), 4000);
     } finally {
       setStaffActionLoading(false);
     }
   };
 
+  // Staff Management: Resend Invitation
+  const handleResendStaffInvite = async (id) => {
+    try {
+      const res = await API.post(`/admin/staff/invitations/${id}/resend`);
+      setStaffSuccess(res.data.message || 'Invitation resent.');
+      fetchData();
+      setTimeout(() => setStaffSuccess(''), 3000);
+    } catch (err) {
+      setStaffError('Failed to resend invitation.');
+    }
+  };
+
+  // Staff Management: Revoke
   const handleRevokeStaff = async (id) => {
-    if (window.confirm("Are you sure you want to revoke this staff member's credentials? They will no longer be able to log in to the staff portal.")) {
+    if (window.confirm("Are you sure you want to revoke this staff member's clearance?")) {
       try {
         await API.delete('/admin/staff/invitations/' + id);
-        setStaffSuccess('Staff account and access revoked.');
-        const updatedStaff = await API.get('/admin/staff/invitations');
-        setStaffInvitations(updatedStaff.data || []);
+        fetchData();
       } catch (err) {
-        alert('Failed to revoke staff access.');
+        alert("Failed to revoke staff access");
       }
     }
   };
 
+  // Client Details Modal
+  const handleViewClientDetails = async (clientId) => {
+    setClientDetailLoading(true);
+    try {
+      const res = await API.get(`/admin/clients/${clientId}`);
+      setSelectedClient(res.data);
+    } catch (err) {
+      alert("Failed to load client details.");
+    } finally {
+      setClientDetailLoading(false);
+    }
+  };
+
+  // Clinic Settings Save
+  const handleSaveSettings = async (e) => {
+    e.preventDefault();
+    setSettingsLoading(true);
+    setSettingsSuccess('');
+
+    try {
+      const res = await API.put('/admin/settings', settings);
+      setSettingsSuccess(res.data.message || 'Clinic settings updated successfully.');
+      setTimeout(() => setSettingsSuccess(''), 3000);
+    } catch (err) {
+      alert('Failed to save settings.');
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
+  // Change Admin Password
   const handleChangePassword = async (e) => {
     e.preventDefault();
     setPasswordError('');
     setPasswordSuccess('');
 
-    if (!passwordForm.oldPassword) {
-      setPasswordError('Please provide your current password.');
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('New passwords do not match.');
       return;
     }
     if (passwordForm.newPassword.length < 6) {
-      setPasswordError('New password must be at least 6 characters long.');
-      return;
-    }
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setPasswordError('New password and confirmation do not match.');
+      setPasswordError('Password must be at least 6 characters long.');
       return;
     }
 
+    const currentEmail = localStorage.getItem('email') || 'apurvdwivedi2205@gmail.com';
+    setPasswordLoading(true);
+
     try {
-      setPasswordLoading(true);
-      const email = localStorage.getItem('email') || 'apurvdwivedi2205@gmail.com';
       const response = await API.post('/auth/change-password', {
-        email: email,
+        email: currentEmail,
         oldPassword: passwordForm.oldPassword,
         newPassword: passwordForm.newPassword
       });
-      setPasswordSuccess(response.data?.message || 'Password changed successfully!');
+
+      setPasswordSuccess(response.data.message || 'Password changed successfully!');
       setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
+      setTimeout(() => setPasswordSuccess(''), 4000);
     } catch (err) {
-      setPasswordError(err.response?.data?.message || 'Failed to change password. Please check your current password.');
+      console.error("Failed to change password:", err);
+      setPasswordError(err.response?.data?.message || 'Incorrect old password or session error.');
     } finally {
       setPasswordLoading(false);
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('role');
-    localStorage.removeItem('fullName');
-    navigate('/admin-login');
+    localStorage.clear();
+    navigate('/owner/login');
   };
 
-  // Active appointments needing clinic action (excludes COMPLETED, CANCELLED, REJECTED)
+  // Active appointments needing clinic action
   const activeAppointments = appointments.filter(a => {
     const st = (a.status || 'PENDING').toUpperCase();
     return st === 'PENDING' || st === 'CONFIRMED';
   });
 
-  // Unread incoming patient inquiries
+  // Unread patient inquiries
   const unreadMessages = messages.filter(m => {
     const st = (m.status || 'UNREAD').toUpperCase();
     return st === 'UNREAD';
@@ -278,21 +340,63 @@ const AdminDashboard = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const filteredClients = clients.filter(c => {
+    const q = clientSearchTerm.toLowerCase();
+    return (
+      (c.fullName && c.fullName.toLowerCase().includes(q)) ||
+      (c.email && c.email.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.includes(q))
+    );
+  });
+
   return (
-    <div className="internal-page">
-      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
+    <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '10px 0 60px 0' }}>
+      
+      {/* Top Header Card */}
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        gap: '20px',
+        backgroundColor: 'var(--bg-white)',
+        padding: '28px 32px',
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid var(--border-light)',
+        boxShadow: 'var(--shadow-soft)',
+        marginBottom: '25px'
+      }}>
         <div>
-          <h1>Admin Control Dashboard</h1>
-          <p style={{ color: 'var(--text-light)' }}>
-            Super Admin Suite: Financial revenues, clinic operations, live bookings, and staff management.
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+            <span style={{ 
+              backgroundColor: '#fef3c7', color: '#92400e', padding: '4px 10px', 
+              borderRadius: '20px', fontSize: '0.75rem', fontWeight: '800', letterSpacing: '0.08em', textTransform: 'uppercase'
+            }}>
+              SUPER_ADMIN
+            </span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>Clinic Management Platform</span>
+          </div>
+          <h1 style={{ fontSize: '1.8rem', color: 'var(--color-primary)', margin: 0, fontFamily: 'var(--font-heading)', fontWeight: '600' }}>
+            Derma Aline Executive Suite
+          </h1>
         </div>
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn-primary" onClick={fetchData} style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 16px' }}>
-            <RefreshCw size={16} /> Refresh
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button 
+            className="btn-secondary" 
+            onClick={fetchData} 
+            title="Refresh All Data"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 14px', fontSize: '0.85rem', fontWeight: '600' }}
+          >
+            <RefreshCw size={15} /> Refresh
           </button>
-          <button className="btn-secondary" onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', fontWeight: '700' }}>
-            <LogOut size={16} /> Logout / Exit
+          
+          <button 
+            className="btn-primary" 
+            onClick={handleLogout} 
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontSize: '0.85rem', fontWeight: '600', backgroundColor: '#dc3545', borderColor: '#dc3545' }}
+          >
+            <LogOut size={15} /> Sign Out
           </button>
         </div>
       </div>
@@ -303,40 +407,40 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Top Stats & Financial Summary Cards */}
+      {/* Top Operational Summary Cards (Zero Financial/Revenue Metrics) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '30px' }}>
         
-        {/* Revenue Collected */}
+        {/* Total Registered Clients */}
         <div style={{ backgroundColor: 'var(--bg-white)', padding: '22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Revenue Collected</span>
-            <TrendingUp size={22} color="#155724" />
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registered Clients</span>
+            <Users size={22} color="var(--color-accent)" />
           </div>
-          <p style={{ fontSize: '1.9rem', fontWeight: '800', color: '#155724', margin: '6px 0 2px' }}>
-            ₹{Number(reports.completedRevenue || 0).toLocaleString('en-IN')}
+          <p style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--color-primary)', margin: '6px 0 2px' }}>
+            {reports.totalCustomers || clients.length}
           </p>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>From completed sessions</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>Client profiles in clinic CRM</span>
         </div>
 
-        {/* Projected Pipeline */}
+        {/* Clinical Treatments Recorded */}
         <div style={{ backgroundColor: 'var(--bg-white)', padding: '22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Projected Pipeline</span>
-            <DollarSign size={22} color="var(--color-primary)" />
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Treatments Recorded</span>
+            <HeartPulse size={22} color="#155724" />
           </div>
-          <p style={{ fontSize: '1.9rem', fontWeight: '800', color: 'var(--color-primary)', margin: '6px 0 2px' }}>
-            ₹{Number(reports.projectedRevenue || 0).toLocaleString('en-IN')}
+          <p style={{ fontSize: '2rem', fontWeight: '800', color: '#155724', margin: '6px 0 2px' }}>
+            {reports.totalTreatmentsRecorded || 0}
           </p>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>From confirmed bookings</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>Clinical sessions completed</span>
         </div>
 
         {/* Active Appointments */}
         <div style={{ backgroundColor: 'var(--bg-white)', padding: '22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Appointments</span>
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Appointments</span>
             <Calendar size={22} color="var(--color-accent)" />
           </div>
-          <p style={{ fontSize: '1.9rem', fontWeight: '800', color: 'var(--color-primary)', margin: '6px 0 2px' }}>
+          <p style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--color-primary)', margin: '6px 0 2px' }}>
             {activeAppointments.length}
           </p>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>
@@ -344,16 +448,16 @@ const AdminDashboard = () => {
           </span>
         </div>
 
-        {/* Staff Members */}
+        {/* Staff Team */}
         <div style={{ backgroundColor: 'var(--bg-white)', padding: '22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.9rem', color: 'var(--text-light)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Staff Workers</span>
-            <Users size={22} color="var(--color-primary)" />
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Clinic Staff Team</span>
+            <Briefcase size={22} color="var(--color-primary)" />
           </div>
-          <p style={{ fontSize: '1.9rem', fontWeight: '800', color: 'var(--color-primary)', margin: '6px 0 2px' }}>
+          <p style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--color-primary)', margin: '6px 0 2px' }}>
             {staffInvitations.length}
           </p>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>Active salon team members</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>Authorized operational staff</span>
         </div>
       </div>
 
@@ -362,7 +466,7 @@ const AdminDashboard = () => {
         <button 
           onClick={() => setActiveTab('appointments')} 
           style={{ 
-            padding: '12px 20px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
             backgroundColor: activeTab === 'appointments' ? 'var(--color-accent)' : 'var(--bg-white)', 
             color: activeTab === 'appointments' ? '#fff' : 'var(--color-primary)', 
             boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
@@ -371,31 +475,42 @@ const AdminDashboard = () => {
         </button>
 
         <button 
-          onClick={() => setActiveTab('revenue')} 
+          onClick={() => setActiveTab('clients')} 
           style={{ 
-            padding: '12px 20px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
-            backgroundColor: activeTab === 'revenue' ? 'var(--color-accent)' : 'var(--bg-white)', 
-            color: activeTab === 'revenue' ? '#fff' : 'var(--color-primary)', 
+            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            backgroundColor: activeTab === 'clients' ? 'var(--color-accent)' : 'var(--bg-white)', 
+            color: activeTab === 'clients' ? '#fff' : 'var(--color-primary)', 
             boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
           }}>
-          <DollarSign size={16} /> Revenue & Financials
+          <Users size={16} /> Client CRM ({clients.length})
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('reports')} 
+          style={{ 
+            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            backgroundColor: activeTab === 'reports' ? 'var(--color-accent)' : 'var(--bg-white)', 
+            color: activeTab === 'reports' ? '#fff' : 'var(--color-primary)', 
+            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
+          }}>
+          <FileText size={16} /> Operational Reports
         </button>
 
         <button 
           onClick={() => setActiveTab('staff')} 
           style={{ 
-            padding: '12px 20px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
             backgroundColor: activeTab === 'staff' ? 'var(--color-accent)' : 'var(--bg-white)', 
             color: activeTab === 'staff' ? '#fff' : 'var(--color-primary)', 
             boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
           }}>
-          <Users size={16} /> Staff & Workers ({staffInvitations.length})
+          <Briefcase size={16} /> Staff Management ({staffInvitations.length})
         </button>
 
         <button 
           onClick={() => setActiveTab('messages')} 
           style={{ 
-            padding: '12px 20px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
             backgroundColor: activeTab === 'messages' ? 'var(--color-accent)' : 'var(--bg-white)', 
             color: activeTab === 'messages' ? '#fff' : 'var(--color-primary)', 
             boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
@@ -404,25 +519,35 @@ const AdminDashboard = () => {
         </button>
 
         <button 
+          onClick={() => setActiveTab('settings')} 
+          style={{ 
+            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            backgroundColor: activeTab === 'settings' ? 'var(--color-accent)' : 'var(--bg-white)', 
+            color: activeTab === 'settings' ? '#fff' : 'var(--color-primary)', 
+            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
+          }}>
+          <Settings size={16} /> Clinic Settings
+        </button>
+
+        <button 
           onClick={() => setActiveTab('security')} 
           style={{ 
-            padding: '12px 20px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
             backgroundColor: activeTab === 'security' ? 'var(--color-accent)' : 'var(--bg-white)', 
             color: activeTab === 'security' ? '#fff' : 'var(--color-primary)', 
             boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
           }}>
-          <KeyRound size={16} /> Security & Password
+          <KeyRound size={16} /> Admin Password
         </button>
       </div>
 
-      {/* Tab 1: Appointments Table */}
+      {/* TAB 1: APPOINTMENTS */}
       {activeTab === 'appointments' && (
         <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
-          
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '15px', marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', fontFamily: 'var(--font-heading)', margin: 0 }}>Live Patient Appointments</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+            <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', margin: 0, fontFamily: 'var(--font-heading)' }}>Live Patient Appointments</h2>
             
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
               <div style={{ position: 'relative' }}>
                 <Search size={18} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-light)' }} />
                 <input 
@@ -461,9 +586,7 @@ const AdminDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
-                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '30px' }}>Loading...</td></tr>
-                ) : filteredAppointments.length === 0 ? (
+                {filteredAppointments.length === 0 ? (
                   <tr><td colSpan="5" style={{ textAlign: 'center', padding: '30px' }}>No appointments match your filters.</td></tr>
                 ) : (
                   filteredAppointments.map((appt) => (
@@ -498,7 +621,7 @@ const AdminDashboard = () => {
                             {(appt.customerPhone || appt.phone) && <div style={{ fontSize: '0.8rem', color: 'var(--text-light)', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}><Phone size={12}/> {appt.customerPhone || appt.phone}</div>}
                           </td>
                           <td style={{ padding: '15px 12px' }}>{appt.treatmentName}</td>
-                          <td style={{ padding: '15px 12px', color: 'var(--text-light)' }}>{appt.appointmentDate}<br/><span style={{ fontSize: '0.9rem' }}>{appt.appointmentTime}</span></td>
+                          <td style={{ padding: '15px 12px', color: 'var(--text-light)' }}>{appt.appointmentDate ? String(appt.appointmentDate).split('T')[0] : '—'}<br/><span style={{ fontSize: '0.9rem' }}>{appt.appointmentTime}</span></td>
                           <td style={{ padding: '15px 12px' }}>
                             <span style={{ 
                               padding: '5px 10px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '700', 
@@ -523,100 +646,104 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Tab 2: Revenue & Financials */}
-      {activeTab === 'revenue' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
-          {/* Revenue Metric Breakdown */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px' }}>
-            <div style={{ backgroundColor: 'var(--bg-white)', padding: '24px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                <TrendingUp size={20} color="#155724" />
-                <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Realized Revenue</h4>
-              </div>
-              <p style={{ fontSize: '2.2rem', fontWeight: '800', color: '#155724', margin: '8px 0' }}>
-                ₹{Number(reports.completedRevenue || 0).toLocaleString('en-IN')}
-              </p>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)' }}>
-                Total income collected from {reports.completedAppointments || 0} successfully completed client procedures.
-              </p>
+      {/* TAB 2: CLIENT CRM */}
+      {activeTab === 'clients' && (
+        <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+            <div>
+              <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', margin: 0, fontFamily: 'var(--font-heading)' }}>Client CRM & History</h2>
+              <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', margin: '4px 0 0 0' }}>Centralized directory of clinic patients and their clinical treatments.</p>
             </div>
-
-            <div style={{ backgroundColor: 'var(--bg-white)', padding: '24px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                <DollarSign size={20} color="var(--color-primary)" />
-                <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Confirmed Pipeline</h4>
-              </div>
-              <p style={{ fontSize: '2.2rem', fontWeight: '800', color: 'var(--color-primary)', margin: '8px 0' }}>
-                ₹{Number(reports.projectedRevenue || 0).toLocaleString('en-IN')}
-              </p>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)' }}>
-                Expected revenue from {reports.confirmedAppointments || 0} confirmed client appointments.
-              </p>
-            </div>
-
-            <div style={{ backgroundColor: 'var(--bg-white)', padding: '24px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                <Award size={20} color="var(--color-accent)" />
-                <h4 style={{ margin: 0, fontSize: '0.95rem', color: 'var(--text-light)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Average Ticket Value</h4>
-              </div>
-              <p style={{ fontSize: '2.2rem', fontWeight: '800', color: 'var(--color-primary)', margin: '8px 0' }}>
-                ₹{Number(reports.averageBookingValue || 0).toLocaleString('en-IN')}
-              </p>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)' }}>
-                Average revenue generated per booked aesthetic treatment session.
-              </p>
+            
+            <div style={{ position: 'relative' }}>
+              <Search size={18} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-light)' }} />
+              <input 
+                type="text" 
+                placeholder="Search clients..." 
+                value={clientSearchTerm}
+                onChange={(e) => setClientSearchTerm(e.target.value)}
+                style={{ padding: '8px 12px 8px 35px', borderRadius: '8px', border: '1px solid var(--border-light)', outline: 'none' }}
+              />
             </div>
           </div>
 
-          {/* Treatment Distribution Table */}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '750px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border-light)', color: 'var(--text-light)', fontSize: '0.88rem' }}>
+                  <th style={{ padding: '12px' }}>Client</th>
+                  <th style={{ padding: '12px' }}>Email</th>
+                  <th style={{ padding: '12px' }}>Phone</th>
+                  <th style={{ padding: '12px', textAlign: 'center' }}>Sessions on File</th>
+                  <th style={{ padding: '12px', textAlign: 'center' }}>Clinical Profile</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredClients.length === 0 ? (
+                  <tr><td colSpan="5" style={{ textAlign: 'center', padding: '30px' }}>No clients found.</td></tr>
+                ) : (
+                  filteredClients.map((c) => (
+                    <tr key={c.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td style={{ padding: '14px 12px', fontWeight: '600', color: 'var(--color-primary)' }}>{c.fullName}</td>
+                      <td style={{ padding: '14px 12px', color: 'var(--text-light)', fontSize: '0.88rem' }}>{c.email}</td>
+                      <td style={{ padding: '14px 12px', color: 'var(--text-light)', fontSize: '0.88rem' }}>{c.phone || '—'}</td>
+                      <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                        <span style={{ backgroundColor: '#f1f5f9', color: '#334155', padding: '4px 10px', borderRadius: '12px', fontSize: '0.78rem', fontWeight: '700' }}>
+                          {c.treatmentCount || 0} treatments
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                        <button
+                          onClick={() => handleViewClientDetails(c.id)}
+                          style={{ backgroundColor: '#fbf9f6', border: '1px solid #ebdcd0', color: '#806657', padding: '6px 14px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer' }}
+                        >
+                          View File
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: OPERATIONAL REPORTS */}
+      {activeTab === 'reports' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
           <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
-            <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', marginBottom: '15px', fontFamily: 'var(--font-heading)' }}>
-              Treatment Volume & Distribution
+            <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', marginBottom: '8px', fontFamily: 'var(--font-heading)' }}>
+              Treatment Volume & Service Popularity Breakdown
             </h3>
-            <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '20px' }}>
-              Detailed breakdown of booking demand across all dermatology and aesthetic services.
+            <p style={{ color: 'var(--text-light)', fontSize: '0.88rem', marginBottom: '20px' }}>
+              Operational clinic analysis tracking service demand across all skin and dermatology procedures (strictly non-financial).
             </p>
 
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '600px' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--border-light)', color: 'var(--text-light)', fontSize: '0.9rem' }}>
-                    <th style={{ padding: '12px' }}>Treatment Name</th>
-                    <th style={{ padding: '12px', textAlign: 'center' }}>Total Bookings</th>
-                    <th style={{ padding: '12px', textAlign: 'right' }}>Volume Share</th>
+                    <th style={{ padding: '12px' }}>Treatment Service Name</th>
+                    <th style={{ padding: '12px', textAlign: 'center' }}>Total Completed Sessions</th>
+                    <th style={{ padding: '12px', textAlign: 'right' }}>Popularity Share</th>
                   </tr>
                 </thead>
                 <tbody>
                   {reports.treatmentCounts && Object.keys(reports.treatmentCounts).length > 0 ? (
                     Object.entries(reports.treatmentCounts).map(([name, count]) => {
-                      const percentage = reports.totalAppointments > 0 
-                        ? Math.round((count / reports.totalAppointments) * 100) 
-                        : 0;
+                      const total = reports.totalTreatmentsRecorded || 1;
+                      const percentage = Math.round((count / total) * 100);
                       return (
                         <tr key={name} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                          <td style={{ padding: '14px 12px', fontWeight: '600', color: 'var(--color-primary)' }}>
-                            {name}
-                          </td>
-                          <td style={{ padding: '14px 12px', textAlign: 'center', fontWeight: '700' }}>
-                            {count}
-                          </td>
-                          <td style={{ padding: '14px 12px', textAlign: 'right', color: 'var(--text-light)' }}>
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                              <span>{percentage}%</span>
-                              <div style={{ width: '80px', height: '6px', backgroundColor: '#f0f0f0', borderRadius: '4px', overflow: 'hidden' }}>
-                                <div style={{ width: `${percentage}%`, height: '100%', backgroundColor: 'var(--color-accent)' }}></div>
-                              </div>
-                            </div>
-                          </td>
+                          <td style={{ padding: '14px 12px', fontWeight: '600', color: 'var(--color-primary)' }}>{name}</td>
+                          <td style={{ padding: '14px 12px', textAlign: 'center', fontWeight: '700' }}>{count}</td>
+                          <td style={{ padding: '14px 12px', textAlign: 'right', color: 'var(--text-light)' }}>{percentage}%</td>
                         </tr>
                       );
                     })
                   ) : (
-                    <tr>
-                      <td colSpan="3" style={{ textAlign: 'center', padding: '25px', color: 'var(--text-light)' }}>
-                        No treatment data recorded yet.
-                      </td>
-                    </tr>
+                    <tr><td colSpan="3" style={{ textAlign: 'center', padding: '25px', color: 'var(--text-light)' }}>No treatment records logged yet.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -625,19 +752,16 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Tab 3: Staff & Workers Management */}
+      {/* TAB 4: STAFF MANAGEMENT */}
       {activeTab === 'staff' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
-          
-          {/* Security & Role Policy Banner */}
           <div style={{ backgroundColor: '#f8f9fa', padding: '18px 24px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'center', gap: '15px' }}>
             <Shield size={28} color="var(--color-primary)" />
             <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', lineHeight: '1.5' }}>
-              <strong>Role Access Boundary:</strong> Staff members are strictly restricted to the <code>/staff</code> operational queue. They can update appointment status (Confirm, Complete, Cancel) but <strong>cannot</strong> view financial revenue, customer medical notes, or manage accounts.
+              <strong>Generalist Staff Working Model:</strong> Authorized staff operate across the general clinic workspace (`/staff`). They can record clinical treatment sessions and answer inquiries, but have <strong>no access</strong> to owner settings or unauthorized patient medical data.
             </div>
           </div>
 
-          {/* Feedback alerts */}
           {staffSuccess && (
             <div style={{ padding: '14px 18px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '8px', border: '1px solid #c3e6cb' }}>
               {staffSuccess}
@@ -649,23 +773,21 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* Enroll New Staff Form */}
+          {/* Send Staff Invitation */}
           <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
               <UserPlus size={22} color="var(--color-accent)" />
               <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', margin: 0, fontFamily: 'var(--font-heading)' }}>
-                Enroll New Salon / Clinic Staff Worker
+                Invite New Staff Member
               </h3>
             </div>
             <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '20px' }}>
-              Create credentials for your clinic therapists, aestheticians, and reception workers to manage daily bookings.
+              Dispatches a secure single-use invitation link expiring in 24 hours. The employee sets their own password.
             </p>
 
             <form onSubmit={handleEnrollStaff} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
-                  Full Name *
-                </label>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Full Name *</label>
                 <input 
                   type="text" 
                   placeholder="e.g. Priya Sharma" 
@@ -677,12 +799,10 @@ const AdminDashboard = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
-                  Work Email *
-                </label>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Work Email *</label>
                 <input 
                   type="email" 
-                  placeholder="e.g. priya@dermaaline.com" 
+                  placeholder="priya@dermaaline.com" 
                   value={newStaff.email}
                   onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
                   required
@@ -691,27 +811,12 @@ const AdminDashboard = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
-                  Designation / Role
-                </label>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Designation</label>
                 <input 
                   type="text" 
                   placeholder="e.g. Skin Therapist, Aesthetician" 
                   value={newStaff.designation}
                   onChange={(e) => setNewStaff({ ...newStaff, designation: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
-                  Initial Password (Optional)
-                </label>
-                <input 
-                  type="password" 
-                  placeholder="Default: Staff@2026" 
-                  value={newStaff.password}
-                  onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
                 />
               </div>
@@ -723,7 +828,7 @@ const AdminDashboard = () => {
                   className="btn-primary" 
                   style={{ width: '100%', padding: '11px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: '700' }}
                 >
-                  <UserPlus size={16} /> {staffActionLoading ? 'Enrolling...' : 'Enroll Staff Worker'}
+                  <UserPlus size={16} /> {staffActionLoading ? 'Dispatching...' : 'Send Secure Invitation'}
                 </button>
               </div>
             </form>
@@ -732,7 +837,7 @@ const AdminDashboard = () => {
           {/* Active Staff List Table */}
           <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
             <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', marginBottom: '15px', fontFamily: 'var(--font-heading)' }}>
-              Active Clinic Staff Team
+              Clinic Staff Team & Invitations
             </h3>
             
             <div style={{ overflowX: 'auto' }}>
@@ -742,52 +847,45 @@ const AdminDashboard = () => {
                     <th style={{ padding: '12px' }}>Staff Worker</th>
                     <th style={{ padding: '12px' }}>Email</th>
                     <th style={{ padding: '12px' }}>Designation</th>
-                    <th style={{ padding: '12px' }}>Role Clearance</th>
+                    <th style={{ padding: '12px' }}>Status</th>
                     <th style={{ padding: '12px', textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {staffInvitations.length === 0 ? (
-                    <tr>
-                      <td colSpan="5" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-light)' }}>
-                        No staff workers enrolled yet. Use the form above to enroll your first salon worker.
-                      </td>
-                    </tr>
+                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-light)' }}>No staff members enrolled yet.</td></tr>
                   ) : (
                     staffInvitations.map((staff) => (
                       <tr key={staff.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                        <td style={{ padding: '14px 12px' }}>
-                          <div style={{ fontWeight: '600', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Briefcase size={16} color="var(--color-accent)" />
-                            {staff.fullName || 'Clinic Staff'}
-                          </div>
-                        </td>
-                        <td style={{ padding: '14px 12px', color: 'var(--text-light)', fontSize: '0.9rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Mail size={14} /> {staff.email}
-                          </div>
-                        </td>
-                        <td style={{ padding: '14px 12px', color: 'var(--color-primary)', fontWeight: '500' }}>
-                          {staff.designation || 'Skin Therapist'}
-                        </td>
+                        <td style={{ padding: '14px 12px', fontWeight: '600', color: 'var(--color-primary)' }}>{staff.fullName || 'Clinic Staff'}</td>
+                        <td style={{ padding: '14px 12px', color: 'var(--text-light)', fontSize: '0.9rem' }}>{staff.email}</td>
+                        <td style={{ padding: '14px 12px', color: 'var(--color-primary)', fontWeight: '500' }}>{staff.designation || 'Skin Therapist'}</td>
                         <td style={{ padding: '14px 12px' }}>
                           <span style={{ 
                             padding: '4px 10px', borderRadius: '15px', fontSize: '0.75rem', fontWeight: '700', 
-                            backgroundColor: '#e2e3e5', color: '#383d41', border: '1px solid #d6d8db'
+                            backgroundColor: staff.status === 'ACTIVE' ? '#d4edda' : staff.status === 'INVITED' ? '#fff3cd' : '#e2e3e5', 
+                            color: staff.status === 'ACTIVE' ? '#155724' : staff.status === 'INVITED' ? '#856404' : '#383d41'
                           }}>
-                            OPERATIONAL STAFF
+                            {staff.status || 'INVITED'}
                           </span>
                         </td>
                         <td style={{ padding: '14px 12px', textAlign: 'center' }}>
-                          <button 
-                            onClick={() => handleRevokeStaff(staff.id)}
-                            style={{ 
-                              backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', 
-                              borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' 
-                            }}
-                          >
-                            <Trash2 size={13} /> Revoke Access
-                          </button>
+                          <div style={{ display: 'inline-flex', gap: '8px' }}>
+                            {staff.status === 'INVITED' && (
+                              <button 
+                                onClick={() => handleResendStaffInvite(staff.id)}
+                                style={{ backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', padding: '6px 10px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' }}
+                              >
+                                Resend
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => handleRevokeStaff(staff.id)}
+                              style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
+                            >
+                              Revoke
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))
@@ -796,11 +894,10 @@ const AdminDashboard = () => {
               </table>
             </div>
           </div>
-
         </div>
       )}
 
-      {/* Tab 4: Client Messages Table */}
+      {/* TAB 5: MESSAGES / INQUIRIES */}
       {activeTab === 'messages' && (
         <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)', overflowX: 'auto' }}>
           <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', marginBottom: '20px', fontFamily: 'var(--font-heading)' }}>Client Contact Messages</h2>
@@ -837,7 +934,6 @@ const AdminDashboard = () => {
                           borderRadius: '12px',
                           fontSize: '0.75rem',
                           fontWeight: '700',
-                          letterSpacing: '0.04em',
                           backgroundColor: isRead ? '#f1f5f9' : '#fef3c7',
                           color: isRead ? '#475569' : '#92400e',
                           border: `1px solid ${isRead ? '#cbd5e1' : '#fde68a'}`
@@ -852,34 +948,15 @@ const AdminDashboard = () => {
                             title={isRead ? "Mark as unread" : "Mark as read"}
                             style={{ 
                               backgroundColor: isRead ? '#64748b' : '#059669', 
-                              color: '#fff', 
-                              border: 'none', 
-                              padding: '6px 12px', 
-                              borderRadius: '6px', 
-                              cursor: 'pointer',
-                              fontSize: '0.8rem',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
+                              color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', 
+                              cursor: 'pointer', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' 
                             }}
                           >
                             <CheckCircle2 size={13} /> {isRead ? 'Mark Unread' : 'Mark Read'}
                           </button>
                           <button 
                             onClick={() => handleDeleteMessage(msg.id)} 
-                            title="Delete message"
-                            style={{ 
-                              backgroundColor: '#dc3545', 
-                              color: '#fff', 
-                              border: 'none', 
-                              padding: '6px 12px', 
-                              borderRadius: '6px', 
-                              cursor: 'pointer',
-                              fontSize: '0.8rem',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '4px'
-                            }}
+                            style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
                           >
                             <Trash2 size={13} /> Delete
                           </button>
@@ -894,109 +971,164 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Tab 5: Security & Admin Password */}
-      {activeTab === 'security' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', maxWidth: '650px', margin: '0 auto' }}>
-          
-          {/* Information Notice */}
-          <div style={{ backgroundColor: '#f8f9fa', padding: '18px 22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', display: 'flex', alignItems: 'flex-start', gap: '15px' }}>
-            <Shield size={24} color="var(--color-primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <div style={{ fontSize: '0.88rem', color: 'var(--text-main)', lineHeight: '1.5' }}>
-              <strong>Administrator Credentials:</strong> You can update your master password anytime directly from this portal. Make sure to use at least 6 characters with a combination of letters, numbers, and symbols.
-            </div>
+      {/* TAB 6: CLINIC SETTINGS */}
+      {activeTab === 'settings' && (
+        <div style={{ backgroundColor: 'var(--bg-white)', padding: '36px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)', maxWidth: '750px', margin: '0 auto' }}>
+          <div style={{ marginBottom: '24px' }}>
+            <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', fontFamily: 'var(--font-heading)', fontWeight: '600', margin: '0 0 6px 0' }}>Clinic Settings & Information</h2>
+            <p style={{ color: 'var(--text-light)', fontSize: '0.88rem', margin: 0 }}>Configure official public clinic contact and operational parameters.</p>
           </div>
 
-          {/* Feedback alerts */}
-          {passwordSuccess && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 18px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '8px', border: '1px solid #c3e6cb' }}>
-              <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
-              <span>{passwordSuccess}</span>
-            </div>
-          )}
-          {passwordError && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '14px 18px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '8px', border: '1px solid #f5c6cb' }}>
-              <AlertCircle size={18} style={{ flexShrink: 0 }} />
-              <span>{passwordError}</span>
+          {settingsSuccess && (
+            <div style={{ padding: '12px 16px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '8px', marginBottom: '20px' }}>
+              {settingsSuccess}
             </div>
           )}
 
-          {/* Password Change Form */}
-          <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+          <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Official Clinic Name</label>
+              <input
+                type="text"
+                required
+                value={settings.clinicName}
+                onChange={(e) => setSettings({ ...settings, clinicName: e.target.value })}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Public Contact Email</label>
+                <input
+                  type="email"
+                  required
+                  value={settings.contactEmail}
+                  onChange={(e) => setSettings({ ...settings, contactEmail: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Contact Phone Number</label>
+                <input
+                  type="text"
+                  required
+                  value={settings.contactPhone}
+                  onChange={(e) => setSettings({ ...settings, contactPhone: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Clinic Location Address</label>
+              <input
+                type="text"
+                value={settings.address}
+                onChange={(e) => setSettings({ ...settings, address: e.target.value })}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Consultation & Opening Hours</label>
+              <input
+                type="text"
+                value={settings.openingHours}
+                onChange={(e) => setSettings({ ...settings, openingHours: e.target.value })}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Clinic Description</label>
+              <textarea
+                rows={3}
+                value={settings.generalInformation}
+                onChange={(e) => setSettings({ ...settings, generalInformation: e.target.value })}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+              />
+            </div>
+
+            <button type="submit" disabled={settingsLoading} className="btn-primary" style={{ padding: '12px', fontWeight: '600', marginTop: '6px' }}>
+              {settingsLoading ? 'Saving...' : 'Save Settings'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* TAB 7: SECURITY & ADMIN PASSWORD */}
+      {activeTab === 'security' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', maxWidth: '650px', margin: '0 auto' }}>
+          <div style={{ backgroundColor: 'var(--bg-white)', padding: '35px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
-              <KeyRound size={22} color="var(--color-accent)" />
-              <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', margin: 0, fontFamily: 'var(--font-heading)' }}>
-                Change Master Admin Password
+              <KeyRound size={24} color="var(--color-accent)" />
+              <h3 style={{ fontSize: '1.35rem', color: 'var(--color-primary)', margin: 0, fontFamily: 'var(--font-heading)' }}>
+                Change Owner Administrator Password
               </h3>
             </div>
-            <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '22px' }}>
-              Updating password for account: <strong>{localStorage.getItem('email') || 'apurvdwivedi2205@gmail.com'}</strong>
+            <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '25px', lineHeight: '1.5' }}>
+              Update your master administrator credentials directly. Changes apply immediately with BCrypt encryption.
             </p>
+
+            {passwordSuccess && (
+              <div style={{ padding: '14px 18px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '8px', border: '1px solid #c3e6cb', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCircle2 size={18} /> {passwordSuccess}
+              </div>
+            )}
+            {passwordError && (
+              <div style={{ padding: '14px 18px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '8px', border: '1px solid #f5c6cb', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertCircle size={18} /> {passwordError}
+              </div>
+            )}
 
             <form onSubmit={handleChangePassword} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
-                  Current Password *
-                </label>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Current Admin Password *</label>
                 <div style={{ position: 'relative' }}>
                   <input 
-                    type={showOldPassword ? 'text' : 'password'}
-                    placeholder="Enter current password" 
+                    type={showOldPassword ? "text" : "password"} 
+                    placeholder="Enter existing password"
                     value={passwordForm.oldPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, oldPassword: e.target.value })}
                     required
-                    style={{ width: '100%', padding: '11px 45px 11px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '11px 40px 11px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', outline: 'none' }}
                   />
-                  <button 
-                    type="button" 
-                    onClick={() => setShowOldPassword(!showOldPassword)}
-                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#7c6252', padding: 0 }}
-                  >
+                  <button type="button" onClick={() => setShowOldPassword(!showOldPassword)} style={{ position: 'absolute', right: '12px', top: '12px', background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer' }}>
                     {showOldPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
-                  New Password * (Min. 6 characters)
-                </label>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>New Admin Password *</label>
                 <div style={{ position: 'relative' }}>
                   <input 
-                    type={showNewPassword ? 'text' : 'password'}
-                    placeholder="Enter new strong password" 
+                    type={showNewPassword ? "text" : "password"} 
+                    placeholder="Minimum 6 characters"
                     value={passwordForm.newPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                     required
-                    style={{ width: '100%', padding: '11px 45px 11px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '11px 40px 11px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', outline: 'none' }}
                   />
-                  <button 
-                    type="button" 
-                    onClick={() => setShowNewPassword(!showNewPassword)}
-                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#7c6252', padding: 0 }}
-                  >
+                  <button type="button" onClick={() => setShowNewPassword(!showNewPassword)} style={{ position: 'absolute', right: '12px', top: '12px', background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer' }}>
                     {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
-                  Confirm New Password *
-                </label>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Confirm New Password *</label>
                 <div style={{ position: 'relative' }}>
                   <input 
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="Re-enter new password" 
+                    type={showConfirmPassword ? "text" : "password"} 
+                    placeholder="Re-enter new password"
                     value={passwordForm.confirmPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                     required
-                    style={{ width: '100%', padding: '11px 45px 11px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', boxSizing: 'border-box' }}
+                    style={{ width: '100%', padding: '11px 40px 11px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', outline: 'none' }}
                   />
-                  <button 
-                    type="button" 
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#7c6252', padding: 0 }}
-                  >
+                  <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} style={{ position: 'absolute', right: '12px', top: '12px', background: 'none', border: 'none', color: 'var(--text-light)', cursor: 'pointer' }}>
                     {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                   </button>
                 </div>
@@ -1006,21 +1138,54 @@ const AdminDashboard = () => {
                 type="submit" 
                 disabled={passwordLoading}
                 className="btn-primary" 
-                style={{ width: '100%', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: '700', marginTop: '10px' }}
+                style={{ padding: '12px 20px', fontWeight: '700', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
               >
-                <Lock size={16} /> {passwordLoading ? 'Updating Password...' : 'Save New Password'}
+                <Lock size={16} /> {passwordLoading ? 'Updating Password...' : 'Save New Admin Password'}
               </button>
             </form>
           </div>
+        </div>
+      )}
 
-          {/* Forgot Password Recovery Guidance */}
-          <div style={{ backgroundColor: '#fff', padding: '20px 24px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)' }}>
-            <h4 style={{ margin: '0 0 8px 0', fontSize: '0.95rem', color: 'var(--color-primary)' }}>Forgot your password?</h4>
-            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-light)', lineHeight: '1.5' }}>
-              If you ever forget your password and cannot log in, navigate to <code>/admin-login</code>, click <strong>Forgot Password?</strong>, and enter your admin email. You can also override credentials anytime via the Render Dashboard environment variables (<code>ADMIN_EMAIL</code> & <code>ADMIN_PASSWORD</code>).
-            </p>
+      {/* MODAL: CLIENT DETAIL VIEW */}
+      {selectedClient && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff', borderRadius: '16px', padding: '32px',
+            maxWidth: '650px', width: '100%', maxHeight: '85vh', overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <div>
+                <h2 style={{ fontSize: '1.4rem', color: '#2c221e', margin: 0, fontWeight: '600' }}>
+                  {selectedClient.customer?.fullName}
+                </h2>
+                <span style={{ fontSize: '0.85rem', color: '#8c7b70' }}>{selectedClient.customer?.email} • {selectedClient.customer?.phone || 'No phone'}</span>
+              </div>
+              <button onClick={() => setSelectedClient(null)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+
+            <h3 style={{ fontSize: '1.1rem', color: '#806657', marginBottom: '12px' }}>Clinical Treatment Records</h3>
+            {(!selectedClient.treatments || selectedClient.treatments.length === 0) ? (
+              <p style={{ color: '#8c7b70', fontStyle: 'italic', padding: '20px 0' }}>No clinical treatments recorded for this client yet.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {selectedClient.treatments.map((tr) => (
+                  <div key={tr.id} style={{ border: '1px solid #ebdcd0', borderRadius: '8px', padding: '16px', backgroundColor: '#faf8f5' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                      <span style={{ fontWeight: '600', color: '#2c221e' }}>{tr.treatmentName}</span>
+                      <span style={{ fontSize: '0.82rem', color: '#8c7b70' }}>{new Date(tr.treatmentDate).toLocaleDateString()}</span>
+                    </div>
+                    {tr.clinicalNotes && <p style={{ fontSize: '0.85rem', color: '#5c4d44', margin: '0 0 6px 0' }}><b>Notes:</b> {tr.clinicalNotes}</p>}
+                    <p style={{ fontSize: '0.82rem', color: '#854d0e', margin: 0 }}><b>Aftercare:</b> {tr.aftercareInstructions}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-
         </div>
       )}
     </div>

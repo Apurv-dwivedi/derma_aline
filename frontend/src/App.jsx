@@ -1,5 +1,5 @@
 import React, { useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Navbar from './components/layout/Navbar.jsx';
 import Footer from './components/layout/Footer.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
@@ -7,18 +7,24 @@ import ProtectedRoute from './components/ProtectedRoute.jsx';
 // Core public pages loaded eagerly or quickly
 import Home from './pages/Home.jsx';
 
-// Route-level code-splitting: lazy load pages on-demand to reduce initial bundle size by >60%
+// Route-level code-splitting: lazy load pages on-demand
 const About = lazy(() => import('./pages/About.jsx'));
 const Treatments = lazy(() => import('./pages/Treatments.jsx'));
-const Booking = lazy(() => import('./pages/Booking.jsx'));
-const Auth = lazy(() => import('./pages/Auth.jsx'));
 const Contact = lazy(() => import('./pages/Contact.jsx'));
-const Profile = lazy(() => import('./pages/Profile.jsx'));
 const Privacy = lazy(() => import('./pages/Privacy.jsx'));
+const NotFound = lazy(() => import('./pages/NotFound.jsx'));
+
+// Portal 1: Owner / Admin Portal
 const Login = lazy(() => import('./pages/Login.jsx'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
+
+// Portal 2: Staff Portal
 const StaffDashboard = lazy(() => import('./pages/StaffDashboard.jsx'));
-const NotFound = lazy(() => import('./pages/NotFound.jsx'));
+const StaffActivate = lazy(() => import('./pages/StaffActivate.jsx'));
+
+// Portal 3: Client / Customer Portal
+const ClientAuth = lazy(() => import('./pages/ClientAuth.jsx'));
+const ClientDashboard = lazy(() => import('./pages/ClientDashboard.jsx'));
 
 // Lightweight, sleek loading fallback
 const PageLoader = () => (
@@ -73,20 +79,35 @@ function App() {
         <main className="container" style={{ flex: 1, padding: '40px 20px' }}>
           <Suspense fallback={<PageLoader />}>
             <Routes>
+              {/* Public Website */}
               <Route path="/" element={<Home />} />
               <Route path="/about" element={<About />} />
               <Route path="/treatments" element={<Treatments />} />
               <Route path="/contact" element={<Contact />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/booking" element={<Booking />} />
-              <Route path="/profile" element={<Profile />} />
               <Route path="/privacy" element={<Privacy />} />
 
-              {/* Dedicated Internal Salon Access (Admin & Staff) */}
-              <Route path="/admin-login" element={<Login />} />
+              {/* Portal 3: Client Portal Routes (Self-Registration with Email OTP, Login, Dashboard) */}
+              <Route path="/client/login" element={<ClientAuth />} />
+              <Route path="/client/register" element={<ClientAuth />} />
+              <Route path="/client/verify-email" element={<ClientAuth />} />
+              <Route path="/client/forgot-password" element={<ClientAuth />} />
+              <Route path="/client/reset-password" element={<ClientAuth />} />
+              <Route path="/client/dashboard" element={<ClientDashboard />} />
+              <Route path="/profile" element={<Navigate to="/client/dashboard" replace />} />
+              <Route path="/auth" element={<Navigate to="/client/login" replace />} />
+
+              {/* Portal 2: Staff Portal Routes */}
+              <Route path="/staff/login" element={<Login />} />
               <Route path="/staff-login" element={<Login />} />
-              <Route path="/admin" element={<ProtectedRoute requireAdmin={true}><AdminDashboard /></ProtectedRoute>} />
+              <Route path="/staff/activate" element={<StaffActivate />} />
               <Route path="/staff" element={<ProtectedRoute requireStaff={true}><StaffDashboard /></ProtectedRoute>} />
+              <Route path="/staff/dashboard" element={<ProtectedRoute requireStaff={true}><StaffDashboard /></ProtectedRoute>} />
+
+              {/* Portal 1: Owner / Admin Portal Routes */}
+              <Route path="/owner/login" element={<Login />} />
+              <Route path="/admin-login" element={<Login />} />
+              <Route path="/admin" element={<ProtectedRoute requireAdmin={true}><AdminDashboard /></ProtectedRoute>} />
+              <Route path="/admin/dashboard" element={<ProtectedRoute requireAdmin={true}><AdminDashboard /></ProtectedRoute>} />
 
               {/* Catch-all 404 Route */}
               <Route path="*" element={<NotFound />} />

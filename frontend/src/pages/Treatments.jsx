@@ -89,9 +89,9 @@ const Treatments = () => {
                   <Clock size={16} color="var(--color-accent)" /> Duration: {item.duration}
                 </div>
 
-                <Link to="/booking" style={{ textDecoration: 'none' }}>
+                <Link to="/contact" style={{ textDecoration: 'none' }}>
                   <button className="btn-primary" style={{ width: '100%', padding: '12px', textAlign: 'center' }}>
-                    Book This Treatment
+                    Enquire This Treatment
                   </button>
                 </Link>
               </div>

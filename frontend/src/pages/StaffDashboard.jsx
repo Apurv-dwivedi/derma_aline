@@ -1,376 +1,790 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Calendar, CheckCircle, Clock, RefreshCw, LogOut, 
-  Search, XCircle, UserCheck, ShieldCheck, Phone, Filter
+  HeartPulse, Users, MessageSquare, Calendar, RefreshCw, LogOut, 
+  Search, CheckCircle2, AlertCircle, Plus, FileText, Phone, Mail, 
+  ShieldCheck, Info, X, Clock, CheckCircle
 } from 'lucide-react';
 import API from '../services/api';
 import '../styles/pages.css';
 
 const StaffDashboard = () => {
   const navigate = useNavigate();
+
+  // Active Tab: 'treatments' | 'customers' | 'enquiries' | 'queue'
+  const [activeTab, setActiveTab] = useState('treatments');
+
+  // Data States
+  const [dashboardData, setDashboardData] = useState(null);
+  const [treatmentRecords, setTreatmentRecords] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [enquiries, setEnquiries] = useState([]);
   const [appointments, setAppointments] = useState([]);
+  const [treatmentsList, setTreatmentsList] = useState([]);
+
+  // UI States
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Filters
+  // Search States
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('ALL');
 
-  const staffName = localStorage.getItem('fullName') || 'Clinic Therapist';
+  // Modals
+  const [showRecordModal, setShowRecordModal] = useState(false);
+  const [recordForm, setRecordForm] = useState({
+    customerEmail: '',
+    treatmentName: '',
+    treatmentDate: new Date().toISOString().split('T')[0],
+    description: '',
+    clinicalNotes: '',
+    aftercareInstructions: 'Keep skin clean and hydrated. Avoid sun exposure and apply broad-spectrum SPF 50+ regularly.'
+  });
+  const [recordSaving, setRecordSaving] = useState(false);
+
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
+  const [customerForm, setCustomerForm] = useState({ fullName: '', email: '', phone: '', notes: '' });
+  const [customerSaving, setCustomerSaving] = useState(false);
+
+  const staffName = localStorage.getItem('fullName') || 'Clinical Staff';
   const staffRole = localStorage.getItem('role') || 'STAFF';
 
-  const fetchStaffQueue = async () => {
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    setError('');
+
     try {
-      setLoading(true);
-      setError('');
-      const response = await API.get('/staff/appointments');
-      setAppointments(response.data.sort((a, b) => b.id - a.id));
+      const [dashRes, treatRecordsRes, custRes, enqRes, apptRes, treatsRes] = await Promise.all([
+        API.get('/staff/dashboard').catch(() => ({ data: {} })),
+        API.get('/staff/treatments/records').catch(() => ({ data: [] })),
+        API.get('/staff/customers').catch(() => ({ data: [] })),
+        API.get('/staff/enquiries').catch(() => ({ data: [] })),
+        API.get('/staff/appointments').catch(() => ({ data: [] })),
+        API.get('/treatments/active').catch(() => ({ data: [] }))
+      ]);
+
+      setDashboardData(dashRes.data);
+      setTreatmentRecords(treatRecordsRes.data || []);
+      setCustomers(custRes.data || []);
+      setEnquiries(enqRes.data || []);
+      setAppointments(apptRes.data || []);
+      setTreatmentsList(treatsRes.data || []);
     } catch (err) {
-      console.error('Failed to fetch staff queue:', err);
-      setError('Unable to fetch appointment queue. Please check your network connection.');
+      console.error("Failed to load staff workspace:", err);
+      setError('Unable to load clinical workspace. Please check your authentication.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchStaffQueue();
-  }, []);
+  const handleCreateTreatmentRecord = async (e) => {
+    e.preventDefault();
+    setRecordSaving(true);
+    setError('');
 
-  const handleUpdateStatus = async (id, newStatus) => {
     try {
-      await API.patch(`/staff/appointments/${id}/status`, { status: newStatus });
-      setSuccessMessage(`Appointment #${id} updated to ${newStatus}`);
+      await API.post('/staff/treatments/records', recordForm);
+      setSuccessMessage('Clinical treatment session successfully recorded!');
+      setShowRecordModal(false);
+      setRecordForm({
+        customerEmail: '',
+        treatmentName: '',
+        treatmentDate: new Date().toISOString().split('T')[0],
+        description: '',
+        clinicalNotes: '',
+        aftercareInstructions: 'Keep skin clean and hydrated. Avoid sun exposure and apply broad-spectrum SPF 50+ regularly.'
+      });
+      fetchDashboardData();
       setTimeout(() => setSuccessMessage(''), 3000);
-      fetchStaffQueue();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update status.');
-      setTimeout(() => setError(''), 4000);
+      setError(err.response?.data?.message || 'Failed to record treatment.');
+    } finally {
+      setRecordSaving(false);
+    }
+  };
+
+  const handleCreateCustomer = async (e) => {
+    e.preventDefault();
+    setCustomerSaving(true);
+    setError('');
+
+    try {
+      await API.post('/staff/customers', customerForm);
+      setSuccessMessage('Client profile successfully created!');
+      setShowCustomerModal(false);
+      setCustomerForm({ fullName: '', email: '', phone: '', notes: '' });
+      fetchDashboardData();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to create client.');
+    } finally {
+      setCustomerSaving(false);
+    }
+  };
+
+  const handleUpdateEnquiryStatus = async (id, status) => {
+    try {
+      await API.patch(`/staff/enquiries/${id}/status`, { status });
+      setEnquiries((prev) =>
+        prev.map((e) => (e.id === id ? { ...e, status } : e))
+      );
+      setSuccessMessage(`Enquiry marked as ${status}`);
+      setTimeout(() => setSuccessMessage(''), 2500);
+    } catch (err) {
+      setError('Failed to update enquiry status.');
+    }
+  };
+
+  const handleUpdateAppointmentStatus = async (id, status) => {
+    try {
+      await API.patch(`/staff/appointments/${id}/status`, { status });
+      setAppointments((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, status } : a))
+      );
+      setSuccessMessage(`Appointment status updated to ${status}`);
+      setTimeout(() => setSuccessMessage(''), 2500);
+    } catch (err) {
+      setError('Failed to update status.');
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('role');
-    localStorage.removeItem('fullName');
-    navigate('/admin-login');
+    localStorage.clear();
+    navigate('/staff-login');
   };
 
-  const filteredAppointments = appointments.filter((appt) => {
-    const matchesSearch = 
-      (appt.customerName && appt.customerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (appt.treatmentName && appt.treatmentName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (appt.customerPhone && appt.customerPhone.includes(searchTerm));
-    const matchesStatus = statusFilter === 'ALL' || appt.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  const filteredCustomers = customers.filter((c) => {
+    const q = searchTerm.toLowerCase();
+    return (
+      (c.fullName && c.fullName.toLowerCase().includes(q)) ||
+      (c.email && c.email.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.includes(q))
+    );
   });
 
-  const pendingCount = appointments.filter((a) => a.status === 'PENDING').length;
-  const confirmedCount = appointments.filter((a) => a.status === 'CONFIRMED').length;
-  const completedCount = appointments.filter((a) => a.status === 'COMPLETED').length;
+  const filteredTreatmentRecords = treatmentRecords.filter((tr) => {
+    const q = searchTerm.toLowerCase();
+    return (
+      (tr.treatmentName && tr.treatmentName.toLowerCase().includes(q)) ||
+      (tr.customerName && tr.customerName.toLowerCase().includes(q)) ||
+      (tr.customerEmail && tr.customerEmail.toLowerCase().includes(q))
+    );
+  });
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px 15px' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '10px 0 60px 0' }}>
       {/* Top Header Card */}
       <div style={{
+        backgroundColor: '#ffffff',
+        borderRadius: '16px',
+        padding: '28px 32px',
+        border: '1px solid #ebdcd0',
+        boxShadow: '0 4px 20px rgba(44, 34, 30, 0.03)',
+        marginBottom: '25px',
         display: 'flex',
-        flexWrap: 'wrap',
         justifyContent: 'space-between',
         alignItems: 'center',
-        gap: '15px',
-        backgroundColor: '#ffffff',
-        padding: '24px',
-        borderRadius: '12px',
-        border: '1px solid #e2d9cf',
-        boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
-        marginBottom: '25px'
+        flexWrap: 'wrap',
+        gap: '20px'
       }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-            <h1 style={{ fontSize: '1.6rem', color: '#3a2d24', margin: 0, fontWeight: '700' }}>
-              Salon Staff Workspace
-            </h1>
-            <span style={{
-              backgroundColor: '#e0f2fe',
-              color: '#0369a1',
-              padding: '3px 10px',
-              borderRadius: '20px',
-              fontSize: '0.75rem',
-              fontWeight: '700',
-              letterSpacing: '0.5px'
-            }}>
-              {staffRole}
-            </span>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            backgroundColor: '#f7f2ed',
+            padding: '4px 12px',
+            borderRadius: '15px',
+            fontSize: '0.75rem',
+            fontWeight: '700',
+            letterSpacing: '0.08em',
+            color: '#806657',
+            marginBottom: '6px',
+            textTransform: 'uppercase'
+          }}>
+            <ShieldCheck size={14} color="#16a34a" /> Generalist Clinical Operations
           </div>
-          <p style={{ margin: 0, color: '#7c6a5d', fontSize: '0.95rem' }}>
-            Logged in as <b>{staffName}</b> &bull; Appointment queue and service execution
+          <h1 style={{
+            fontSize: '1.75rem',
+            color: '#2c221e',
+            fontFamily: 'var(--font-heading)',
+            fontWeight: '600',
+            margin: '0 0 4px 0'
+          }}>
+            Staff Clinical Workspace
+          </h1>
+          <p style={{ margin: 0, color: '#8c7b70', fontSize: '0.88rem' }}>
+            Operating Practitioner: <b>{staffName}</b> ({staffRole})
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
-          <button 
-            onClick={fetchStaffQueue}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => setShowRecordModal(true)}
+            className="btn-primary"
+            style={{ padding: '10px 18px', fontSize: '0.85rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <Plus size={16} /> Record Treatment
+          </button>
+          <button
+            onClick={() => setShowCustomerModal(true)}
             style={{
+              backgroundColor: '#fbf9f6',
+              border: '1px solid #ebdcd0',
+              color: '#806657',
+              padding: '10px 16px',
+              borderRadius: '8px',
+              fontSize: '0.85rem',
+              fontWeight: '600',
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '10px 16px',
-              backgroundColor: '#f5efe6',
-              border: '1px solid #d9cbbe',
-              borderRadius: '8px',
-              color: '#4a3b30',
-              fontWeight: '600',
-              cursor: 'pointer'
+              gap: '6px'
             }}
           >
-            <RefreshCw size={16} /> Refresh
+            <Plus size={16} /> Add Client Profile
           </button>
-          <button 
+          <button
+            onClick={fetchDashboardData}
+            title="Refresh"
+            style={{ backgroundColor: '#ffffff', border: '1px solid #ebdcd0', padding: '10px', borderRadius: '8px', cursor: 'pointer' }}
+          >
+            <RefreshCw size={16} color="#6e5d53" />
+          </button>
+          <button
             onClick={handleLogout}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '10px 16px',
-              backgroundColor: '#fee2e2',
-              border: '1px solid #fca5a5',
-              borderRadius: '8px',
-              color: '#991b1b',
-              fontWeight: '600',
-              cursor: 'pointer'
-            }}
+            style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
-            <LogOut size={16} /> Exit
+            <LogOut size={15} /> Sign Out
           </button>
         </div>
       </div>
 
-      {/* Privacy Notice Banner */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-        backgroundColor: '#f0fdf4',
-        border: '1px solid #bbf7d0',
-        color: '#166534',
-        padding: '12px 18px',
-        borderRadius: '8px',
-        fontSize: '0.88rem',
-        marginBottom: '25px'
-      }}>
-        <ShieldCheck size={20} color="#16a34a" />
-        <span>
-          <b>Role Partition Active:</b> Staff access is restricted to operational service appointments. Sensitive patient medical history, billing records, and administrative user management remain isolated.
-        </span>
-      </div>
-
-      {/* Metric Counters */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '15px',
-        marginBottom: '25px'
-      }}>
-        <div style={{ backgroundColor: '#ffffff', padding: '18px', borderRadius: '10px', border: '1px solid #e6ded5', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-          <div style={{ color: '#8c7b70', fontSize: '0.85rem', fontWeight: '600', marginBottom: '5px' }}>TOTAL ASSIGNED</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: '700', color: '#2c221e' }}>{appointments.length}</div>
-        </div>
-        <div style={{ backgroundColor: '#ffffff', padding: '18px', borderRadius: '10px', border: '1px solid #fef08a', borderLeft: '4px solid #ca8a04', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-          <div style={{ color: '#854d0e', fontSize: '0.85rem', fontWeight: '600', marginBottom: '5px' }}>PENDING REVIEW</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: '700', color: '#ca8a04' }}>{pendingCount}</div>
-        </div>
-        <div style={{ backgroundColor: '#ffffff', padding: '18px', borderRadius: '10px', border: '1px solid #bae6fd', borderLeft: '4px solid #0284c7', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-          <div style={{ color: '#0369a1', fontSize: '0.85rem', fontWeight: '600', marginBottom: '5px' }}>CONFIRMED QUEUE</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: '700', color: '#0284c7' }}>{confirmedCount}</div>
-        </div>
-        <div style={{ backgroundColor: '#ffffff', padding: '18px', borderRadius: '10px', border: '1px solid #bbf7d0', borderLeft: '4px solid #16a34a', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
-          <div style={{ color: '#166534', fontSize: '0.85rem', fontWeight: '600', marginBottom: '5px' }}>COMPLETED</div>
-          <div style={{ fontSize: '1.8rem', fontWeight: '700', color: '#16a34a' }}>{completedCount}</div>
-        </div>
-      </div>
-
-      {/* Alerts */}
+      {/* Global Alerts */}
       {error && (
-        <div style={{ padding: '12px 18px', backgroundColor: '#fef2f2', color: '#991b1b', borderRadius: '8px', marginBottom: '20px' }}>
-          {error}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 18px',
+          backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b',
+          borderRadius: '10px', marginBottom: '20px', fontSize: '0.9rem'
+        }}>
+          <AlertCircle size={18} /> <span>{error}</span>
         </div>
       )}
+
       {successMessage && (
-        <div style={{ padding: '12px 18px', backgroundColor: '#f0fdf4', color: '#166534', borderRadius: '8px', marginBottom: '20px' }}>
-          {successMessage}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 18px',
+          backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534',
+          borderRadius: '10px', marginBottom: '20px', fontSize: '0.9rem'
+        }}>
+          <CheckCircle2 size={18} /> <span>{successMessage}</span>
         </div>
       )}
 
-      {/* Search and Filters Bar */}
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '12px',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: '#ffffff',
-        padding: '16px',
-        borderRadius: '10px',
-        border: '1px solid #e6ded5',
-        marginBottom: '20px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: '1', minWidth: '240px' }}>
-          <Search size={18} color="#8c7b70" />
-          <input 
-            type="text"
-            placeholder="Search patient name, treatment, phone..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: '100%', border: 'none', outline: 'none', fontSize: '0.95rem' }}
-          />
+      {/* Operational Metrics Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '25px' }}>
+        <div style={{ backgroundColor: '#ffffff', padding: '22px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
+          <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Client Profiles
+          </div>
+          <div style={{ fontSize: '2rem', fontWeight: '700', color: '#2c221e', margin: '6px 0 2px' }}>
+            {customers.length}
+          </div>
+          <span style={{ fontSize: '0.82rem', color: '#6e5d53' }}>Registered in clinic CRM</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Filter size={16} color="#8c7b70" />
-          <select 
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #d4c5b9', outline: 'none', fontSize: '0.9rem' }}
-          >
-            <option value="ALL">All Statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="CONFIRMED">Confirmed</option>
-            <option value="COMPLETED">Completed</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
+        <div style={{ backgroundColor: '#ffffff', padding: '22px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
+          <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Treatments Recorded
+          </div>
+          <div style={{ fontSize: '2rem', fontWeight: '700', color: '#2c221e', margin: '6px 0 2px' }}>
+            {treatmentRecords.length}
+          </div>
+          <span style={{ fontSize: '0.82rem', color: '#6e5d53' }}>Completed clinical sessions</span>
+        </div>
+
+        <div style={{ backgroundColor: '#ffffff', padding: '22px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
+          <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Unread Client Enquiries
+          </div>
+          <div style={{ fontSize: '2rem', fontWeight: '700', color: '#ca8a04', margin: '6px 0 2px' }}>
+            {enquiries.filter((e) => e.status === 'UNREAD').length}
+          </div>
+          <span style={{ fontSize: '0.82rem', color: '#6e5d53' }}>Awaiting staff response</span>
+        </div>
+
+        <div style={{ backgroundColor: '#ffffff', padding: '22px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
+          <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Operational Queue
+          </div>
+          <div style={{ fontSize: '2rem', fontWeight: '700', color: '#2c221e', margin: '6px 0 2px' }}>
+            {appointments.filter((a) => a.status === 'PENDING' || a.status === 'CONFIRMED').length}
+          </div>
+          <span style={{ fontSize: '0.82rem', color: '#6e5d53' }}>Active visits</span>
         </div>
       </div>
 
-      {/* Appointments List / Table */}
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '50px 0', color: '#8c7b70' }}>Loading appointment queue...</div>
-      ) : filteredAppointments.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '40px', backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #e6ded5', color: '#8c7b70' }}>
-          No appointments found matching your search.
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          {filteredAppointments.map((appt) => (
-            <div 
-              key={appt.id}
+      {/* Navigation Tabs */}
+      <div style={{
+        display: 'flex',
+        gap: '10px',
+        borderBottom: '1px solid #ebdcd0',
+        paddingBottom: '6px',
+        marginBottom: '25px',
+        overflowX: 'auto'
+      }}>
+        {[
+          { id: 'treatments', label: `Clinical Treatment Records (${treatmentRecords.length})`, icon: HeartPulse },
+          { id: 'customers', label: `Client Directory (${customers.length})`, icon: Users },
+          { id: 'enquiries', label: `Client Enquiries (${enquiries.length})`, icon: MessageSquare },
+          { id: 'queue', label: `Operations Queue (${appointments.length})`, icon: Calendar }
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); setSearchTerm(''); }}
               style={{
-                backgroundColor: '#ffffff',
-                borderRadius: '10px',
-                border: '1px solid #e6ded5',
-                padding: '20px',
-                display: 'flex',
-                flexWrap: 'wrap',
-                justifyContent: 'space-between',
+                backgroundColor: isActive ? '#806657' : '#ffffff',
+                color: isActive ? '#ffffff' : '#5c4d44',
+                border: '1px solid',
+                borderColor: isActive ? '#806657' : '#ebdcd0',
+                padding: '10px 18px',
+                borderRadius: '8px',
+                fontSize: '0.88rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'inline-flex',
                 alignItems: 'center',
-                gap: '15px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+                gap: '8px',
+                whiteSpace: 'nowrap'
               }}
             >
-              {/* Left Details */}
-              <div style={{ minWidth: '260px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                  <span style={{ fontSize: '1.1rem', fontWeight: '700', color: '#2c221e' }}>{appt.customerName}</span>
-                  <span style={{
-                    padding: '3px 10px',
-                    borderRadius: '12px',
-                    fontSize: '0.75rem',
-                    fontWeight: '700',
-                    backgroundColor: 
-                      appt.status === 'CONFIRMED' ? '#e0f2fe' :
-                      appt.status === 'COMPLETED' ? '#dcfce7' :
-                      appt.status === 'CANCELLED' ? '#fee2e2' : '#fef9c3',
-                    color: 
-                      appt.status === 'CONFIRMED' ? '#0369a1' :
-                      appt.status === 'COMPLETED' ? '#15803d' :
-                      appt.status === 'CANCELLED' ? '#b91c1c' : '#854d0e'
-                  }}>
-                    {appt.status}
-                  </span>
-                </div>
-                <div style={{ color: '#6b584c', fontSize: '0.9rem', marginBottom: '4px' }}>
-                  Treatment: <b>{appt.treatmentName}</b>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', color: '#8c7b70', fontSize: '0.85rem' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Calendar size={14} /> {appt.appointmentDate ? appt.appointmentDate.replace('T', ' ') : 'N/A'}
-                  </span>
-                  {appt.customerPhone && (
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Phone size={14} /> {appt.customerPhone}
-                    </span>
-                  )}
-                </div>
-              </div>
+              <Icon size={16} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
 
-              {/* Action Buttons (CTAs) */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {appt.status !== 'CONFIRMED' && appt.status !== 'COMPLETED' && (
-                  <button 
-                    onClick={() => handleUpdateStatus(appt.id, 'CONFIRMED')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      padding: '8px 14px',
-                      backgroundColor: '#0284c7',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '0.85rem',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <CheckCircle size={15} /> Confirm
-                  </button>
-                )}
+      {/* Search Bar for Records / Directory */}
+      <div style={{ marginBottom: '20px' }}>
+        <div style={{ position: 'relative', maxWidth: '400px' }}>
+          <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#a8988d' }} />
+          <input
+            type="text"
+            placeholder="Search by client name, email, or treatment..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ width: '100%', padding: '10px 14px 10px 36px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.88rem' }}
+          />
+        </div>
+      </div>
 
-                {appt.status !== 'COMPLETED' && (
-                  <button 
-                    onClick={() => handleUpdateStatus(appt.id, 'COMPLETED')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      padding: '8px 14px',
-                      backgroundColor: '#16a34a',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '0.85rem',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <UserCheck size={15} /> Complete
-                  </button>
-                )}
-
-                {appt.status !== 'CANCELLED' && (
-                  <button 
-                    onClick={() => handleUpdateStatus(appt.id, 'CANCELLED')}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      padding: '8px 14px',
-                      backgroundColor: '#ef4444',
-                      color: '#ffffff',
-                      border: 'none',
-                      borderRadius: '6px',
-                      fontSize: '0.85rem',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <XCircle size={15} /> Cancel
-                  </button>
-                )}
-              </div>
+      {/* TAB 1: CLINICAL TREATMENT RECORDS */}
+      {activeTab === 'treatments' && (
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '14px', border: '1px solid #ebdcd0', overflowX: 'auto' }}>
+          {filteredTreatmentRecords.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '50px 20px', color: '#8c7b70' }}>
+              <HeartPulse size={36} color="#c2b4a8" style={{ marginBottom: '10px' }} />
+              <p style={{ margin: 0 }}>No treatment records match your search criteria.</p>
             </div>
-          ))}
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '850px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #ebdcd0', color: '#8c7b70', fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <th style={{ padding: '14px 16px' }}>Client</th>
+                  <th style={{ padding: '14px 16px' }}>Treatment</th>
+                  <th style={{ padding: '14px 16px' }}>Date</th>
+                  <th style={{ padding: '14px 16px' }}>Clinical Notes</th>
+                  <th style={{ padding: '14px 16px' }}>Aftercare Prescribed</th>
+                  <th style={{ padding: '14px 16px' }}>Recorded By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredTreatmentRecords.map((tr) => (
+                  <tr key={tr.id} style={{ borderBottom: '1px solid #ebdcd0' }}>
+                    <td style={{ padding: '14px 16px' }}>
+                      <div style={{ fontWeight: '600', color: '#2c221e' }}>{tr.customerName}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#8c7b70' }}>{tr.customerEmail}</div>
+                    </td>
+                    <td style={{ padding: '14px 16px', fontWeight: '500', color: '#806657' }}>
+                      {tr.treatmentName}
+                    </td>
+                    <td style={{ padding: '14px 16px', fontSize: '0.88rem', color: '#6e5d53' }}>
+                      {new Date(tr.treatmentDate).toLocaleDateString()}
+                    </td>
+                    <td style={{ padding: '14px 16px', fontSize: '0.85rem', color: '#5c4d44', maxWidth: '240px' }}>
+                      {tr.clinicalNotes || 'Session completed as scheduled.'}
+                    </td>
+                    <td style={{ padding: '14px 16px', fontSize: '0.82rem', color: '#854d0e', maxWidth: '240px' }}>
+                      <span style={{ backgroundColor: '#fefce8', padding: '4px 8px', borderRadius: '4px', border: '1px solid #fef08a' }}>
+                        {tr.aftercareInstructions || 'Standard hydration and SPF.'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '14px 16px', fontSize: '0.82rem', color: '#8c7b70' }}>
+                      {tr.practitionerName || 'Staff'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* TAB 2: CLIENT DIRECTORY */}
+      {activeTab === 'customers' && (
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '14px', border: '1px solid #ebdcd0', overflowX: 'auto' }}>
+          {filteredCustomers.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '50px 20px', color: '#8c7b70' }}>
+              <Users size={36} color="#c2b4a8" style={{ marginBottom: '10px' }} />
+              <p style={{ margin: 0 }}>No client profiles found.</p>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #ebdcd0', color: '#8c7b70', fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <th style={{ padding: '14px 16px' }}>Client Name</th>
+                  <th style={{ padding: '14px 16px' }}>Email</th>
+                  <th style={{ padding: '14px 16px' }}>Phone</th>
+                  <th style={{ padding: '14px 16px' }}>Clinical Profile Notes</th>
+                  <th style={{ padding: '14px 16px', textAlign: 'center' }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCustomers.map((c) => (
+                  <tr key={c.id} style={{ borderBottom: '1px solid #ebdcd0' }}>
+                    <td style={{ padding: '14px 16px', fontWeight: '600', color: '#2c221e' }}>{c.fullName}</td>
+                    <td style={{ padding: '14px 16px', color: '#6e5d53', fontSize: '0.88rem' }}>{c.email}</td>
+                    <td style={{ padding: '14px 16px', color: '#6e5d53', fontSize: '0.88rem' }}>{c.phone || '—'}</td>
+                    <td style={{ padding: '14px 16px', color: '#5c4d44', fontSize: '0.85rem' }}>{c.notes || 'No general notes.'}</td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                      <button
+                        onClick={() => {
+                          setRecordForm((prev) => ({ ...prev, customerEmail: c.email }));
+                          setShowRecordModal(true);
+                        }}
+                        style={{
+                          backgroundColor: '#fbf9f6',
+                          border: '1px solid #ebdcd0',
+                          color: '#806657',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          fontWeight: '600'
+                        }}
+                      >
+                        Record Session
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: CLIENT ENQUIRIES */}
+      {activeTab === 'enquiries' && (
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '14px', border: '1px solid #ebdcd0', overflowX: 'auto' }}>
+          {enquiries.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '50px 20px', color: '#8c7b70' }}>
+              <MessageSquare size={36} color="#c2b4a8" style={{ marginBottom: '10px' }} />
+              <p style={{ margin: 0 }}>No client enquiries received.</p>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '750px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #ebdcd0', color: '#8c7b70', fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <th style={{ padding: '14px 16px' }}>Sender</th>
+                  <th style={{ padding: '14px 16px' }}>Contact</th>
+                  <th style={{ padding: '14px 16px' }}>Message</th>
+                  <th style={{ padding: '14px 16px', textAlign: 'center' }}>Status</th>
+                  <th style={{ padding: '14px 16px', textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {enquiries.map((e) => (
+                  <tr key={e.id} style={{ borderBottom: '1px solid #ebdcd0' }}>
+                    <td style={{ padding: '14px 16px', fontWeight: '600', color: '#2c221e' }}>{e.name}</td>
+                    <td style={{ padding: '14px 16px', fontSize: '0.85rem', color: '#6e5d53' }}>
+                      <div>{e.email}</div>
+                      <div>{e.phone}</div>
+                    </td>
+                    <td style={{ padding: '14px 16px', fontSize: '0.88rem', color: '#4a3b32', maxWidth: '300px' }}>
+                      {e.message}
+                    </td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                      <span style={{
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        backgroundColor: e.status === 'RESOLVED' ? '#f0fdf4' : e.status === 'READ' ? '#f8fafc' : '#fef3c7',
+                        color: e.status === 'RESOLVED' ? '#166534' : e.status === 'READ' ? '#475569' : '#92400e',
+                        border: '1px solid',
+                        borderColor: e.status === 'RESOLVED' ? '#bbf7d0' : e.status === 'READ' ? '#cbd5e1' : '#fde68a'
+                      }}>
+                        {e.status || 'UNREAD'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                      <div style={{ display: 'inline-flex', gap: '6px' }}>
+                        <button
+                          onClick={() => handleUpdateEnquiryStatus(e.id, 'READ')}
+                          style={{ backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', padding: '6px 10px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
+                        >
+                          Mark Read
+                        </button>
+                        <button
+                          onClick={() => handleUpdateEnquiryStatus(e.id, 'RESOLVED')}
+                          style={{ backgroundColor: '#059669', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
+                        >
+                          Resolve
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* TAB 4: OPERATIONS QUEUE */}
+      {activeTab === 'queue' && (
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '14px', border: '1px solid #ebdcd0', overflowX: 'auto' }}>
+          {appointments.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '50px 20px', color: '#8c7b70' }}>
+              <Calendar size={36} color="#c2b4a8" style={{ marginBottom: '10px' }} />
+              <p style={{ margin: 0 }}>No active operational visits queued.</p>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '750px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #ebdcd0', color: '#8c7b70', fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <th style={{ padding: '14px 16px' }}>Client</th>
+                  <th style={{ padding: '14px 16px' }}>Service</th>
+                  <th style={{ padding: '14px 16px' }}>Schedule</th>
+                  <th style={{ padding: '14px 16px', textAlign: 'center' }}>Status</th>
+                  <th style={{ padding: '14px 16px', textAlign: 'center' }}>Operational Update</th>
+                </tr>
+              </thead>
+              <tbody>
+                {appointments.map((a) => (
+                  <tr key={a.id} style={{ borderBottom: '1px solid #ebdcd0' }}>
+                    <td style={{ padding: '14px 16px' }}>
+                      <div style={{ fontWeight: '600', color: '#2c221e' }}>{a.customerName || a.patientName}</div>
+                      <div style={{ fontSize: '0.8rem', color: '#8c7b70' }}>{a.customerEmail || a.email}</div>
+                    </td>
+                    <td style={{ padding: '14px 16px', fontWeight: '500', color: '#806657' }}>
+                      {a.treatmentName}
+                    </td>
+                    <td style={{ padding: '14px 16px', fontSize: '0.85rem', color: '#6e5d53' }}>
+                      {a.appointmentDate ? String(a.appointmentDate).split('T')[0] : '—'} • {a.appointmentTime || '10:00'}
+                    </td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                      <span style={{
+                        padding: '4px 10px',
+                        borderRadius: '12px',
+                        fontSize: '0.75rem',
+                        fontWeight: '700',
+                        backgroundColor: a.status === 'COMPLETED' ? '#f0fdf4' : a.status === 'CONFIRMED' ? '#dcfce7' : '#fef3c7',
+                        color: a.status === 'COMPLETED' ? '#166534' : a.status === 'CONFIRMED' ? '#15803d' : '#92400e'
+                      }}>
+                        {a.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                      <select
+                        value={a.status}
+                        onChange={(e) => handleUpdateAppointmentStatus(a.id, e.target.value)}
+                        style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid #ebdcd0', fontSize: '0.82rem', outline: 'none' }}
+                      >
+                        <option value="PENDING">Pending</option>
+                        <option value="CONFIRMED">Confirmed</option>
+                        <option value="COMPLETED">Completed</option>
+                        <option value="CANCELLED">Cancelled</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {/* MODAL 1: RECORD TREATMENT */}
+      {showRecordModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff', borderRadius: '16px', padding: '32px',
+            maxWidth: '560px', width: '100%', maxHeight: '90vh', overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '1.3rem', color: '#2c221e', margin: 0, fontWeight: '600' }}>Record Clinical Treatment Session</h2>
+              <button onClick={() => setShowRecordModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+
+            <form onSubmit={handleCreateTreatmentRecord} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '4px' }}>Client Email Address</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="client@domain.com"
+                  value={recordForm.customerEmail}
+                  onChange={(e) => setRecordForm({ ...recordForm, customerEmail: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '4px' }}>Treatment Service</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Chemical Peel, Glass Skin"
+                    value={recordForm.treatmentName}
+                    onChange={(e) => setRecordForm({ ...recordForm, treatmentName: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '4px' }}>Session Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={recordForm.treatmentDate}
+                    onChange={(e) => setRecordForm({ ...recordForm, treatmentDate: e.target.value })}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '4px' }}>Clinical Session Notes</label>
+                <textarea
+                  rows={2}
+                  placeholder="Practitioner observations, products applied..."
+                  value={recordForm.clinicalNotes}
+                  onChange={(e) => setRecordForm({ ...recordForm, clinicalNotes: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '4px' }}>
+                  Prescribed Aftercare Instructions (Visible to Client in Portal)
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="e.g. Keep skin hydrated. Avoid direct sun for 48 hours..."
+                  value={recordForm.aftercareInstructions}
+                  onChange={(e) => setRecordForm({ ...recordForm, aftercareInstructions: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button type="submit" disabled={recordSaving} className="btn-primary" style={{ flex: 1, padding: '12px', fontWeight: '600' }}>
+                  {recordSaving ? 'Saving Record...' : 'Save & Notify Client'}
+                </button>
+                <button type="button" onClick={() => setShowRecordModal(false)} style={{ padding: '12px 18px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: ADD CLIENT PROFILE */}
+      {showCustomerModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+        }}>
+          <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', padding: '32px', maxWidth: '480px', width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '1.3rem', color: '#2c221e', margin: 0, fontWeight: '600' }}>Create Client Profile</h2>
+              <button onClick={() => setShowCustomerModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+
+            <form onSubmit={handleCreateCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '4px' }}>Full Legal Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Eleanor Vance"
+                  value={customerForm.fullName}
+                  onChange={(e) => setCustomerForm({ ...customerForm, fullName: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '4px' }}>Email Address</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="client@domain.com"
+                  value={customerForm.email}
+                  onChange={(e) => setCustomerForm({ ...customerForm, email: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '4px' }}>Phone Number</label>
+                <input
+                  type="tel"
+                  placeholder="+91 98765 43210"
+                  value={customerForm.phone}
+                  onChange={(e) => setCustomerForm({ ...customerForm, phone: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '4px' }}>General Clinical Notes</label>
+                <textarea
+                  rows={2}
+                  placeholder="Skin sensitivities, allergies, consultation goals..."
+                  value={customerForm.notes}
+                  onChange={(e) => setCustomerForm({ ...customerForm, notes: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button type="submit" disabled={customerSaving} className="btn-primary" style={{ flex: 1, padding: '12px', fontWeight: '600' }}>
+                  {customerSaving ? 'Creating Profile...' : 'Save Client Profile'}
+                </button>
+                <button type="button" onClick={() => setShowCustomerModal(false)} style={{ padding: '12px 18px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
