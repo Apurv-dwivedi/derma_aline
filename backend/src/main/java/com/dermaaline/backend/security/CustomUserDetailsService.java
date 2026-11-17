@@ -9,7 +9,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
@@ -19,14 +20,31 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmail(email.trim().toLowerCase())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+
+        boolean enabled = user.getStatus() != User.AccountStatus.DISABLED;
+
+        List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+        String roleName = user.getRole().name().toUpperCase();
+        authorities.add(new SimpleGrantedAuthority("ROLE_" + roleName));
+
+        if ("SUPER_ADMIN".equals(roleName)) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_ADMIN"));
+        } else if ("ADMIN".equals(roleName)) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
+        } else if ("PATIENT".equals(roleName)) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_CUSTOMER"));
+        }
 
         return new org.springframework.security.core.userdetails.User(
                 user.getEmail(),
                 user.getPassword(),
-                true, true, true, true,
-                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()))
+                enabled,
+                true,
+                true,
+                true,
+                authorities
         );
     }
 }

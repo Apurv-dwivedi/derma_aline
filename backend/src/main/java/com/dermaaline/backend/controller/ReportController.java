@@ -1,17 +1,19 @@
 package com.dermaaline.backend.controller;
 
-import com.dermaaline.backend.entity.Appointment;
+import com.dermaaline.backend.entity.ContactMessage;
+import com.dermaaline.backend.entity.ContactStatus;
 import com.dermaaline.backend.entity.Treatment;
-import com.dermaaline.backend.repository.AppointmentRepository;
+import com.dermaaline.backend.entity.TreatmentRecord;
+import com.dermaaline.backend.repository.ContactRepository;
 import com.dermaaline.backend.repository.CustomerRepository;
+import com.dermaaline.backend.repository.TreatmentRecordRepository;
 import com.dermaaline.backend.repository.TreatmentRepository;
+import com.dermaaline.backend.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/admin/reports")
@@ -19,91 +21,56 @@ import java.util.Map;
 public class ReportController {
 
     @Autowired
-    private AppointmentRepository appointmentRepository;
-
-    @Autowired
     private CustomerRepository customerRepository;
 
     @Autowired
     private TreatmentRepository treatmentRepository;
 
+    @Autowired
+    private TreatmentRecordRepository treatmentRecordRepository;
+
+    @Autowired
+    private ContactRepository contactRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    /**
+     * Operational Clinic Analytics (Excludes all financial/revenue records per clinic specifications)
+     */
     @GetMapping("/overview")
     public ResponseEntity<?> getOverviewReports() {
         try {
-            List<Appointment> appointments = appointmentRepository.findAll();
-            List<Treatment> treatments = treatmentRepository.findAll();
-
-            // Map treatment names to prices
-            Map<String, Double> priceMap = new HashMap<>();
-            for (Treatment t : treatments) {
-                if (t.getName() != null && t.getPrice() != null) {
-                    priceMap.put(t.getName().trim().toLowerCase(), t.getPrice());
-                }
-            }
-
-            long totalAppointments = appointments.size();
-            long pendingAppointments = 0;
-            long confirmedAppointments = 0;
-            long completedAppointments = 0;
-            long cancelledAppointments = 0;
-
-            double completedRevenue = 0.0;
-            double projectedRevenue = 0.0;
-
-            Map<String, Long> treatmentCounts = new HashMap<>();
-
-            for (Appointment a : appointments) {
-                String status = a.getStatus() != null ? a.getStatus().toUpperCase() : "PENDING";
-                String tName = a.getTreatmentName() != null ? a.getTreatmentName().trim() : "General Consultation";
-                Double price = priceMap.getOrDefault(tName.toLowerCase(), 3500.0);
-
-                treatmentCounts.put(tName, treatmentCounts.getOrDefault(tName, 0L) + 1);
-
-                switch (status) {
-                    case "COMPLETED":
-                        completedAppointments++;
-                        completedRevenue += price;
-                        break;
-                    case "CONFIRMED":
-                        confirmedAppointments++;
-                        projectedRevenue += price;
-                        break;
-                    case "CANCELLED":
-                        cancelledAppointments++;
-                        break;
-                    default:
-                        pendingAppointments++;
-                        break;
-                }
-            }
-
-            double totalEstimatedValue = completedRevenue + projectedRevenue;
-            double avgBookingValue = (completedAppointments + confirmedAppointments) > 0 
-                    ? totalEstimatedValue / (completedAppointments + confirmedAppointments) 
-                    : 0.0;
-
             long totalCustomers = customerRepository.count();
+            long totalTreatmentsRecorded = treatmentRecordRepository.count();
+            long totalActiveServices = treatmentRepository.count();
+            long totalStaff = userRepository.findAll().stream().filter(u -> u.getRole().name().equals("STAFF")).count();
+
+            List<TreatmentRecord> allRecords = treatmentRecordRepository.findAll();
+            Map<String, Long> treatmentCounts = new HashMap<>();
+            for (TreatmentRecord tr : allRecords) {
+                String tName = tr.getTreatmentName() != null ? tr.getTreatmentName().trim() : "General Consultation";
+                treatmentCounts.put(tName, treatmentCounts.getOrDefault(tName, 0L) + 1);
+            }
+
+            List<ContactMessage> enquiries = contactRepository.findAll();
+            long unreadEnquiries = enquiries.stream().filter(e -> e.getStatus() == ContactStatus.UNREAD).count();
+            long resolvedEnquiries = enquiries.stream().filter(e -> e.getStatus() == ContactStatus.RESOLVED || e.getStatus() == ContactStatus.READ).count();
 
             Map<String, Object> report = new HashMap<>();
             report.put("success", true);
-            report.put("totalAppointments", totalAppointments);
-            report.put("pendingAppointments", pendingAppointments);
-            report.put("confirmedAppointments", confirmedAppointments);
-            report.put("completedAppointments", completedAppointments);
-            report.put("cancelledAppointments", cancelledAppointments);
-            report.put("completedRevenue", completedRevenue);
-            report.put("projectedRevenue", projectedRevenue);
-            report.put("totalEstimatedValue", totalEstimatedValue);
-            report.put("averageBookingValue", Math.round(avgBookingValue));
             report.put("totalCustomers", totalCustomers);
+            report.put("totalTreatmentsRecorded", totalTreatmentsRecorded);
+            report.put("totalActiveServices", totalActiveServices);
+            report.put("totalStaff", totalStaff);
             report.put("treatmentCounts", treatmentCounts);
+            report.put("totalEnquiries", enquiries.size());
+            report.put("unreadEnquiries", unreadEnquiries);
+            report.put("resolvedEnquiries", resolvedEnquiries);
 
             return ResponseEntity.ok(report);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of(
-                "success", false,
-                "message", "Failed to load reports: " + e.getMessage()
-            ));
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Failed to compile operational report: " + e.getMessage()));
         }
     }
 }

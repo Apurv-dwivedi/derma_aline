@@ -15,6 +15,7 @@ public class StaffInvitation {
     private String email;
 
     private String fullName;
+    private String phone;
     private String designation;
     private String token;
 
@@ -25,7 +26,7 @@ public class StaffInvitation {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public enum InvitationStatus {
-        INVITED, ACTIVE, REVOKED, EXPIRED
+        INVITED, ACTIVE, DISABLED, REVOKED, EXPIRED
     }
 
     // Getters and Setters
@@ -37,6 +38,9 @@ public class StaffInvitation {
 
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
+
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
 
     public String getDesignation() { return designation; }
     public void setDesignation(String designation) { this.designation = designation; }
@@ -51,4 +55,5 @@ public class StaffInvitation {
     public void setExpiresAt(LocalDateTime expiresAt) { this.expiresAt = expiresAt; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
