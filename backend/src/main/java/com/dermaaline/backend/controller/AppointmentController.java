@@ -224,24 +224,23 @@ public class AppointmentController {
             return;
         }
         try {
-            String email = appointment.getCustomerEmail() != null ? appointment.getCustomerEmail() : appointment.getEmail();
-            if (email == null || email.trim().isEmpty()) {
-                email = "patient@dermaaline.com";
-            }
-            String cleanEmail = email.trim().toLowerCase();
-            String tName = appointment.getTreatmentName();
-            if (tName == null || tName.trim().isEmpty()) {
-                tName = "Clinical Treatment";
-            }
+            final String rawEmail = appointment.getCustomerEmail() != null ? appointment.getCustomerEmail() : appointment.getEmail();
+            final String cleanEmail = (rawEmail != null && !rawEmail.trim().isEmpty()) 
+                ? rawEmail.trim().toLowerCase() 
+                : "patient@dermaaline.com";
 
-            LocalDate tDate = appointment.getAppointmentDate() != null 
+            final String finalTreatmentName = (appointment.getTreatmentName() != null && !appointment.getTreatmentName().trim().isEmpty())
+                ? appointment.getTreatmentName().trim()
+                : "Clinical Treatment";
+
+            final LocalDate finalTreatmentDate = appointment.getAppointmentDate() != null 
                 ? appointment.getAppointmentDate().toLocalDate() 
                 : LocalDate.now();
 
             List<TreatmentRecord> existing = treatmentRecordRepository.findByCustomerEmailIgnoreCaseOrderByTreatmentDateDesc(cleanEmail);
             boolean exists = existing.stream().anyMatch(r -> 
-                tName.equalsIgnoreCase(r.getTreatmentName()) && 
-                tDate.equals(r.getTreatmentDate())
+                finalTreatmentName.equalsIgnoreCase(r.getTreatmentName()) && 
+                finalTreatmentDate.equals(r.getTreatmentDate())
             );
 
             if (!exists) {
@@ -261,8 +260,8 @@ public class AppointmentController {
                 tr.setCustomerId(customer.getId());
                 tr.setCustomerEmail(cleanEmail);
                 tr.setCustomerName(customer.getFullName() != null ? customer.getFullName() : "Valued Client");
-                tr.setTreatmentName(tName);
-                tr.setTreatmentDate(tDate);
+                tr.setTreatmentName(finalTreatmentName);
+                tr.setTreatmentDate(finalTreatmentDate);
                 tr.setPractitionerName(practitioner != null ? practitioner : "Derma Aline Specialist");
                 tr.setDescription("Clinical appointment completed.");
                 tr.setClinicalNotes(appointment.getNotes() != null && !appointment.getNotes().trim().isEmpty() 
