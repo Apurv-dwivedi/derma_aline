@@ -29,6 +29,7 @@ const StaffDashboard = () => {
 
   // Search States
   const [searchTerm, setSearchTerm] = useState('');
+  const [enquiryFilter, setEnquiryFilter] = useState('ACTIVE'); // 'ACTIVE' | 'RESOLVED' | 'ALL'
 
   // Modals
   const [showRecordModal, setShowRecordModal] = useState(false);
@@ -181,10 +182,24 @@ const StaffDashboard = () => {
     return st === 'PENDING' || st === 'CONFIRMED';
   });
 
-  // Unread patient enquiries
-  const unreadEnquiries = enquiries.filter((e) => {
+  // Active patient enquiries awaiting resolution (excludes RESOLVED)
+  const activeEnquiries = enquiries.filter((e) => {
     const st = (e.status || 'UNREAD').toUpperCase();
-    return st === 'UNREAD';
+    return st !== 'RESOLVED';
+  });
+
+  // Resolved patient enquiries archive
+  const resolvedEnquiries = enquiries.filter((e) => {
+    const st = (e.status || 'UNREAD').toUpperCase();
+    return st === 'RESOLVED';
+  });
+
+  // Filtered enquiries based on sub-tab
+  const displayedEnquiries = enquiries.filter((e) => {
+    const st = (e.status || 'UNREAD').toUpperCase();
+    if (enquiryFilter === 'ACTIVE') return st !== 'RESOLVED';
+    if (enquiryFilter === 'RESOLVED') return st === 'RESOLVED';
+    return true;
   });
 
   return (
@@ -352,7 +367,7 @@ const StaffDashboard = () => {
         {[
           { id: 'treatments', label: `Clinical Treatment Records (${treatmentRecords.length})`, icon: HeartPulse },
           { id: 'customers', label: `Client Directory (${customers.length})`, icon: Users },
-          { id: 'enquiries', label: `Client Enquiries (${unreadEnquiries.length})`, icon: MessageSquare },
+          { id: 'enquiries', label: `Client Enquiries (${activeEnquiries.length})`, icon: MessageSquare },
           { id: 'queue', label: `Operations Queue (${activeAppointments.length})`, icon: Calendar }
         ].map((tab) => {
           const Icon = tab.icon;
@@ -506,68 +521,128 @@ const StaffDashboard = () => {
 
       {/* TAB 3: CLIENT ENQUIRIES */}
       {activeTab === 'enquiries' && (
-        <div style={{ backgroundColor: '#ffffff', borderRadius: '14px', border: '1px solid #ebdcd0', overflowX: 'auto' }}>
-          {enquiries.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '50px 20px', color: '#8c7b70' }}>
-              <MessageSquare size={36} color="#c2b4a8" style={{ marginBottom: '10px' }} />
-              <p style={{ margin: 0 }}>No client enquiries received.</p>
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '14px', border: '1px solid #ebdcd0', padding: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+            <div>
+              <h2 style={{ fontSize: '1.25rem', color: '#2c221e', margin: 0, fontWeight: '700' }}>Client Enquiries Queue</h2>
+              <p style={{ color: '#8c7b70', fontSize: '0.85rem', margin: '3px 0 0 0' }}>Manage patient inquiries submitted through the website.</p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', backgroundColor: '#faf7f2', padding: '4px', borderRadius: '8px', border: '1px solid #ebdcd0' }}>
+              <button
+                onClick={() => setEnquiryFilter('ACTIVE')}
+                style={{
+                  padding: '7px 14px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: '600', border: 'none', cursor: 'pointer',
+                  backgroundColor: enquiryFilter === 'ACTIVE' ? '#806657' : 'transparent',
+                  color: enquiryFilter === 'ACTIVE' ? '#ffffff' : '#5c4d44'
+                }}
+              >
+                Active Enquiries ({activeEnquiries.length})
+              </button>
+              <button
+                onClick={() => setEnquiryFilter('RESOLVED')}
+                style={{
+                  padding: '7px 14px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: '600', border: 'none', cursor: 'pointer',
+                  backgroundColor: enquiryFilter === 'RESOLVED' ? '#806657' : 'transparent',
+                  color: enquiryFilter === 'RESOLVED' ? '#ffffff' : '#5c4d44'
+                }}
+              >
+                Resolved ({resolvedEnquiries.length})
+              </button>
+              <button
+                onClick={() => setEnquiryFilter('ALL')}
+                style={{
+                  padding: '7px 14px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: '600', border: 'none', cursor: 'pointer',
+                  backgroundColor: enquiryFilter === 'ALL' ? '#806657' : 'transparent',
+                  color: enquiryFilter === 'ALL' ? '#ffffff' : '#5c4d44'
+                }}
+              >
+                All ({enquiries.length})
+              </button>
+            </div>
+          </div>
+
+          {displayedEnquiries.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '45px 20px', color: '#8c7b70', border: '1px dashed #ebdcd0', borderRadius: '10px' }}>
+              <MessageSquare size={34} color="#c2b4a8" style={{ marginBottom: '10px' }} />
+              <p style={{ margin: 0, fontWeight: '500' }}>
+                {enquiryFilter === 'ACTIVE' ? 'All client enquiries have been resolved!' : enquiryFilter === 'RESOLVED' ? 'No resolved enquiries in archive.' : 'No enquiries received.'}
+              </p>
             </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '750px' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid #ebdcd0', color: '#8c7b70', fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  <th style={{ padding: '14px 16px' }}>Sender</th>
-                  <th style={{ padding: '14px 16px' }}>Contact</th>
-                  <th style={{ padding: '14px 16px' }}>Message</th>
-                  <th style={{ padding: '14px 16px', textAlign: 'center' }}>Status</th>
-                  <th style={{ padding: '14px 16px', textAlign: 'center' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {enquiries.map((e) => (
-                  <tr key={e.id} style={{ borderBottom: '1px solid #ebdcd0' }}>
-                    <td style={{ padding: '14px 16px', fontWeight: '600', color: '#2c221e' }}>{e.name}</td>
-                    <td style={{ padding: '14px 16px', fontSize: '0.85rem', color: '#6e5d53' }}>
-                      <div>{e.email}</div>
-                      <div>{e.phone}</div>
-                    </td>
-                    <td style={{ padding: '14px 16px', fontSize: '0.88rem', color: '#4a3b32', maxWidth: '300px' }}>
-                      {e.message}
-                    </td>
-                    <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                      <span style={{
-                        padding: '4px 10px',
-                        borderRadius: '12px',
-                        fontSize: '0.75rem',
-                        fontWeight: '700',
-                        backgroundColor: e.status === 'RESOLVED' ? '#f0fdf4' : e.status === 'READ' ? '#f8fafc' : '#fef3c7',
-                        color: e.status === 'RESOLVED' ? '#166534' : e.status === 'READ' ? '#475569' : '#92400e',
-                        border: '1px solid',
-                        borderColor: e.status === 'RESOLVED' ? '#bbf7d0' : e.status === 'READ' ? '#cbd5e1' : '#fde68a'
-                      }}>
-                        {e.status || 'UNREAD'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                      <div style={{ display: 'inline-flex', gap: '6px' }}>
-                        <button
-                          onClick={() => handleUpdateEnquiryStatus(e.id, 'READ')}
-                          style={{ backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', padding: '6px 10px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
-                        >
-                          Mark Read
-                        </button>
-                        <button
-                          onClick={() => handleUpdateEnquiryStatus(e.id, 'RESOLVED')}
-                          style={{ backgroundColor: '#059669', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
-                        >
-                          Resolve
-                        </button>
-                      </div>
-                    </td>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '750px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #ebdcd0', color: '#8c7b70', fontSize: '0.82rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    <th style={{ padding: '14px 16px' }}>Sender</th>
+                    <th style={{ padding: '14px 16px' }}>Contact</th>
+                    <th style={{ padding: '14px 16px' }}>Message</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'center' }}>Status</th>
+                    <th style={{ padding: '14px 16px', textAlign: 'center' }}>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {displayedEnquiries.map((e) => {
+                    const isResolved = (e.status || '').toUpperCase() === 'RESOLVED';
+                    const isRead = (e.status || '').toUpperCase() === 'READ';
+                    return (
+                      <tr key={e.id} style={{ borderBottom: '1px solid #ebdcd0', backgroundColor: isResolved ? '#fafafa' : isRead ? 'transparent' : 'rgba(217, 119, 6, 0.03)' }}>
+                        <td style={{ padding: '14px 16px', fontWeight: '600', color: '#2c221e' }}>{e.name}</td>
+                        <td style={{ padding: '14px 16px', fontSize: '0.85rem', color: '#6e5d53' }}>
+                          <div>{e.email}</div>
+                          <div>{e.phone}</div>
+                        </td>
+                        <td style={{ padding: '14px 16px', fontSize: '0.88rem', color: '#4a3b32', maxWidth: '300px' }}>
+                          {e.message}
+                        </td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                            backgroundColor: isResolved ? '#f0fdf4' : isRead ? '#f8fafc' : '#fef3c7',
+                            color: isResolved ? '#166534' : isRead ? '#475569' : '#92400e',
+                            border: '1px solid',
+                            borderColor: isResolved ? '#bbf7d0' : isRead ? '#cbd5e1' : '#fde68a'
+                          }}>
+                            {isResolved ? 'RESOLVED' : isRead ? 'READ' : 'UNREAD'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                          <div style={{ display: 'inline-flex', gap: '6px' }}>
+                            {isResolved ? (
+                              <button
+                                onClick={() => handleUpdateEnquiryStatus(e.id, 'UNREAD')}
+                                style={{ backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', padding: '6px 12px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
+                              >
+                                Reopen
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleUpdateEnquiryStatus(e.id, 'READ')}
+                                  style={{ backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', padding: '6px 10px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' }}
+                                >
+                                  Mark Read
+                                </button>
+                                <button
+                                  onClick={() => handleUpdateEnquiryStatus(e.id, 'RESOLVED')}
+                                  title="Mark as resolved and remove from active queue"
+                                  style={{ backgroundColor: '#059669', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer', fontWeight: '600' }}
+                                >
+                                  Resolve
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}

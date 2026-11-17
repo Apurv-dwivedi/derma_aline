@@ -67,6 +67,8 @@ const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [clientSearchTerm, setClientSearchTerm] = useState('');
+  const [messageFilter, setMessageFilter] = useState('ACTIVE');
+  const [messageToast, setMessageToast] = useState('');
 
   // State for editing appointment
   const [editingId, setEditingId] = useState(null);
@@ -333,19 +335,47 @@ const AdminDashboard = () => {
     return st === 'PENDING' || st === 'CONFIRMED';
   });
 
-  // Unread patient inquiries
-  const unreadMessages = messages.filter(m => {
+  // Active patient inquiries awaiting resolution (excludes RESOLVED)
+  const activeMessages = messages.filter(m => {
     const st = (m.status || 'UNREAD').toUpperCase();
-    return st === 'UNREAD';
+    return st !== 'RESOLVED';
   });
 
-  const handleToggleMessageStatus = async (id, currentStatus) => {
-    const nextStatus = currentStatus === 'READ' ? 'UNREAD' : 'READ';
+  // Resolved patient inquiries
+  const resolvedMessages = messages.filter(m => {
+    const st = (m.status || 'UNREAD').toUpperCase();
+    return st === 'RESOLVED';
+  });
+
+  // Displayed messages based on sub-filter
+  const displayedMessages = messages.filter(m => {
+    const st = (m.status || 'UNREAD').toUpperCase();
+    if (messageFilter === 'ACTIVE') return st !== 'RESOLVED';
+    if (messageFilter === 'RESOLVED') return st === 'RESOLVED';
+    return true;
+  });
+
+  const handleResolveMessage = async (id) => {
     try {
-      await API.patch(`/contact/${id}/status`, { status: nextStatus });
-      setMessages(prev => prev.map(m => m.id === id ? { ...m, status: nextStatus } : m));
+      setMessages(prev => prev.map(m => m.id === id ? { ...m, status: 'RESOLVED' } : m));
+      await API.patch(`/contact/${id}/status`, { status: 'RESOLVED' });
+      setMessageToast('Query marked as resolved and removed from active list.');
+      setTimeout(() => setMessageToast(''), 3500);
     } catch (err) {
-      console.error("Failed to update message status:", err);
+      console.error("Failed to resolve message:", err);
+      fetchData();
+    }
+  };
+
+  const handleReopenMessage = async (id) => {
+    try {
+      setMessages(prev => prev.map(m => m.id === id ? { ...m, status: 'UNREAD' } : m));
+      await API.patch(`/contact/${id}/status`, { status: 'UNREAD' });
+      setMessageToast('Query reopened and restored to active list.');
+      setTimeout(() => setMessageToast(''), 3500);
+    } catch (err) {
+      console.error("Failed to reopen message:", err);
+      fetchData();
     }
   };
 
@@ -540,7 +570,7 @@ const AdminDashboard = () => {
             color: activeTab === 'messages' ? '#fff' : 'var(--color-primary)', 
             boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
           }}>
-          <MessageSquare size={16} /> Inquiries ({unreadMessages.length})
+          <MessageSquare size={16} /> Inquiries ({activeMessages.length})
         </button>
 
         <button 
@@ -939,74 +969,141 @@ const AdminDashboard = () => {
 
       {/* TAB 5: MESSAGES / INQUIRIES */}
       {activeTab === 'messages' && (
-        <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)', overflowX: 'auto' }}>
-          <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', marginBottom: '20px', fontFamily: 'var(--font-heading)' }}>Client Contact Messages</h2>
+        <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+            <div>
+              <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', margin: 0, fontFamily: 'var(--font-heading)' }}>Client Inquiries & Messages</h2>
+              <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', margin: '4px 0 0 0' }}>Review and resolve patient enquiries submitted through the clinic contact form.</p>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '8px', backgroundColor: '#faf7f2', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+              <button
+                onClick={() => setMessageFilter('ACTIVE')}
+                style={{
+                  padding: '7px 14px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: '600', border: 'none', cursor: 'pointer',
+                  backgroundColor: messageFilter === 'ACTIVE' ? 'var(--color-primary)' : 'transparent',
+                  color: messageFilter === 'ACTIVE' ? '#ffffff' : 'var(--color-primary)'
+                }}
+              >
+                Active Queries ({activeMessages.length})
+              </button>
+              <button
+                onClick={() => setMessageFilter('RESOLVED')}
+                style={{
+                  padding: '7px 14px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: '600', border: 'none', cursor: 'pointer',
+                  backgroundColor: messageFilter === 'RESOLVED' ? 'var(--color-primary)' : 'transparent',
+                  color: messageFilter === 'RESOLVED' ? '#ffffff' : 'var(--color-primary)'
+                }}
+              >
+                Resolved Archive ({resolvedMessages.length})
+              </button>
+              <button
+                onClick={() => setMessageFilter('ALL')}
+                style={{
+                  padding: '7px 14px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: '600', border: 'none', cursor: 'pointer',
+                  backgroundColor: messageFilter === 'ALL' ? 'var(--color-primary)' : 'transparent',
+                  color: messageFilter === 'ALL' ? '#ffffff' : 'var(--color-primary)'
+                }}
+              >
+                All ({messages.length})
+              </button>
+            </div>
+          </div>
+
+          {messageToast && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', borderRadius: '8px', marginBottom: '16px', fontSize: '0.85rem' }}>
+              <CheckCircle2 size={16} /> <span>{messageToast}</span>
+            </div>
+          )}
           
           {loading ? (
-            <p style={{ textAlign: 'center', padding: '30px', color: 'var(--text-light)' }}>Loading messages...</p>
-          ) : messages.length === 0 ? (
-            <p style={{ textAlign: 'center', padding: '30px', color: 'var(--text-light)' }}>No messages found.</p>
+            <p style={{ textAlign: 'center', padding: '30px', color: 'var(--text-light)' }}>Loading inquiries...</p>
+          ) : displayedMessages.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-light)', border: '1px dashed var(--border-light)', borderRadius: '8px' }}>
+              <MessageSquare size={32} color="#c2b4a8" style={{ marginBottom: '8px' }} />
+              <p style={{ margin: 0, fontWeight: '500' }}>
+                {messageFilter === 'ACTIVE' ? 'All patient inquiries are resolved!' : messageFilter === 'RESOLVED' ? 'No resolved queries in archive.' : 'No messages found.'}
+              </p>
+            </div>
           ) : (
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
-              <thead>
-                <tr style={{ borderBottom: '2px solid var(--border-light)', color: 'var(--text-light)', fontSize: '0.9rem' }}>
-                  <th style={{ padding: '12px' }}>Sender Name</th>
-                  <th style={{ padding: '12px' }}>Contact Info</th>
-                  <th style={{ padding: '12px' }}>Message</th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>Status</th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {messages.map((msg) => {
-                  const isRead = (msg.status || 'UNREAD').toUpperCase() === 'READ';
-                  return (
-                    <tr key={msg.id} style={{ borderBottom: '1px solid var(--border-light)', backgroundColor: isRead ? 'transparent' : 'rgba(217, 119, 6, 0.03)' }}>
-                      <td style={{ padding: '15px 12px', fontWeight: '600', color: 'var(--color-primary)' }}>{msg.name}</td>
-                      <td style={{ padding: '15px 12px', color: 'var(--text-light)', fontSize: '0.9rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}><Mail size={14} /> {msg.email}</div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={14} /> {msg.phone}</div>
-                      </td>
-                      <td style={{ padding: '15px 12px', maxWidth: '300px', wordBreak: 'break-word' }}>{msg.message}</td>
-                      <td style={{ padding: '15px 12px', textAlign: 'center' }}>
-                        <span style={{
-                          padding: '4px 10px',
-                          borderRadius: '12px',
-                          fontSize: '0.75rem',
-                          fontWeight: '700',
-                          backgroundColor: isRead ? '#f1f5f9' : '#fef3c7',
-                          color: isRead ? '#475569' : '#92400e',
-                          border: `1px solid ${isRead ? '#cbd5e1' : '#fde68a'}`
-                        }}>
-                          {isRead ? 'READ' : 'UNREAD'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '15px 12px', textAlign: 'center' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                          <button 
-                            onClick={() => handleToggleMessageStatus(msg.id, msg.status || 'UNREAD')} 
-                            title={isRead ? "Mark as unread" : "Mark as read"}
-                            style={{ 
-                              backgroundColor: isRead ? '#64748b' : '#059669', 
-                              color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', 
-                              cursor: 'pointer', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' 
-                            }}
-                          >
-                            <CheckCircle2 size={13} /> {isRead ? 'Mark Unread' : 'Mark Read'}
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteMessage(msg.id)} 
-                            style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
-                          >
-                            <Trash2 size={13} /> Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border-light)', color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                    <th style={{ padding: '12px' }}>Sender Name</th>
+                    <th style={{ padding: '12px' }}>Contact Info</th>
+                    <th style={{ padding: '12px' }}>Message</th>
+                    <th style={{ padding: '12px', textAlign: 'center' }}>Status</th>
+                    <th style={{ padding: '12px', textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedMessages.map((msg) => {
+                    const isResolved = (msg.status || '').toUpperCase() === 'RESOLVED';
+                    const isRead = (msg.status || '').toUpperCase() === 'READ';
+                    return (
+                      <tr key={msg.id} style={{ borderBottom: '1px solid var(--border-light)', backgroundColor: isResolved ? '#fafafa' : isRead ? 'transparent' : 'rgba(217, 119, 6, 0.03)' }}>
+                        <td style={{ padding: '15px 12px', fontWeight: '600', color: 'var(--color-primary)' }}>{msg.name}</td>
+                        <td style={{ padding: '15px 12px', color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}><Mail size={14} /> {msg.email}</div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Phone size={14} /> {msg.phone}</div>
+                        </td>
+                        <td style={{ padding: '15px 12px', maxWidth: '300px', wordBreak: 'break-word', fontSize: '0.92rem' }}>{msg.message}</td>
+                        <td style={{ padding: '15px 12px', textAlign: 'center' }}>
+                          <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '12px',
+                            fontSize: '0.75rem',
+                            fontWeight: '700',
+                            backgroundColor: isResolved ? '#d4edda' : isRead ? '#e2e8f0' : '#fef3c7',
+                            color: isResolved ? '#155724' : isRead ? '#475569' : '#92400e',
+                            border: `1px solid ${isResolved ? '#c3e6cb' : isRead ? '#cbd5e1' : '#fde68a'}`
+                          }}>
+                            {isResolved ? 'RESOLVED' : isRead ? 'READ' : 'UNREAD'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '15px 12px', textAlign: 'center' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                            {isResolved ? (
+                              <button 
+                                onClick={() => handleReopenMessage(msg.id)} 
+                                title="Reopen query and move back to active"
+                                style={{ 
+                                  backgroundColor: '#6c757d', 
+                                  color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', 
+                                  cursor: 'pointer', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '4px' 
+                                }}
+                              >
+                                Reopen
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => handleResolveMessage(msg.id)} 
+                                title="Resolve query and remove from active list"
+                                style={{ 
+                                  backgroundColor: '#198754', 
+                                  color: '#fff', border: 'none', padding: '6px 14px', borderRadius: '6px', 
+                                  cursor: 'pointer', fontSize: '0.82rem', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '5px' 
+                                }}
+                              >
+                                <CheckCircle2 size={14} /> Resolve Query
+                              </button>
+                            )}
+                            <button 
+                              onClick={() => handleDeleteMessage(msg.id)} 
+                              title="Delete query permanently"
+                              style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       )}
