@@ -64,22 +64,57 @@ public class DatabaseFixRunner {
                 "ALTER TABLE staff_invitations ADD COLUMN IF NOT EXISTS phone VARCHAR(255);",
                 "ALTER TABLE staff_invitations ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'INVITED';",
 
-                // 5. Treatment Records table verification
+                // 5. Treatment Records table verification and completed appointment sync
                 "CREATE TABLE IF NOT EXISTS treatment_records (" +
                     "id BIGSERIAL PRIMARY KEY, " +
-                    "customer_id BIGINT, " +
+                    "customer_id BIGINT DEFAULT 0, " +
                     "customer_name VARCHAR(255), " +
                     "customer_email VARCHAR(255), " +
                     "customer_phone VARCHAR(255), " +
                     "treatment_name VARCHAR(255), " +
                     "treatment_category VARCHAR(255), " +
-                    "conducted_by_name VARCHAR(255), " +
-                    "conducted_by_role VARCHAR(255), " +
-                    "treatment_date TIMESTAMP, " +
+                    "practitioner_name VARCHAR(255), " +
+                    "treatment_date DATE DEFAULT CURRENT_DATE, " +
+                    "description TEXT, " +
                     "clinical_notes TEXT, " +
                     "aftercare_instructions TEXT, " +
-                    "status VARCHAR(50) DEFAULT 'COMPLETED', " +
-                    "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);",
+                    "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                    "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);",
+                "ALTER TABLE treatment_records ADD COLUMN IF NOT EXISTS customer_id BIGINT DEFAULT 0;",
+                "ALTER TABLE treatment_records ADD COLUMN IF NOT EXISTS customer_email VARCHAR(255);",
+                "ALTER TABLE treatment_records ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255);",
+                "ALTER TABLE treatment_records ADD COLUMN IF NOT EXISTS treatment_name VARCHAR(255);",
+                "ALTER TABLE treatment_records ADD COLUMN IF NOT EXISTS treatment_date DATE DEFAULT CURRENT_DATE;",
+                "ALTER TABLE treatment_records ADD COLUMN IF NOT EXISTS practitioner_name VARCHAR(255);",
+                "ALTER TABLE treatment_records ADD COLUMN IF NOT EXISTS clinical_notes TEXT;",
+                "ALTER TABLE treatment_records ADD COLUMN IF NOT EXISTS aftercare_instructions TEXT;",
+                "ALTER TABLE treatment_records ADD COLUMN IF NOT EXISTS description TEXT;",
+                "ALTER TABLE treatment_records ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
+                "ALTER TABLE treatment_records ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
+
+                // Backfill completed appointments into treatment_records so completed visits immediately appear in clinical logs
+                "INSERT INTO treatment_records (" +
+                    "customer_id, customer_email, customer_name, treatment_name, " +
+                    "treatment_date, practitioner_name, clinical_notes, " +
+                    "aftercare_instructions, created_at, updated_at) " +
+                "SELECT " +
+                    "0, " +
+                    "COALESCE(LOWER(customer_email), LOWER(email), 'patient@dermaaline.com'), " +
+                    "COALESCE(customer_name, patient_name, 'Valued Client'), " +
+                    "treatment_name, " +
+                    "COALESCE(CAST(appointment_date AS DATE), CURRENT_DATE), " +
+                    "'Derma Aline Specialist', " +
+                    "COALESCE(notes, 'Completed clinical session.'), " +
+                    "'Keep the treated area clean, hydrated, and protected with broad-spectrum SPF 50+ sunscreen daily.', " +
+                    "CURRENT_TIMESTAMP, " +
+                    "CURRENT_TIMESTAMP " +
+                "FROM appointments a " +
+                "WHERE UPPER(a.status) = 'COMPLETED' " +
+                "  AND NOT EXISTS (" +
+                    "SELECT 1 FROM treatment_records tr " +
+                    "WHERE LOWER(tr.customer_email) = LOWER(COALESCE(a.customer_email, a.email)) " +
+                    "  AND LOWER(tr.treatment_name) = LOWER(a.treatment_name)" +
+                ");",
 
                 // 6. Email OTPs table verification
                 "CREATE TABLE IF NOT EXISTS email_verification_otps (" +

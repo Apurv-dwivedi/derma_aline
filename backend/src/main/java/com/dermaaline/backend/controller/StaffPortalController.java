@@ -110,6 +110,8 @@ public class StaffPortalController {
      */
     @GetMapping("/treatments/records")
     public ResponseEntity<List<TreatmentRecord>> getTreatmentRecords() {
+        // Automatically backfill and sync any completed visits into clinical treatment records
+        syncCompletedAppointments();
         return ResponseEntity.ok(treatmentRecordRepository.findAllByOrderByTreatmentDateDesc());
     }
 
@@ -229,11 +231,82 @@ public class StaffPortalController {
 
         return appointmentRepository.findById(id).map(appointment -> {
             appointment.setStatus(newStatus.trim().toUpperCase());
-            appointmentRepository.save(appointment);
+            Appointment saved = appointmentRepository.save(appointment);
+            if ("COMPLETED".equalsIgnoreCase(saved.getStatus())) {
+                String staffEmail = getStaffEmail();
+                String staffName = userRepository.findByEmail(staffEmail).map(User::getFullName).orElse("Clinic Staff");
+                ensureTreatmentRecordCreated(saved, staffName);
+            }
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Appointment status updated to " + appointment.getStatus()
             ));
         }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Appointment not found")));
+    }
+
+    private void syncCompletedAppointments() {
+        try {
+            List<Appointment> completed = appointmentRepository.findAll().stream()
+                .filter(a -> "COMPLETED".equalsIgnoreCase(a.getStatus()))
+                .toList();
+            for (Appointment a : completed) {
+                ensureTreatmentRecordCreated(a, "Derma Aline Specialist");
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void ensureTreatmentRecordCreated(Appointment appointment, String practitioner) {
+        if (appointment == null || !"COMPLETED".equalsIgnoreCase(appointment.getStatus())) {
+            return;
+        }
+        try {
+            String email = appointment.getCustomerEmail() != null ? appointment.getCustomerEmail() : appointment.getEmail();
+            if (email == null || email.trim().isEmpty()) {
+                email = "patient@dermaaline.com";
+            }
+            String cleanEmail = email.trim().toLowerCase();
+            String tName = appointment.getTreatmentName();
+            if (tName == null || tName.trim().isEmpty()) {
+                tName = "Clinical Treatment";
+            }
+
+            LocalDate tDate = appointment.getAppointmentDate() != null 
+                ? appointment.getAppointmentDate().toLocalDate() 
+                : LocalDate.now();
+
+            List<TreatmentRecord> existing = treatmentRecordRepository.findByCustomerEmailIgnoreCaseOrderByTreatmentDateDesc(cleanEmail);
+            boolean exists = existing.stream().anyMatch(r -> 
+                tName.equalsIgnoreCase(r.getTreatmentName()) && 
+                tDate.equals(r.getTreatmentDate())
+            );
+
+            if (!exists) {
+                Optional<Customer> customerOpt = customerRepository.findByEmail(cleanEmail);
+                Customer customer;
+                if (customerOpt.isEmpty()) {
+                    customer = new Customer();
+                    customer.setEmail(cleanEmail);
+                    customer.setFullName(appointment.getCustomerName() != null ? appointment.getCustomerName() : "Valued Client");
+                    customer.setPhone(appointment.getCustomerPhone());
+                    customer = customerRepository.save(customer);
+                } else {
+                    customer = customerOpt.get();
+                }
+
+                TreatmentRecord tr = new TreatmentRecord();
+                tr.setCustomerId(customer.getId());
+                tr.setCustomerEmail(cleanEmail);
+                tr.setCustomerName(customer.getFullName() != null ? customer.getFullName() : "Valued Client");
+                tr.setTreatmentName(tName);
+                tr.setTreatmentDate(tDate);
+                tr.setPractitionerName(practitioner != null ? practitioner : "Derma Aline Specialist");
+                tr.setDescription("Clinical appointment procedure completed.");
+                tr.setClinicalNotes(appointment.getNotes() != null && !appointment.getNotes().trim().isEmpty() 
+                    ? appointment.getNotes() 
+                    : "Clinical appointment procedure completed successfully.");
+                tr.setAftercareInstructions("Keep treated area clean and hydrated. Avoid direct heat/sun and apply broad-spectrum SPF 50+ sunscreen daily.");
+                treatmentRecordRepository.save(tr);
+            }
+        } catch (Exception ignored) {}
     }
 }
