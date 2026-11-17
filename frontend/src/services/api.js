@@ -1,4 +1,4 @@
-﻿import axios from 'axios';
+import axios from 'axios';
 
 // Use environment variable for production, fallback to live Render backend for development/production safety
 const API = axios.create({

@@ -98,7 +98,14 @@ public class AuthController {
         }
 
         try {
-            otpService.generateAndSendOtp(email, request.getFullName());
+            boolean sent = otpService.generateAndSendOtp(email, request.getFullName());
+            if (!sent) {
+                return ResponseEntity.status(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                    "success", false,
+                    "email", email,
+                    "message", "Registration saved, but verification email could not be delivered: outbound SMTP is blocked by cloud hosting firewall. Please configure RESEND_API_KEY or BREVO_API_KEY in Render environment variables to enable live delivery."
+                ));
+            }
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "requiresVerification", true,
@@ -195,7 +202,13 @@ public class AuthController {
         }
 
         try {
-            otpService.generateAndSendOtp(cleanEmail, user.getFullName());
+            boolean sent = otpService.generateAndSendOtp(cleanEmail, user.getFullName());
+            if (!sent) {
+                return ResponseEntity.status(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                    "success", false,
+                    "message", "Verification email could not be delivered: outbound SMTP is blocked by cloud hosting firewall. Please configure RESEND_API_KEY or BREVO_API_KEY in Render environment variables."
+                ));
+            }
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "A new verification code has been dispatched to your email address."
