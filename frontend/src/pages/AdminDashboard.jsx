@@ -46,7 +46,7 @@ const AdminDashboard = () => {
   const [settings, setSettings] = useState({
     clinicName: 'DERMA ALINE AESTHÉTICS SKIN CLINIC',
     contactEmail: 'dermaalineskinaesthetics@gmail.com',
-    contactPhone: '+91 6392194139',
+    contactPhone: '+91 87007 51880',
     address: 'Derma Aline Aesthétics Clinic, Luxury Care Suite',
     openingHours: 'Mon - Sat: 10:00 AM - 08:00 PM',
     generalInformation: 'Premier aesthetic skin clinic providing tailored clinical treatments, skin rejuvenation, and luxury dermatological care.'

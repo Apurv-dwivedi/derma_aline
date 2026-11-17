@@ -14,7 +14,7 @@ const Contact = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Basic Rate Limiting / Validation to prevent spam clicks
     if (loading) return;
     if (formData.message.trim().length < 10) {
@@ -91,12 +91,12 @@ const Contact = () => {
         <div style={{ flex: '1', minWidth: '300px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div style={{ backgroundColor: 'var(--color-primary)', color: '#fff', padding: '40px', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-soft)' }}>
             <h3 style={{ fontSize: '1.4rem', marginBottom: '25px', fontFamily: 'var(--font-heading)' }}>Clinic Information</h3>
-            
+
             <div style={{ display: 'flex', gap: '15px', marginBottom: '20px' }}>
               <MapPin size={24} color="var(--color-accent)" style={{ flexShrink: 0 }} />
               <div>
                 <h4 style={{ fontSize: '1.1rem', marginBottom: '5px' }}>Our Location</h4>
-                <p style={{ color: '#ccc', lineHeight: '1.5' }}>Rajouri Garden<br/>New Delhi, 110027<br/>India</p>
+                <p style={{ color: '#ccc', lineHeight: '1.5' }}>Rajouri Garden<br />New Delhi, 110027<br />India</p>
               </div>
             </div>
 
@@ -104,8 +104,8 @@ const Contact = () => {
               <Phone size={24} color="var(--color-accent)" style={{ flexShrink: 0 }} />
               <div>
                 <h4 style={{ fontSize: '1.1rem', marginBottom: '5px' }}>Contact Details</h4>
-                <p style={{ color: '#ccc', marginBottom: '4px' }}>+91 98765 43210</p>
-                <p style={{ color: '#ccc' }}>+91 11 2345 6789</p>
+                <a href="tel:8700751880" style={{ color: '#ccc', textDecoration: 'none', display: 'block', marginBottom: '4px' }}>+91 87007 51880</a>
+                <a href="tel:9319544704" style={{ color: '#ccc', textDecoration: 'none', display: 'block' }}>+91 93195 44704</a>
               </div>
             </div>
 
@@ -113,7 +113,7 @@ const Contact = () => {
               <Mail size={24} color="var(--color-accent)" style={{ flexShrink: 0 }} />
               <div>
                 <h4 style={{ fontSize: '1.1rem', marginBottom: '5px' }}>Email Support</h4>
-                <p style={{ color: '#ccc' }}>hello@dermaaline.com</p>
+                <a href="mailto:dermaalineskinaesthetics@gmail.com" style={{ color: '#ccc', textDecoration: 'none' }}>dermaalineskinaesthetics@gmail.com</a>
               </div>
             </div>
 

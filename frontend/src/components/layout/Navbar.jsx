@@ -44,6 +44,9 @@ const Navbar = () => {
     const isClient = userRole === 'CUSTOMER' || userRole === 'PATIENT';
     const isOwner = userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
     const isStaff = userRole === 'STAFF';
+    const isPortalRoute = location.pathname.startsWith('/staff') || 
+                          location.pathname.startsWith('/admin') || 
+                          location.pathname.startsWith('/client/dashboard');
 
     return (
         <header className="navbar">
@@ -97,53 +100,123 @@ const Navbar = () => {
 
                 {/* Desktop Navigation Links (Hidden on Mobile) */}
                 <nav className="nav-links desktop-nav">
-                    <Link to="/" className="nav-link">Home</Link>
-                    <Link to="/about" className="nav-link">About</Link>
-                    <Link to="/treatments" className="nav-link">Treatments</Link>
-                    <Link to="/contact" className="nav-link">Contact</Link>
+                    {isPortalRoute ? (
+                        /* Dedicated Internal Portal Navigation Mode */
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '18px' }}>
+                            {isStaff && (
+                                <span style={{
+                                    padding: '5px 14px',
+                                    borderRadius: '20px',
+                                    backgroundColor: '#e0f2fe',
+                                    color: '#0369a1',
+                                    fontSize: '0.78rem',
+                                    fontWeight: '700',
+                                    letterSpacing: '0.04em'
+                                }}>
+                                    STAFF OPERATIONS PORTAL
+                                </span>
+                            )}
+                            {isOwner && (
+                                <span style={{
+                                    padding: '5px 14px',
+                                    borderRadius: '20px',
+                                    backgroundColor: '#fef3c7',
+                                    color: '#92400e',
+                                    fontSize: '0.78rem',
+                                    fontWeight: '700',
+                                    letterSpacing: '0.04em'
+                                }}>
+                                    OWNER EXECUTIVE SUITE
+                                </span>
+                            )}
+                            {isClient && (
+                                <span style={{
+                                    padding: '5px 14px',
+                                    borderRadius: '20px',
+                                    backgroundColor: '#f0eae1',
+                                    color: '#806657',
+                                    fontSize: '0.78rem',
+                                    fontWeight: '700',
+                                    letterSpacing: '0.04em'
+                                }}>
+                                    CLIENT PRIVATE SUITE
+                                </span>
+                            )}
 
-                    {/* Role-Specific Portal Shortcuts */}
-                    {isLoggedIn && isOwner && (
-                        <Link to="/admin" className="nav-link" style={{ fontWeight: '700', color: '#806657' }}>
-                            Executive Suite
-                        </Link>
-                    )}
-                    {isLoggedIn && isStaff && (
-                        <Link to="/staff" className="nav-link" style={{ fontWeight: '700', color: '#0369a1' }}>
-                            Staff Workspace
-                        </Link>
-                    )}
-                    {isLoggedIn && isClient && (
-                        <Link to="/client/dashboard" className="nav-link" style={{ fontWeight: '700', color: '#806657' }}>
-                            Client Suite
-                        </Link>
-                    )}
+                            <Link to="/" className="nav-link" style={{ fontSize: '0.88rem', color: '#6e5d53', textDecoration: 'none', fontWeight: '500' }}>
+                                View Website &rarr;
+                            </Link>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginLeft: '10px' }}>
-                        {!isLoggedIn ? (
-                            <>
-                                <Link to="/client/login" style={{ color: 'var(--color-primary, #806657)', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', fontWeight: '600', fontSize: '0.9rem' }}>
-                                    <User size={17} /> Client Portal
-                                </Link>
-                                <Link to="/contact">
-                                    <button className="btn-primary" style={{ padding: '9px 18px', fontSize: '0.85rem' }}>
-                                        Enquire Consultation
-                                    </button>
-                                </Link>
-                            </>
-                        ) : (
-                            <>
-                                <button onClick={handleLogout} style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem' }}>
-                                    <LogOut size={16} /> Sign Out
-                                </button>
-                                <Link to={isOwner ? "/admin" : isStaff ? "/staff" : "/client/dashboard"}>
-                                    <button className="btn-primary" style={{ padding: '9px 18px', fontSize: '0.85rem' }}>
-                                        My Dashboard
-                                    </button>
-                                </Link>
-                            </>
-                        )}
-                    </div>
+                            <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                fontSize: '0.85rem',
+                                color: '#2c221e',
+                                fontWeight: '600',
+                                backgroundColor: '#faf7f2',
+                                padding: '6px 14px',
+                                borderRadius: '8px',
+                                border: '1px solid #ebdcd0'
+                            }}>
+                                <UserCircle size={16} color="#806657" />
+                                <span>{userName || (isStaff ? 'Staff Member' : isOwner ? 'Administrator' : 'Client')}</span>
+                            </div>
+
+                            <button 
+                                onClick={handleLogout} 
+                                style={{ 
+                                    color: '#dc2626', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    gap: '6px', 
+                                    background: '#fef2f2', 
+                                    border: '1px solid #fecaca', 
+                                    padding: '7px 14px', 
+                                    borderRadius: '8px', 
+                                    cursor: 'pointer', 
+                                    fontWeight: '600', 
+                                    fontSize: '0.85rem' 
+                                }}
+                            >
+                                <LogOut size={15} /> Sign Out
+                            </button>
+                        </div>
+                    ) : (
+                        /* Public Website Navigation Mode */
+                        <>
+                            <Link to="/" className="nav-link">Home</Link>
+                            <Link to="/about" className="nav-link">About</Link>
+                            <Link to="/treatments" className="nav-link">Treatments</Link>
+                            <Link to="/contact" className="nav-link">Contact</Link>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginLeft: '10px' }}>
+                                {!isLoggedIn ? (
+                                    <>
+                                        <Link to="/client/login" style={{ color: 'var(--color-primary, #806657)', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', fontWeight: '600', fontSize: '0.9rem' }}>
+                                            <User size={17} /> Client Portal
+                                        </Link>
+                                        <Link to="/contact">
+                                            <button className="btn-primary" style={{ padding: '9px 18px', fontSize: '0.85rem' }}>
+                                                Enquire Consultation
+                                            </button>
+                                        </Link>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Link to={isOwner ? "/admin" : isStaff ? "/staff" : "/client/dashboard"}>
+                                            <button className="btn-primary" style={{ padding: '9px 18px', fontSize: '0.85rem' }}>
+                                                {isOwner ? "Executive Suite" : isStaff ? "Staff Workspace" : "My Dashboard"}
+                                            </button>
+                                        </Link>
+                                        <button onClick={handleLogout} style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem' }}>
+                                            <LogOut size={16} /> Sign Out
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </nav>
 
                 {/* Mobile Hamburger Toggle Button (Hidden on Desktop) */}

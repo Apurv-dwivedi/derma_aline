@@ -15,7 +15,7 @@ public class ClinicSettings {
     private String clinicName = "DERMA ALINE AESTHÉTICS SKIN CLINIC";
 
     private String contactEmail = "dermaalineskinaesthetics@gmail.com";
-    private String contactPhone = "+91 6392194139";
+    private String contactPhone = "+91 87007 51880";
     private String address = "Derma Aline Aesthétics Clinic, Luxury Care Suite";
     private String openingHours = "Mon - Sat: 10:00 AM - 08:00 PM, Sun: By Consultation";
 
