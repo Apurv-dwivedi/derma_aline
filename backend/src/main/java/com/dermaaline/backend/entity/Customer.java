@@ -22,6 +22,9 @@ public class Customer {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "profile_picture", columnDefinition = "TEXT")
+    private String profilePicture;
+
     private LocalDateTime createdAt = LocalDateTime.now();
 
     // Getters and Setters
@@ -39,6 +42,9 @@ public class Customer {
 
     public String getNotes() { return notes; }
     public void setNotes(String notes) { this.notes = notes; }
+
+    public String getProfilePicture() { return profilePicture; }
+    public void setProfilePicture(String profilePicture) { this.profilePicture = profilePicture; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
 }

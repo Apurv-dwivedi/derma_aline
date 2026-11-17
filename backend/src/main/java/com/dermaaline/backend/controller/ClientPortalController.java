@@ -74,6 +74,7 @@ public class ClientPortalController {
         response.put("role", user.getRole().name());
         response.put("status", user.getStatus().name());
         response.put("createdAt", user.getCreatedAt());
+        response.put("profilePicture", user.getProfilePicture() != null ? user.getProfilePicture() : "");
 
         long treatmentCount = treatmentRecordRepository.findByCustomerEmailIgnoreCaseOrderByTreatmentDateDesc(email).size();
         response.put("totalTreatments", treatmentCount);
@@ -96,6 +97,7 @@ public class ClientPortalController {
         User user = userOpt.get();
         String newFullName = payload.get("fullName");
         String newPhone = payload.get("phone");
+        String newProfilePicture = payload.get("profilePicture");
 
         if (newFullName != null && !newFullName.trim().isEmpty()) {
             user.setFullName(newFullName.trim());
@@ -103,13 +105,17 @@ public class ClientPortalController {
         if (newPhone != null) {
             user.setPhone(newPhone.trim());
         }
+        if (newProfilePicture != null) {
+            user.setProfilePicture(newProfilePicture.trim());
+        }
 
         userRepository.save(user);
 
         // Synchronize corresponding Customer CRM record if present
         customerRepository.findByEmail(email).ifPresent(customer -> {
-            if (newFullName != null) customer.setFullName(newFullName.trim());
+            if (newFullName != null && !newFullName.trim().isEmpty()) customer.setFullName(newFullName.trim());
             if (newPhone != null) customer.setPhone(newPhone.trim());
+            if (newProfilePicture != null) customer.setProfilePicture(newProfilePicture.trim());
             customerRepository.save(customer);
         });
 
@@ -117,7 +123,65 @@ public class ClientPortalController {
             "success", true,
             "message", "Profile updated successfully.",
             "fullName", user.getFullName(),
-            "phone", user.getPhone() != null ? user.getPhone() : ""
+            "phone", user.getPhone() != null ? user.getPhone() : "",
+            "profilePicture", user.getProfilePicture() != null ? user.getProfilePicture() : ""
+        ));
+    }
+
+    /**
+     * Customer Profile Photo Upload/Update: PUT /api/client/profile/photo
+     */
+    @PutMapping("/profile/photo")
+    public ResponseEntity<?> updateProfilePhoto(@RequestBody Map<String, String> payload) {
+        String email = getAuthenticatedEmail();
+        Optional<User> userOpt = userRepository.findByEmail(email);
+
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("success", false, "message", "User not found."));
+        }
+
+        User user = userOpt.get();
+        String photo = payload.get("profilePicture");
+        user.setProfilePicture(photo != null && !photo.trim().isEmpty() ? photo.trim() : null);
+        userRepository.save(user);
+
+        customerRepository.findByEmail(email).ifPresent(customer -> {
+            customer.setProfilePicture(photo != null && !photo.trim().isEmpty() ? photo.trim() : null);
+            customerRepository.save(customer);
+        });
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "message", photo != null && !photo.trim().isEmpty() ? "Profile photo updated successfully." : "Profile photo removed.",
+            "profilePicture", user.getProfilePicture() != null ? user.getProfilePicture() : ""
+        ));
+    }
+
+    /**
+     * Customer Profile Photo Deletion: DELETE /api/client/profile/photo
+     */
+    @DeleteMapping("/profile/photo")
+    public ResponseEntity<?> deleteProfilePhoto() {
+        String email = getAuthenticatedEmail();
+        Optional<User> userOpt = userRepository.findByEmail(email);
+
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("success", false, "message", "User not found."));
+        }
+
+        User user = userOpt.get();
+        user.setProfilePicture(null);
+        userRepository.save(user);
+
+        customerRepository.findByEmail(email).ifPresent(customer -> {
+            customer.setProfilePicture(null);
+            customerRepository.save(customer);
+        });
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "message", "Profile photo removed.",
+            "profilePicture", ""
         ));
     }
 

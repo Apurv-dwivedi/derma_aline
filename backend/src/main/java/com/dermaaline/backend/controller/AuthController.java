@@ -274,14 +274,16 @@ public class AuthController {
                 Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + roleStr)))
         );
 
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "message", "Welcome back to Derma Aline Aesthétics.",
-            "token", token,
-            "role", roleStr,
-            "email", user.getEmail(),
-            "fullName", user.getFullName()
-        ));
+        Map<String, Object> respMap = new HashMap<>();
+        respMap.put("success", true);
+        respMap.put("message", "Welcome back to Derma Aline Aesthétics.");
+        respMap.put("token", token);
+        respMap.put("role", roleStr);
+        respMap.put("email", user.getEmail());
+        respMap.put("fullName", user.getFullName());
+        respMap.put("profilePicture", user.getProfilePicture() != null ? user.getProfilePicture() : "");
+
+        return ResponseEntity.ok(respMap);
     }
 
     /**

@@ -70,11 +70,16 @@ const ClientAuth = () => {
         portal: 'client'
       });
 
-      const { token, role, fullName: userFullName } = res.data;
+      const { token, role, fullName: userFullName, profilePicture } = res.data;
       localStorage.setItem('token', token);
       localStorage.setItem('role', role || 'CUSTOMER');
       localStorage.setItem('fullName', userFullName || 'Client');
       localStorage.setItem('email', email.trim().toLowerCase());
+      if (profilePicture) {
+        localStorage.setItem('profilePicture', profilePicture);
+      } else {
+        localStorage.removeItem('profilePicture');
+      }
 
       navigate('/client/dashboard');
     } catch (err) {
@@ -142,11 +147,16 @@ const ClientAuth = () => {
         otp: otp.trim()
       });
 
-      const { token, role, fullName: userFullName } = res.data;
+      const { token, role, fullName: userFullName, profilePicture } = res.data;
       localStorage.setItem('token', token);
       localStorage.setItem('role', role || 'CUSTOMER');
       localStorage.setItem('fullName', userFullName || 'Client');
       localStorage.setItem('email', email.trim().toLowerCase());
+      if (profilePicture) {
+        localStorage.setItem('profilePicture', profilePicture);
+      } else {
+        localStorage.removeItem('profilePicture');
+      }
 
       setSuccessMessage('Account verified successfully! Redirecting to your private suite...');
       setTimeout(() => navigate('/client/dashboard'), 1200);

@@ -13,6 +13,7 @@ const Navbar = () => {
     const isLoggedIn = !!localStorage.getItem('token');
     const userRole = (localStorage.getItem('role') || '').toUpperCase();
     const userName = localStorage.getItem('fullName') || '';
+    const userPhoto = localStorage.getItem('profilePicture') || '';
 
     // Close sidebar on route change
     useEffect(() => {
@@ -159,7 +160,15 @@ const Navbar = () => {
                                 borderRadius: '8px',
                                 border: '1px solid #ebdcd0'
                             }}>
-                                <UserCircle size={16} color="#806657" />
+                                {userPhoto ? (
+                                    <img 
+                                        src={userPhoto} 
+                                        alt={userName || 'Profile'} 
+                                        style={{ width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover' }} 
+                                    />
+                                ) : (
+                                    <UserCircle size={16} color="#806657" />
+                                )}
                                 <span>{userName || (isStaff ? 'Staff Member' : isOwner ? 'Administrator' : 'Client')}</span>
                             </div>
 
@@ -272,7 +281,15 @@ const Navbar = () => {
                 {isLoggedIn && (
                     <div className="sidebar-user-pill">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <UserCircle size={18} color="#806657" />
+                            {userPhoto ? (
+                                <img 
+                                    src={userPhoto} 
+                                    alt={userName || 'Profile'} 
+                                    style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover' }} 
+                                />
+                            ) : (
+                                <UserCircle size={18} color="#806657" />
+                            )}
                             <span style={{ fontSize: '0.9rem', fontWeight: '600', color: '#333' }}>
                                 {userName || 'Active Session'}
                             </span>

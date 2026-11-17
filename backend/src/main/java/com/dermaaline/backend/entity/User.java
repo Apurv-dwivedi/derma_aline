@@ -32,6 +32,9 @@ public class User {
 
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(name = "profile_picture", columnDefinition = "TEXT")
+    private String profilePicture;
+
     @Column(name = "reset_token")
     private String resetToken;
 
@@ -69,6 +72,9 @@ public class User {
     public void setStatus(AccountStatus status) { this.status = status != null ? status : AccountStatus.ACTIVE; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
+
+    public String getProfilePicture() { return profilePicture; }
+    public void setProfilePicture(String profilePicture) { this.profilePicture = profilePicture; }
 
     public String getResetToken() { return resetToken; }
     public void setResetToken(String resetToken) { this.resetToken = resetToken; }

@@ -26,6 +26,8 @@ public class DatabaseFixRunner {
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(255);",
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expiry TIMESTAMP;",
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture TEXT;",
+                "ALTER TABLE customers ADD COLUMN IF NOT EXISTS profile_picture TEXT;",
                 "UPDATE users SET status = 'ACTIVE' WHERE status IS NULL;",
                 "UPDATE users SET role = 'CUSTOMER' WHERE role IS NULL;",
                 "UPDATE users SET role = 'SUPER_ADMIN' WHERE email = 'apurvdwivedi2205@gmail.com';",

@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   User, Sparkles, Calendar, Clock, FileText, MessageSquare, Bell, 
   ShieldCheck, LogOut, CheckCircle2, AlertCircle, Edit2, KeyRound, 
-  Lock, RefreshCw, ChevronRight, HeartPulse, Info
+  Lock, RefreshCw, ChevronRight, HeartPulse, Info, Camera, Trash2, Upload
 } from 'lucide-react';
 import API from '../services/api';
 import '../styles/pages.css';
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
 
   // Active Tab: 'overview' | 'treatments' | 'profile' | 'enquiries' | 'notifications' | 'security'
   const [activeTab, setActiveTab] = useState('overview');
@@ -22,6 +23,9 @@ const ClientDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Profile Picture Upload State
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   // Edit Profile State
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -62,6 +66,11 @@ const ClientDashboard = () => {
       setProfile(profileRes.data);
       setEditFullName(profileRes.data.fullName || '');
       setEditPhone(profileRes.data.phone || '');
+      if (profileRes.data.profilePicture) {
+        localStorage.setItem('profilePicture', profileRes.data.profilePicture);
+      } else {
+        localStorage.removeItem('profilePicture');
+      }
 
       setTreatments(treatmentsRes.data || []);
       setEnquiries(enquiriesRes.data || []);
@@ -76,6 +85,93 @@ const ClientDashboard = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePhotoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file (JPEG, PNG, WebP).');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image file exceeds 5MB. Please choose a smaller photo.');
+      return;
+    }
+
+    setPhotoUploading(true);
+    setError('');
+
+    const reader = new FileReader();
+    reader.onerror = () => {
+      setError('Failed to read image file.');
+      setPhotoUploading(false);
+    };
+
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onerror = () => {
+        setError('Failed to process image file.');
+        setPhotoUploading(false);
+      };
+
+      img.onload = async () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const MAX_DIM = 400;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_DIM) {
+              height = Math.round((height * MAX_DIM) / width);
+              width = MAX_DIM;
+            }
+          } else {
+            if (height > MAX_DIM) {
+              width = Math.round((width * MAX_DIM) / height);
+              height = MAX_DIM;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          const base64Data = canvas.toDataURL('image/jpeg', 0.85);
+
+          const res = await API.put('/client/profile/photo', { profilePicture: base64Data });
+          setProfile((prev) => ({ ...prev, profilePicture: res.data.profilePicture }));
+          localStorage.setItem('profilePicture', res.data.profilePicture);
+          setSuccessMessage('Profile photo updated successfully.');
+          setTimeout(() => setSuccessMessage(''), 3000);
+        } catch (uploadErr) {
+          setError(uploadErr.response?.data?.message || 'Failed to update profile photo.');
+        } finally {
+          setPhotoUploading(false);
+        }
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemovePhoto = async () => {
+    setPhotoUploading(true);
+    setError('');
+    try {
+      await API.delete('/client/profile/photo');
+      setProfile((prev) => ({ ...prev, profilePicture: '' }));
+      localStorage.removeItem('profilePicture');
+      setSuccessMessage('Profile photo removed.');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to remove profile photo.');
+    } finally {
+      setPhotoUploading(false);
     }
   };
 
@@ -179,18 +275,52 @@ const ClientDashboard = () => {
         gap: '20px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
-            backgroundColor: '#f7f2ed',
-            color: '#806657',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            border: '2px solid #e6ded5'
-          }}>
-            <User size={30} />
+          <div 
+            onClick={() => {
+              setActiveTab('profile');
+              fileInputRef.current?.click();
+            }}
+            title="Click to update profile photo"
+            style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              backgroundColor: '#f7f2ed',
+              color: '#806657',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '2px solid #d4c3b3',
+              overflow: 'hidden',
+              cursor: 'pointer',
+              position: 'relative',
+              boxShadow: '0 2px 8px rgba(128, 102, 87, 0.15)',
+              flexShrink: 0
+            }}
+          >
+            {profile?.profilePicture ? (
+              <img 
+                src={profile.profilePicture} 
+                alt={profile.fullName || 'Client'} 
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+              />
+            ) : (
+              <User size={30} />
+            )}
+            <div style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              backgroundColor: 'rgba(44, 34, 30, 0.65)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: '2px 0',
+              color: '#ffffff'
+            }}>
+              <Camera size={11} />
+            </div>
           </div>
           <div>
             <div style={{
@@ -523,6 +653,105 @@ const ClientDashboard = () => {
                 <Edit2 size={14} /> Edit Details
               </button>
             )}
+          </div>
+
+          {/* Profile Photo Management Card */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '24px',
+            padding: '20px 24px',
+            backgroundColor: '#faf7f2',
+            borderRadius: '12px',
+            border: '1px solid #ebdcd0',
+            marginBottom: '26px'
+          }}>
+            <div style={{
+              width: '84px',
+              height: '84px',
+              borderRadius: '50%',
+              backgroundColor: '#f0eae1',
+              color: '#806657',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '3px solid #d4c3b3',
+              overflow: 'hidden',
+              flexShrink: 0,
+              boxShadow: '0 4px 12px rgba(128, 102, 87, 0.12)'
+            }}>
+              {profile?.profilePicture ? (
+                <img 
+                  src={profile.profilePicture} 
+                  alt={profile.fullName || 'Client'} 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                />
+              ) : (
+                <User size={38} />
+              )}
+            </div>
+
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: '600', color: '#2c221e', fontSize: '0.96rem', marginBottom: '4px' }}>
+                Profile Photo
+              </div>
+              <p style={{ color: '#8c7b70', fontSize: '0.82rem', margin: '0 0 12px 0', lineHeight: '1.4' }}>
+                Upload a portrait for your personalized clinic record and reception greeting.
+              </p>
+
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <input 
+                  type="file" 
+                  ref={fileInputRef}
+                  accept="image/png, image/jpeg, image/webp" 
+                  onChange={handlePhotoUpload} 
+                  style={{ display: 'none' }} 
+                />
+                <button
+                  type="button"
+                  disabled={photoUploading}
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    backgroundColor: 'var(--color-primary, #806657)',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    cursor: photoUploading ? 'wait' : 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <Camera size={14} /> {photoUploading ? 'Uploading...' : profile?.profilePicture ? 'Change Photo' : 'Upload Photo'}
+                </button>
+
+                {profile?.profilePicture && (
+                  <button
+                    type="button"
+                    disabled={photoUploading}
+                    onClick={handleRemovePhoto}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      color: '#dc2626',
+                      border: '1px solid #fecaca',
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      cursor: photoUploading ? 'wait' : 'pointer',
+                      fontSize: '0.82rem',
+                      fontWeight: '600',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Trash2 size={13} /> Remove
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
           {isEditingProfile ? (
