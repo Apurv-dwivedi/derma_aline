@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Lock, Mail, Sparkles, AlertCircle, Shield } from 'lucide-react';
 import API from '../services/api';
 import '../styles/pages.css';
@@ -10,6 +10,10 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isOwnerRoute = location.pathname.includes('/owner') || location.pathname.includes('/admin');
+  const isStaffRoute = location.pathname.includes('/staff');
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -83,10 +87,14 @@ const Login = () => {
             <Shield size={28} color="#7c6a5d" />
           </div>
           <h2 style={{ fontSize: '1.5rem', color: '#3a2d24', margin: '0 0 5px 0', fontWeight: '700' }}>
-            Salon Team Portal
+            {isOwnerRoute ? 'Owner Executive Suite' : isStaffRoute ? 'Staff Operations Portal' : 'Clinic Operations Login'}
           </h2>
           <p style={{ color: '#8c7b70', fontSize: '0.88rem', margin: 0 }}>
-            Dedicated Workspace for Administrators & Therapists
+            {isOwnerRoute 
+              ? 'Authorized Master Access for Clinic Management' 
+              : isStaffRoute 
+              ? 'Dedicated Clinical Workspace for Authorized Staff' 
+              : 'Authorized Clinic Access'}
           </p>
         </div>
 

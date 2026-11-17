@@ -12,13 +12,21 @@ import '../styles/pages.css';
 const AdminDashboard = () => {
   const navigate = useNavigate();
 
-  // Active Tab: 'appointments' | 'clients' | 'reports' | 'staff' | 'messages' | 'settings' | 'security'
-  const [activeTab, setActiveTab] = useState('appointments');
+  // Active Tab: 'clients' | 'treatments' | 'staff' | 'messages' | 'reports' | 'audit' | 'settings' | 'security' | 'appointments'
+  const [activeTab, setActiveTab] = useState('clients');
 
   // Core Data States
   const [appointments, setAppointments] = useState([]);
   const [clients, setClients] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [treatmentsList, setTreatmentsList] = useState([]);
+
+  // Treatment Catalogue Management State
+  const [showTreatmentModal, setShowTreatmentModal] = useState(false);
+  const [treatmentForm, setTreatmentForm] = useState({ name: '', category: 'Facial Aesthetics', description: '', price: '', durationMinutes: 60, active: true });
+  const [treatmentSaving, setTreatmentSaving] = useState(false);
+  const [treatmentToast, setTreatmentToast] = useState('');
   const [reports, setReports] = useState({
     totalCustomers: 0,
     totalTreatmentsRecorded: 0,
@@ -92,13 +100,15 @@ const AdminDashboard = () => {
       }
       setError('');
 
-      const [apptRes, msgRes, reportRes, staffRes, clientsRes, settingsRes] = await Promise.allSettled([
+      const [apptRes, msgRes, reportRes, staffRes, clientsRes, settingsRes, auditRes, treatRes] = await Promise.allSettled([
         API.get('/appointments'),
         API.get('/contact'),
         API.get('/admin/reports/overview'),
         API.get('/admin/staff/invitations'),
         API.get('/admin/clients'),
-        API.get('/admin/settings')
+        API.get('/admin/settings'),
+        API.get('/admin/audit-logs'),
+        API.get('/treatments')
       ]);
 
       if (apptRes.status === 'fulfilled') {
@@ -118,6 +128,12 @@ const AdminDashboard = () => {
       }
       if (settingsRes.status === 'fulfilled' && settingsRes.value.data) {
         setSettings(settingsRes.value.data);
+      }
+      if (auditRes.status === 'fulfilled') {
+        setAuditLogs(auditRes.value.data || []);
+      }
+      if (treatRes.status === 'fulfilled') {
+        setTreatmentsList(treatRes.value.data || []);
       }
 
       if (isManual) {
@@ -221,6 +237,40 @@ const AdminDashboard = () => {
       } catch (err) {
         alert('Error deleting message');
       }
+    }
+  };
+
+  // Treatment Catalogue Management
+  const handleSaveTreatment = async (e) => {
+    e.preventDefault();
+    setTreatmentSaving(true);
+    setTreatmentToast('');
+    try {
+      if (treatmentForm.id) {
+        await API.put(`/treatments/${treatmentForm.id}`, treatmentForm);
+        setTreatmentToast('Treatment updated successfully.');
+      } else {
+        await API.post('/treatments', treatmentForm);
+        setTreatmentToast('Treatment created successfully.');
+      }
+      setShowTreatmentModal(false);
+      setTreatmentForm({ name: '', category: 'Facial Aesthetics', description: '', price: '', durationMinutes: 60, active: true });
+      const res = await API.get('/treatments');
+      setTreatmentsList(res.data || []);
+      setTimeout(() => setTreatmentToast(''), 3000);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to save treatment.');
+    } finally {
+      setTreatmentSaving(false);
+    }
+  };
+
+  const handleToggleTreatmentActive = async (tr) => {
+    try {
+      await API.put(`/treatments/${tr.id}`, { ...tr, active: !tr.active });
+      setTreatmentsList(prev => prev.map(item => item.id === tr.id ? { ...item, active: !item.active } : item));
+    } catch (err) {
+      alert('Failed to update treatment status.');
     }
   };
 
@@ -534,17 +584,17 @@ const AdminDashboard = () => {
           <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>Clinical sessions completed</span>
         </div>
 
-        {/* Active Appointments */}
+        {/* Active Client Enquiries */}
         <div style={{ backgroundColor: 'var(--bg-white)', padding: '22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Appointments</span>
-            <Calendar size={22} color="var(--color-accent)" />
+            <span style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Enquiries</span>
+            <MessageSquare size={22} color="#b45309" />
           </div>
-          <p style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--color-primary)', margin: '6px 0 2px' }}>
-            {activeAppointments.length}
+          <p style={{ fontSize: '2rem', fontWeight: '800', color: '#b45309', margin: '6px 0 2px' }}>
+            {activeMessages.length}
           </p>
           <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>
-            {appointments.filter(a => a.status === 'CONFIRMED').length} confirmed • {appointments.filter(a => a.status === 'PENDING').length} pending
+            {reports.unreadEnquiries || 0} unread • {messages.length} total received
           </span>
         </div>
 
@@ -564,17 +614,6 @@ const AdminDashboard = () => {
       {/* Navigation Tabs */}
       <div style={{ display: 'flex', gap: '10px', marginBottom: '25px', flexWrap: 'wrap' }}>
         <button 
-          onClick={() => setActiveTab('appointments')} 
-          style={{ 
-            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
-            backgroundColor: activeTab === 'appointments' ? 'var(--color-accent)' : 'var(--bg-white)', 
-            color: activeTab === 'appointments' ? '#fff' : 'var(--color-primary)', 
-            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
-          }}>
-          <Calendar size={16} /> Appointments ({activeAppointments.length})
-        </button>
-
-        <button 
           onClick={() => setActiveTab('clients')} 
           style={{ 
             padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
@@ -586,14 +625,14 @@ const AdminDashboard = () => {
         </button>
 
         <button 
-          onClick={() => setActiveTab('reports')} 
+          onClick={() => setActiveTab('treatments')} 
           style={{ 
             padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
-            backgroundColor: activeTab === 'reports' ? 'var(--color-accent)' : 'var(--bg-white)', 
-            color: activeTab === 'reports' ? '#fff' : 'var(--color-primary)', 
+            backgroundColor: activeTab === 'treatments' ? 'var(--color-accent)' : 'var(--bg-white)', 
+            color: activeTab === 'treatments' ? '#fff' : 'var(--color-primary)', 
             boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
           }}>
-          <FileText size={16} /> Operational Reports
+          <Sparkles size={16} /> Treatment Catalogue ({treatmentsList.length})
         </button>
 
         <button 
@@ -619,6 +658,28 @@ const AdminDashboard = () => {
         </button>
 
         <button 
+          onClick={() => setActiveTab('reports')} 
+          style={{ 
+            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            backgroundColor: activeTab === 'reports' ? 'var(--color-accent)' : 'var(--bg-white)', 
+            color: activeTab === 'reports' ? '#fff' : 'var(--color-primary)', 
+            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
+          }}>
+          <FileText size={16} /> Operational Reports
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('audit')} 
+          style={{ 
+            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            backgroundColor: activeTab === 'audit' ? 'var(--color-accent)' : 'var(--bg-white)', 
+            color: activeTab === 'audit' ? '#fff' : 'var(--color-primary)', 
+            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
+          }}>
+          <Shield size={16} /> Audit Trail ({auditLogs.length})
+        </button>
+
+        <button 
           onClick={() => setActiveTab('settings')} 
           style={{ 
             padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
@@ -638,6 +699,17 @@ const AdminDashboard = () => {
             boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
           }}>
           <KeyRound size={16} /> Admin Password
+        </button>
+
+        <button 
+          onClick={() => setActiveTab('appointments')} 
+          style={{ 
+            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
+            backgroundColor: activeTab === 'appointments' ? 'var(--color-accent)' : 'var(--bg-white)', 
+            color: activeTab === 'appointments' ? '#fff' : 'var(--color-primary)', 
+            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
+          }}>
+          <Calendar size={16} /> Archived Visits ({appointments.length})
         </button>
       </div>
 
@@ -1324,6 +1396,285 @@ const AdminDashboard = () => {
               >
                 <Lock size={16} /> {passwordLoading ? 'Updating Password...' : 'Save New Admin Password'}
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: TREATMENT CATALOGUE */}
+      {activeTab === 'treatments' && (
+        <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+            <div>
+              <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', margin: '0 0 4px', fontFamily: 'var(--font-heading)' }}>
+                Clinical Treatment Catalogue
+              </h2>
+              <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', margin: 0 }}>
+                Manage treatment offerings. Treatment prices are catalogue information only and never generate invoices or payments.
+              </p>
+            </div>
+            <button 
+              onClick={() => {
+                setTreatmentForm({ name: '', category: 'Facial Aesthetics', description: '', price: '', durationMinutes: 60, active: true });
+                setShowTreatmentModal(true);
+              }}
+              className="btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontWeight: '700', fontSize: '0.85rem' }}
+            >
+              <Sparkles size={16} /> Add Treatment Entry
+            </button>
+          </div>
+
+          {treatmentToast && (
+            <div style={{ padding: '12px 18px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '8px', border: '1px solid #c3e6cb', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <CheckCircle2 size={16} /> {treatmentToast}
+            </div>
+          )}
+
+          {treatmentsList.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-light)', border: '1px dashed var(--border-light)', borderRadius: '12px' }}>
+              No treatments configured in catalogue yet. Click "Add Treatment Entry" above to add clinic offerings.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border-light)', color: 'var(--text-light)', fontSize: '0.85rem' }}>
+                    <th style={{ padding: '12px 14px' }}>Treatment Name</th>
+                    <th style={{ padding: '12px 14px' }}>Category</th>
+                    <th style={{ padding: '12px 14px' }}>Catalogue Price</th>
+                    <th style={{ padding: '12px 14px' }}>Est. Duration</th>
+                    <th style={{ padding: '12px 14px' }}>Public Status</th>
+                    <th style={{ padding: '12px 14px', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {treatmentsList.map((tr) => (
+                    <tr key={tr.id} style={{ borderBottom: '1px solid var(--border-light)', fontSize: '0.9rem' }}>
+                      <td style={{ padding: '14px', fontWeight: '600', color: 'var(--color-primary)' }}>
+                        {tr.name}
+                      </td>
+                      <td style={{ padding: '14px', color: 'var(--text-light)' }}>
+                        {tr.category || 'Clinical Treatment'}
+                      </td>
+                      <td style={{ padding: '14px', color: '#2c221e', fontWeight: '600' }}>
+                        {tr.price ? `₹${tr.price}` : 'Consultation'}
+                      </td>
+                      <td style={{ padding: '14px', color: 'var(--text-light)' }}>
+                        {tr.durationMinutes ? `${tr.durationMinutes} mins` : '60 mins'}
+                      </td>
+                      <td style={{ padding: '14px' }}>
+                        <span style={{
+                          padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700',
+                          backgroundColor: tr.active ? '#d4edda' : '#f8d7da',
+                          color: tr.active ? '#155724' : '#721c24'
+                        }}>
+                          {tr.active ? 'ACTIVE' : 'INACTIVE'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px', textAlign: 'right' }}>
+                        <button
+                          onClick={() => handleToggleTreatmentActive(tr)}
+                          style={{
+                            backgroundColor: '#faf8f5', border: '1px solid #ebdcd0', color: '#806657',
+                            padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600', marginRight: '8px'
+                          }}
+                        >
+                          {tr.active ? 'Deactivate' : 'Activate'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setTreatmentForm(tr);
+                            setShowTreatmentModal(true);
+                          }}
+                          style={{
+                            backgroundColor: '#f7f2ed', border: '1px solid #d4c3b3', color: '#2c221e',
+                            padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600'
+                          }}
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB: AUDIT LOGS */}
+      {activeTab === 'audit' && (
+        <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+          <div style={{ marginBottom: '20px' }}>
+            <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', margin: '0 0 4px', fontFamily: 'var(--font-heading)' }}>
+              Operational & Security Audit Trail
+            </h2>
+            <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', margin: 0 }}>
+              Immutable record of administrative actions, staff invitations, account status alterations, and security operations.
+            </p>
+          </div>
+
+          {auditLogs.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-light)', border: '1px dashed var(--border-light)', borderRadius: '12px' }}>
+              No audit logs recorded yet. Security events and operational tasks will automatically appear here.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border-light)', color: 'var(--text-light)', fontSize: '0.85rem' }}>
+                    <th style={{ padding: '12px 14px' }}>Timestamp</th>
+                    <th style={{ padding: '12px 14px' }}>Action</th>
+                    <th style={{ padding: '12px 14px' }}>Actor</th>
+                    <th style={{ padding: '12px 14px' }}>Target Entity</th>
+                    <th style={{ padding: '12px 14px' }}>Operational Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {auditLogs.map((log) => (
+                    <tr key={log.id} style={{ borderBottom: '1px solid var(--border-light)', fontSize: '0.88rem' }}>
+                      <td style={{ padding: '12px 14px', color: 'var(--text-light)', whiteSpace: 'nowrap' }}>
+                        {log.timestamp ? new Date(log.timestamp).toLocaleString() : 'Recent'}
+                      </td>
+                      <td style={{ padding: '12px 14px' }}>
+                        <span style={{
+                          padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700',
+                          backgroundColor: log.action?.includes('SUCCESS') ? '#d4edda' : log.action?.includes('FAILED') ? '#f8d7da' : '#e0f2fe',
+                          color: log.action?.includes('SUCCESS') ? '#155724' : log.action?.includes('FAILED') ? '#721c24' : '#0369a1'
+                        }}>
+                          {log.action}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 14px', fontWeight: '600', color: 'var(--color-primary)' }}>
+                        {log.performedBy || 'System'} <span style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: 'normal' }}>({log.role})</span>
+                      </td>
+                      <td style={{ padding: '12px 14px', color: '#5c4d44' }}>
+                        {log.targetEntity} {log.targetId ? `#${log.targetId}` : ''}
+                      </td>
+                      <td style={{ padding: '12px 14px', color: '#2c221e' }}>
+                        {log.details}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* MODAL: ADD / EDIT TREATMENT */}
+      {showTreatmentModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff', borderRadius: '16px', padding: '32px',
+            maxWidth: '550px', width: '100%', maxHeight: '90vh', overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '1.3rem', color: '#2c221e', margin: 0, fontWeight: '600' }}>
+                {treatmentForm.id ? 'Edit Treatment Catalogue Entry' : 'Create Treatment Catalogue Entry'}
+              </h2>
+              <button onClick={() => setShowTreatmentModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
+            </div>
+
+            <form onSubmit={handleSaveTreatment} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: '#4a3b32' }}>Treatment Name *</label>
+                <input 
+                  type="text"
+                  required
+                  placeholder="e.g. HydraFacial Elite Rejuvenation"
+                  value={treatmentForm.name}
+                  onChange={(e) => setTreatmentForm({ ...treatmentForm, name: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: '#4a3b32' }}>Category *</label>
+                <select
+                  value={treatmentForm.category}
+                  onChange={(e) => setTreatmentForm({ ...treatmentForm, category: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', backgroundColor: '#fff' }}
+                >
+                  <option value="Facial Aesthetics">Facial Aesthetics</option>
+                  <option value="Laser Care">Laser Care</option>
+                  <option value="Anti-Aging">Anti-Aging</option>
+                  <option value="Acne & Scars">Acne & Scars</option>
+                  <option value="Skin Rejuvenation">Skin Rejuvenation</option>
+                  <option value="Clinical Peels">Clinical Peels</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: '#4a3b32' }}>Catalogue Price (INR)</label>
+                  <input 
+                    type="number"
+                    placeholder="e.g. 4500"
+                    value={treatmentForm.price}
+                    onChange={(e) => setTreatmentForm({ ...treatmentForm, price: e.target.value })}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none' }}
+                  />
+                  <span style={{ fontSize: '0.75rem', color: '#8c7b70', display: 'block', marginTop: '4px' }}>Informational guide price</span>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: '#4a3b32' }}>Expected Duration (mins)</label>
+                  <input 
+                    type="number"
+                    value={treatmentForm.durationMinutes}
+                    onChange={(e) => setTreatmentForm({ ...treatmentForm, durationMinutes: parseInt(e.target.value) || 60 })}
+                    style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: '#4a3b32' }}>Description</label>
+                <textarea 
+                  rows={3}
+                  placeholder="Clinical treatment summary and benefits..."
+                  value={treatmentForm.description}
+                  onChange={(e) => setTreatmentForm({ ...treatmentForm, description: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', resize: 'vertical' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input 
+                  type="checkbox"
+                  id="activeCheck"
+                  checked={treatmentForm.active}
+                  onChange={(e) => setTreatmentForm({ ...treatmentForm, active: e.target.checked })}
+                />
+                <label htmlFor="activeCheck" style={{ fontSize: '0.85rem', color: '#4a3b32', cursor: 'pointer', fontWeight: '600' }}>
+                  Show in public treatment catalogue on clinic website
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                <button
+                  type="submit"
+                  disabled={treatmentSaving}
+                  className="btn-primary"
+                  style={{ flex: 1, padding: '11px', fontWeight: '700' }}
+                >
+                  {treatmentSaving ? 'Saving...' : 'Save Catalogue Entry'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowTreatmentModal(false)}
+                  style={{ backgroundColor: '#fff', border: '1px solid #ebdcd0', padding: '11px 18px', borderRadius: '8px', cursor: 'pointer', color: '#6e5d53' }}
+                >
+                  Cancel
+                </button>
+              </div>
             </form>
           </div>
         </div>

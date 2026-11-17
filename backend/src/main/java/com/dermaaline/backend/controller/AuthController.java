@@ -48,6 +48,9 @@ public class AuthController {
     @Autowired
     private OtpService otpService;
 
+    @Autowired
+    private com.dermaaline.backend.service.AuditLogService auditLogService;
+
     @Value("${app.frontend.url:https://derma-aline.vercel.app}")
     private String frontendUrl;
 
@@ -226,6 +229,7 @@ public class AuthController {
 
         User user = userOpt.get();
         if (!passwordEncoder.matches(password, user.getPassword())) {
+            auditLogService.record("LOGIN_FAILED", cleanEmail, user.getRole().name(), "USER", user.getId().toString(), "Failed authentication: invalid password attempt");
             return ResponseEntity.status(401).body(Map.of("success", false, "message", "Invalid email or password."));
         }
 
@@ -282,6 +286,8 @@ public class AuthController {
         respMap.put("email", user.getEmail());
         respMap.put("fullName", user.getFullName());
         respMap.put("profilePicture", user.getProfilePicture() != null ? user.getProfilePicture() : "");
+
+        auditLogService.record("LOGIN_SUCCESS", user.getEmail(), roleStr, "USER", user.getId().toString(), "Authenticated into portal mode: " + portal);
 
         return ResponseEntity.ok(respMap);
     }

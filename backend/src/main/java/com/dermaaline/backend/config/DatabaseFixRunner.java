@@ -145,11 +145,18 @@ public class DatabaseFixRunner {
                 "CREATE TABLE IF NOT EXISTS audit_logs (" +
                     "id BIGSERIAL PRIMARY KEY, " +
                     "action VARCHAR(255), " +
-                    "actor_email VARCHAR(255), " +
-                    "actor_role VARCHAR(255), " +
+                    "performed_by VARCHAR(255), " +
+                    "role VARCHAR(255), " +
                     "target_entity VARCHAR(255), " +
+                    "target_id VARCHAR(255), " +
                     "details TEXT, " +
                     "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);",
+                "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS performed_by VARCHAR(255);",
+                "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS role VARCHAR(255);",
+                "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS target_entity VARCHAR(255);",
+                "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS target_id VARCHAR(255);",
+                "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS details TEXT;",
+                "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
 
                 // 9. Notifications table verification
                 "CREATE TABLE IF NOT EXISTS notifications (" +

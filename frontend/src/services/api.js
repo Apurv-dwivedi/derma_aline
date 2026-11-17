@@ -26,10 +26,12 @@ API.interceptors.response.use((response) => {
     localStorage.removeItem('fullName');
 
     const currentPath = window.location.pathname;
-    if (currentPath.startsWith('/admin')) {
-      window.location.href = '/admin-login';
-    } else if (currentPath !== '/auth' && currentPath !== '/admin-login') {
-      window.location.href = '/auth';
+    if (currentPath.startsWith('/admin') || currentPath.startsWith('/owner')) {
+      window.location.href = '/owner/login';
+    } else if (currentPath.startsWith('/staff')) {
+      window.location.href = '/staff/login';
+    } else if (currentPath.startsWith('/client')) {
+      window.location.href = '/client/login';
     }
   }
   return Promise.reject(error);

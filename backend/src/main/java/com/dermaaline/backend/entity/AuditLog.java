@@ -14,16 +14,22 @@ public class AuditLog {
     @Column(nullable = false)
     private String action;
 
-    @Column(nullable = false)
+    @Column(name = "performed_by", nullable = false)
     private String performedBy;
 
+    @Column(name = "role")
     private String role;
+
+    @Column(name = "target_entity")
     private String targetEntity;
+
+    @Column(name = "target_id")
     private String targetId;
 
     @Column(columnDefinition = "TEXT")
     private String details;
 
+    @Column(name = "created_at")
     private LocalDateTime timestamp = LocalDateTime.now();
 
     public Long getId() { return id; }

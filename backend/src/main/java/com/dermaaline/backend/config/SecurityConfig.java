@@ -1,6 +1,7 @@
 package com.dermaaline.backend.config;
 
 import com.dermaaline.backend.security.JwtAuthenticationFilter;
+import com.dermaaline.backend.security.RateLimitingFilter;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -23,6 +24,9 @@ public class SecurityConfig {
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    @Autowired
+    private RateLimitingFilter rateLimitingFilter;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -36,10 +40,15 @@ public class SecurityConfig {
                 // Public Authentication, Registration & Verification
                 .requestMatchers("/api/auth/**").permitAll()
 
-                // Public informational endpoints
+                // Public informational endpoints (read-only treatments, public contact submission)
                 .requestMatchers(HttpMethod.GET, "/api/treatments/**").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/contact/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/contact").permitAll()
                 .requestMatchers("/api/health/**", "/health", "/error").permitAll()
+
+                // Owner-only Treatment Catalogue modifications
+                .requestMatchers(HttpMethod.POST, "/api/treatments/**").hasAnyRole("SUPER_ADMIN", "ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/treatments/**").hasAnyRole("SUPER_ADMIN", "ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/treatments/**").hasAnyRole("SUPER_ADMIN", "ADMIN")
 
                 // Client / Customer Portal APIs (Protected, validated via authenticated principal)
                 .requestMatchers("/api/client/**").hasAnyRole("CUSTOMER", "PATIENT", "SUPER_ADMIN", "ADMIN")
@@ -47,7 +56,11 @@ public class SecurityConfig {
                 // Staff Operational Portal APIs
                 .requestMatchers("/api/staff/**").hasAnyRole("STAFF", "SUPER_ADMIN", "ADMIN")
 
-                // Owner / Super Admin APIs
+                // Enquiries & Customer CRM access (Restricted to Staff and Admin)
+                .requestMatchers("/api/contact/**").hasAnyRole("STAFF", "SUPER_ADMIN", "ADMIN")
+                .requestMatchers("/api/customers/**").hasAnyRole("STAFF", "SUPER_ADMIN", "ADMIN")
+
+                // Owner / Super Admin APIs (Executive suite, staff management, settings, audit logs)
                 .requestMatchers("/api/admin/**").hasAnyRole("SUPER_ADMIN", "ADMIN")
 
                 // Historical appointments fallback during migration
@@ -57,6 +70,7 @@ public class SecurityConfig {
                 // All other endpoints require authentication
                 .anyRequest().authenticated()
             )
+            .addFilterBefore(rateLimitingFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

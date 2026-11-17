@@ -32,6 +32,9 @@ public class StaffManagementController {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private com.dermaaline.backend.service.AuditLogService auditLogService;
+
     @Value("${app.frontend.url:https://derma-aline.vercel.app}")
     private String frontendUrl;
 
@@ -106,6 +109,7 @@ public class StaffManagementController {
                     + "Derma Aline Clinic Administration";
 
             emailService.sendEmail(cleanEmail, subject, body);
+            auditLogService.record("STAFF_INVITED", "admin", "SUPER_ADMIN", "STAFF_INVITATION", cleanEmail, "Invitation generated for " + invitation.getFullName() + " (" + invitation.getDesignation() + ")");
 
             return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -138,6 +142,7 @@ public class StaffManagementController {
                     + "Derma Aline Clinic Administration";
 
             emailService.sendEmail(invitation.getEmail(), subject, body);
+            auditLogService.record("STAFF_INVITATION_RESENT", "admin", "SUPER_ADMIN", "STAFF_INVITATION", invitation.getEmail(), "Invitation link renewed for " + invitation.getFullName());
 
             return ResponseEntity.ok(Map.of("success", true, "message", "Invitation resent to " + invitation.getEmail()));
         }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Invitation not found.")));
@@ -151,6 +156,7 @@ public class StaffManagementController {
                 try {
                     user.setStatus(User.AccountStatus.valueOf(newStatusStr.trim().toUpperCase()));
                     userRepository.save(user);
+                    auditLogService.record("STAFF_STATUS_CHANGED", "admin", "SUPER_ADMIN", "USER", user.getEmail(), "Account status updated to " + user.getStatus());
                     return ResponseEntity.ok(Map.of(
                         "success", true, 
                         "message", "Staff status updated to " + user.getStatus(),
@@ -181,6 +187,7 @@ public class StaffManagementController {
             }
             user.setStatus(User.AccountStatus.DISABLED);
             userRepository.save(user);
+            auditLogService.record("STAFF_DEACTIVATED", "admin", "SUPER_ADMIN", "USER", user.getEmail(), "Staff account disabled");
             return ResponseEntity.ok(Map.of("success", true, "message", "Staff access deactivated successfully."));
         }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Staff member not found.")));
     }

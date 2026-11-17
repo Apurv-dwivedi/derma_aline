@@ -124,7 +124,8 @@ function App() {
               <Route path="/client/verify-email" element={<ClientAuth />} />
               <Route path="/client/forgot-password" element={<ClientAuth />} />
               <Route path="/client/reset-password" element={<ClientAuth />} />
-              <Route path="/client/dashboard" element={<ClientDashboard />} />
+              <Route path="/client/dashboard" element={<ProtectedRoute requireCustomer={true}><ClientDashboard /></ProtectedRoute>} />
+              <Route path="/client/profile" element={<ProtectedRoute requireCustomer={true}><ClientDashboard /></ProtectedRoute>} />
               <Route path="/profile" element={<Navigate to="/client/dashboard" replace />} />
               <Route path="/auth" element={<Navigate to="/client/login" replace />} />
 

@@ -17,6 +17,9 @@ public class ClinicSettingsController {
     @Autowired
     private ClinicSettingsRepository settingsRepository;
 
+    @Autowired
+    private com.dermaaline.backend.service.AuditLogService auditLogService;
+
     @GetMapping
     public ResponseEntity<ClinicSettings> getSettings() {
         ClinicSettings settings = settingsRepository.findAll().stream().findFirst()
@@ -38,6 +41,7 @@ public class ClinicSettingsController {
         settings.setUpdatedAt(LocalDateTime.now());
 
         ClinicSettings saved = settingsRepository.save(settings);
+        auditLogService.record("SETTINGS_UPDATED", "admin", "SUPER_ADMIN", "CLINIC_SETTINGS", "1", "Clinic operational parameters updated");
         return ResponseEntity.ok(Map.of("success", true, "message", "Clinic settings updated.", "settings", saved));
     }
 }

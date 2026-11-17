@@ -18,6 +18,9 @@ public class TreatmentController {
     @Autowired
     private TreatmentRepository treatmentRepository;
 
+    @Autowired
+    private com.dermaaline.backend.service.AuditLogService auditLogService;
+
     @GetMapping
     public ResponseEntity<List<Treatment>> getAllTreatments() {
         return ResponseEntity.ok()
@@ -36,6 +39,7 @@ public class TreatmentController {
     public ResponseEntity<?> createTreatment(@RequestBody Treatment treatment) {
         try {
             Treatment saved = treatmentRepository.save(treatment);
+            auditLogService.record("TREATMENT_CREATED", "admin", "SUPER_ADMIN", "TREATMENT", saved.getId().toString(), "Created treatment catalogue entry: " + saved.getName());
             return ResponseEntity.ok(Map.of("success", true, "message", "Treatment created successfully", "id", saved.getId()));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("success", false, "message", e.getMessage()));
@@ -57,6 +61,7 @@ public class TreatmentController {
         t.setActive(details.isActive());
         
         treatmentRepository.save(t);
+        auditLogService.record("TREATMENT_UPDATED", "admin", "SUPER_ADMIN", "TREATMENT", id.toString(), "Updated treatment details for: " + t.getName());
         return ResponseEntity.ok(Map.of("success", true, "message", "Treatment updated successfully"));
     }
 
@@ -66,6 +71,7 @@ public class TreatmentController {
             return ResponseEntity.status(404).body(Map.of("success", false, "message", "Treatment not found"));
         }
         treatmentRepository.deleteById(id);
+        auditLogService.record("TREATMENT_DELETED", "admin", "SUPER_ADMIN", "TREATMENT", id.toString(), "Deleted treatment ID: " + id);
         return ResponseEntity.ok(Map.of("success", true, "message", "Treatment deleted successfully"));
     }
 }

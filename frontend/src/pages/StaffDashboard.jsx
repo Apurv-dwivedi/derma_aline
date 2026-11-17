@@ -396,12 +396,12 @@ const StaffDashboard = () => {
 
         <div style={{ backgroundColor: '#ffffff', padding: '22px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
           <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Operational Queue
+            Catalogue Services
           </div>
           <div style={{ fontSize: '2rem', fontWeight: '700', color: '#2c221e', margin: '6px 0 2px' }}>
-            {appointments.filter((a) => a.status === 'PENDING' || a.status === 'CONFIRMED').length}
+            {treatmentsList.length}
           </div>
-          <span style={{ fontSize: '0.82rem', color: '#6e5d53' }}>Active visits</span>
+          <span style={{ fontSize: '0.82rem', color: '#6e5d53' }}>Active clinic offerings</span>
         </div>
       </div>
 
@@ -417,8 +417,7 @@ const StaffDashboard = () => {
         {[
           { id: 'treatments', label: `Clinical Treatment Records (${treatmentRecords.length})`, icon: HeartPulse },
           { id: 'customers', label: `Client Directory (${customers.length})`, icon: Users },
-          { id: 'enquiries', label: `Client Enquiries (${activeEnquiries.length})`, icon: MessageSquare },
-          { id: 'queue', label: `Operations Queue (${activeAppointments.length})`, icon: Calendar }
+          { id: 'enquiries', label: `Client Enquiries (${activeEnquiries.length})`, icon: MessageSquare }
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
