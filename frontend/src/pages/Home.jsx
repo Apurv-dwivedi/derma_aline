@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Sparkles, ShieldCheck, Award, MapPin, Phone, 
+  Sparkles, ShieldCheck, Award, MapPin, Phone, Mail,
   ExternalLink, Calendar, Check, ChevronRight, 
   Clock, Droplets, Zap, HeartPulse, UserCheck
 } from 'lucide-react';

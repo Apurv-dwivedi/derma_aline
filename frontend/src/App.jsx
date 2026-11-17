@@ -26,6 +26,37 @@ const StaffActivate = lazy(() => import('./pages/StaffActivate.jsx'));
 const ClientAuth = lazy(() => import('./pages/ClientAuth.jsx'));
 const ClientDashboard = lazy(() => import('./pages/ClientDashboard.jsx'));
 
+// Sleek Error Boundary to prevent blank screens on unexpected client errors
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("Application Render Notice:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ textAlign: 'center', padding: '80px 20px', fontFamily: 'system-ui, sans-serif' }}>
+          <h2 style={{ color: '#806657', marginBottom: '10px', fontFamily: 'serif' }}>Derma Aline Aesthétics</h2>
+          <p style={{ color: '#666', marginBottom: '20px', fontSize: '0.95rem' }}>An update is being synchronized. Please refresh to load the latest clinic experience.</p>
+          <button 
+            onClick={() => { localStorage.clear(); window.location.reload(); }} 
+            style={{ backgroundColor: '#806657', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
+          >
+            Refresh Sanctuary
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Lightweight, sleek loading fallback
 const PageLoader = () => (
   <div style={{
@@ -77,8 +108,9 @@ function App() {
         <Navbar />
 
         <main className="container" style={{ flex: 1, padding: '40px 20px' }}>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
+          <ErrorBoundary>
+            <Suspense fallback={<PageLoader />}>
+              <Routes>
               {/* Public Website */}
               <Route path="/" element={<Home />} />
               <Route path="/about" element={<About />} />
@@ -113,7 +145,8 @@ function App() {
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
-        </main>
+        </ErrorBoundary>
+      </main>
 
         <Footer />
       </div>
