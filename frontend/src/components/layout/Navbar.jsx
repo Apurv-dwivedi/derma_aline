@@ -375,7 +375,7 @@ const Navbar = () => {
                                 </button>
                             </Link>
                             <Link to="/client/register" style={{ display: 'block', textAlign: 'center', fontSize: '0.85rem', color: '#806657', textDecoration: 'none', fontWeight: '600', padding: '8px 0' }}>
-                                New Client? Register with OTP &rarr;
+                                New Client? Create Account &rarr;
                             </Link>
                         </>
                     ) : (

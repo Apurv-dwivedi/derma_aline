@@ -41,7 +41,7 @@ const Footer = () => {
             <h4>Clinic Portals</h4>
             <ul>
               <li><Link to="/client/login"><User size={13} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Client Portal</Link></li>
-              <li><Link to="/client/register">Client Registration (OTP)</Link></li>
+              <li><Link to="/client/register">Client Registration</Link></li>
               <li><Link to="/staff/login"><Shield size={13} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Staff Workspace</Link></li>
               <li><Link to="/owner/login"><Lock size={13} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Owner Administration</Link></li>
               <li><Link to="/privacy">Privacy Policy</Link></li>
