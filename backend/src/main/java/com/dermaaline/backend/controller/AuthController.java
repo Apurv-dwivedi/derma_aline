@@ -100,10 +100,11 @@ public class AuthController {
         try {
             boolean sent = otpService.generateAndSendOtp(email, request.getFullName());
             if (!sent) {
+                String errorDetail = emailService.getLastError() != null ? emailService.getLastError() : "Cloud firewall blocked SMTP port 587";
                 return ResponseEntity.status(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
                     "success", false,
                     "email", email,
-                    "message", "Registration saved, but verification email could not be delivered: outbound SMTP is blocked by cloud hosting firewall. Please configure RESEND_API_KEY or BREVO_API_KEY in Render environment variables to enable live delivery."
+                    "message", "Registration saved, but verification email could not be delivered: " + errorDetail
                 ));
             }
             return ResponseEntity.ok(Map.of(
@@ -204,9 +205,10 @@ public class AuthController {
         try {
             boolean sent = otpService.generateAndSendOtp(cleanEmail, user.getFullName());
             if (!sent) {
+                String errorDetail = emailService.getLastError() != null ? emailService.getLastError() : "Cloud firewall blocked SMTP port 587";
                 return ResponseEntity.status(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
                     "success", false,
-                    "message", "Verification email could not be delivered: outbound SMTP is blocked by cloud hosting firewall. Please configure RESEND_API_KEY or BREVO_API_KEY in Render environment variables."
+                    "message", "Verification email could not be delivered: " + errorDetail
                 ));
             }
             return ResponseEntity.ok(Map.of(
