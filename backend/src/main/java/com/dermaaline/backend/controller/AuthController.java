@@ -55,8 +55,8 @@ public class AuthController {
     private String frontendUrl;
 
     /**
-     * Customer Self-Registration: Step 1
-     * Creates PENDING_VERIFICATION user and dispatches 6-digit OTP to customer's email.
+     * Customer Self-Registration
+     * Direct instant registration: creates ACTIVE customer, issues JWT, and grants direct portal access.
      */
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
@@ -70,6 +70,7 @@ public class AuthController {
         String email = request.getEmail().trim().toLowerCase();
         Optional<User> existingUserOpt = userRepository.findByEmail(email);
 
+        User user;
         if (existingUserOpt.isPresent()) {
             User existing = existingUserOpt.get();
             if (existing.getStatus() == User.AccountStatus.ACTIVE) {
@@ -78,13 +79,13 @@ public class AuthController {
                     "message", "This email address is already registered. Please sign in."
                 ));
             }
-            // If user exists but is still pending verification, update info and re-issue OTP
             existing.setFullName(request.getFullName() != null && !request.getFullName().trim().isEmpty() 
                     ? request.getFullName().trim() : "Valued Client");
             existing.setPhone(request.getPhone() != null ? request.getPhone().trim() : null);
             existing.setPassword(passwordEncoder.encode(request.getPassword()));
             existing.setRole(User.Role.CUSTOMER);
-            userRepository.save(existing);
+            existing.setStatus(User.AccountStatus.ACTIVE);
+            user = userRepository.save(existing);
         } else {
             User newUser = new User();
             newUser.setEmail(email);
@@ -93,34 +94,35 @@ public class AuthController {
             newUser.setPhone(request.getPhone() != null ? request.getPhone().trim() : null);
             newUser.setPassword(passwordEncoder.encode(request.getPassword()));
             newUser.setRole(User.Role.CUSTOMER);
-            newUser.setStatus(User.AccountStatus.PENDING_VERIFICATION);
-            userRepository.save(newUser);
+            newUser.setStatus(User.AccountStatus.ACTIVE);
+            user = userRepository.save(newUser);
         }
 
-        try {
-            boolean sent = otpService.generateAndSendOtp(email, request.getFullName());
-            if (!sent) {
-                String errorDetail = emailService.getLastError() != null ? emailService.getLastError() : "Cloud firewall blocked SMTP port 587";
-                return ResponseEntity.status(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
-                    "success", false,
-                    "email", email,
-                    "message", "Registration saved, but verification email could not be delivered: " + errorDetail
-                ));
-            }
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "requiresVerification", true,
-                "email", email,
-                "message", "A 6-digit verification code has been sent to your email. Please enter it to activate your account."
-            ));
-        } catch (IllegalStateException e) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of(
-                "success", false, 
-                "message", "Registration initiated, but failed to send verification email. Please try resending the OTP."
-            ));
+        // Link/create customer profile
+        Optional<Customer> customerOpt = customerRepository.findByEmailIgnoreCase(email);
+        if (customerOpt.isEmpty()) {
+            Customer newCustomer = new Customer();
+            newCustomer.setEmail(email);
+            newCustomer.setFullName(user.getFullName());
+            newCustomer.setPhone(user.getPhone());
+            customerRepository.save(newCustomer);
         }
+
+        // Issue JWT token immediately
+        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
+        auditLogService.record("REGISTER_SUCCESS", email, user.getRole().name(), "USER", user.getId().toString(), "Client registered and directly activated");
+
+        java.util.Map<String, Object> resp = new java.util.HashMap<>();
+        resp.put("success", true);
+        resp.put("requiresVerification", false);
+        resp.put("token", token);
+        resp.put("role", user.getRole().name());
+        resp.put("email", user.getEmail());
+        resp.put("fullName", user.getFullName());
+        resp.put("profilePicture", user.getProfilePicture() != null ? user.getProfilePicture() : "");
+        resp.put("message", "Registration successful! Welcome to Derma Aline Aesthétics.");
+
+        return ResponseEntity.ok(resp);
     }
 
     /**
@@ -248,14 +250,10 @@ public class AuthController {
             return ResponseEntity.status(401).body(Map.of("success", false, "message", "Invalid email or password."));
         }
 
-        // Account status check
+        // Account status check: auto-activate any pending accounts for seamless client access
         if (user.getStatus() == User.AccountStatus.PENDING_VERIFICATION) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
-                "success", false,
-                "requiresVerification", true,
-                "email", user.getEmail(),
-                "message", "Your email address has not been verified yet. Please enter the OTP sent to your inbox."
-            ));
+            user.setStatus(User.AccountStatus.ACTIVE);
+            userRepository.save(user);
         }
 
         if (user.getStatus() == User.AccountStatus.DISABLED) {

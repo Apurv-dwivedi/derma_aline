@@ -83,19 +83,13 @@ const ClientAuth = () => {
 
       navigate('/client/dashboard');
     } catch (err) {
-      if (err.response?.data?.requiresVerification) {
-        setError('Please verify your email address to activate your account.');
-        setMode('verify');
-        setCooldown(60);
-      } else {
-        setError(err.response?.data?.message || 'Invalid email or password.');
-      }
+      setError(err.response?.data?.message || 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. Client Self-Registration (Step 1: Dispatches Email OTP)
+  // 2. Client Self-Registration (Direct Instant Activation)
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
@@ -124,9 +118,24 @@ const ClientAuth = () => {
         password
       });
 
-      setSuccessMessage(res.data.message || 'Verification code sent to your email.');
-      setMode('verify');
-      setCooldown(60);
+      const { token, role, fullName: userFullName, profilePicture } = res.data;
+      if (token) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('role', role || 'CUSTOMER');
+        localStorage.setItem('fullName', userFullName || 'Client');
+        localStorage.setItem('email', email.trim().toLowerCase());
+        if (profilePicture) {
+          localStorage.setItem('profilePicture', profilePicture);
+        } else {
+          localStorage.removeItem('profilePicture');
+        }
+
+        setSuccessMessage('Registration successful! Entering your client suite...');
+        setTimeout(() => navigate('/client/dashboard'), 800);
+      } else {
+        setSuccessMessage('Account created successfully! Please sign in.');
+        setMode('login');
+      }
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please check your details.');
     } finally {
@@ -541,7 +550,7 @@ const ClientAuth = () => {
               className="btn-primary"
               style={{ width: '100%', padding: '12px', fontSize: '0.95rem', fontWeight: '600', marginTop: '6px' }}
             >
-              {loading ? 'Sending Verification Code...' : 'Register & Receive OTP'}
+              {loading ? 'Creating Account...' : 'Create Account & Enter Suite'}
             </button>
 
             <div style={{ textAlign: 'center', marginTop: '6px', fontSize: '0.85rem', color: '#8c7b70' }}>
