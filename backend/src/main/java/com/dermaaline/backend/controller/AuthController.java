@@ -109,7 +109,10 @@ public class AuthController {
         }
 
         // Issue JWT token immediately
-        String token = jwtUtil.generateToken(user.getEmail(), user.getRole().name());
+        String token = jwtTokenProvider.generateToken(
+            new UsernamePasswordAuthenticationToken(user.getEmail(), null, 
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_CUSTOMER")))
+        );
         auditLogService.record("REGISTER_SUCCESS", email, user.getRole().name(), "USER", user.getId().toString(), "Client registered and directly activated");
 
         java.util.Map<String, Object> resp = new java.util.HashMap<>();
