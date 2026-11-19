@@ -479,6 +479,14 @@
   text-decoration: none;
 }
 
+.desktop-btn-label {
+  display: inline;
+}
+
+.mobile-btn-label {
+  display: none;
+}
+
 .btn-whatsapp-enquire:hover {
   background-color: #1EBE5D;
   color: #FFFFFF;
@@ -677,48 +685,158 @@
 
 @media (max-width: 640px) {
   .treatment-hero {
-    padding: 50px 18px 40px;
+    padding: 45px 16px 35px;
   }
   .treatment-hero-title {
-    font-size: 2.1rem;
+    font-size: 1.95rem;
   }
   .treatment-hero-subtitle {
-    font-size: 0.94rem;
+    font-size: 0.92rem;
+    margin-bottom: 24px;
   }
   .treatment-controls-bar {
-    padding: 14px 14px 10px;
+    padding: 12px 10px 10px;
     top: 56px;
   }
   .treatment-search-row {
     flex-direction: column;
     align-items: stretch;
-    gap: 12px;
-    margin-bottom: 12px;
+    gap: 10px;
+    margin-bottom: 10px;
   }
   .treatment-search-box {
     min-width: 100%;
   }
+  .treatment-search-box input {
+    padding: 10px 36px 10px 38px;
+    font-size: 0.86rem;
+  }
+  .treatment-results-meta {
+    justify-content: space-between;
+    font-size: 0.8rem;
+  }
+
+  /* Two Treatments Side-by-Side on Phone */
   .treatments-content-container {
-    padding: 24px 14px 30px;
+    padding: 18px 8px 30px;
   }
   .treatments-cards-grid {
-    grid-template-columns: 1fr;
-    gap: 16px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .category-section-block {
+    margin-bottom: 35px;
+    scroll-margin-top: 170px;
+  }
+  .category-section-header {
+    margin-bottom: 16px;
+    padding-bottom: 8px;
   }
   .category-section-title-wrap h2 {
-    font-size: 1.5rem;
+    font-size: 1.35rem;
   }
+  .subcategory-title {
+    font-size: 0.92rem;
+    margin-bottom: 12px;
+  }
+
+  /* Compact 2-column Treatment Card */
+  .treatment-card-item {
+    border-radius: 10px;
+  }
+  .treatment-card-top {
+    height: 110px;
+  }
+  .treatment-card-price-badge {
+    top: 6px;
+    right: 6px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 12px;
+  }
+  .treatment-card-subcat-badge {
+    bottom: 5px;
+    left: 5px;
+    font-size: 0.58rem;
+    padding: 2px 5px;
+    border-radius: 6px;
+    max-width: 88%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .treatment-card-body {
+    padding: 10px 8px 10px;
+  }
+  .treatment-card-name {
+    font-size: 0.92rem;
+    line-height: 1.25;
+    margin-bottom: 3px;
+  }
+  .treatment-card-note {
+    font-size: 0.65rem;
+    margin-bottom: 4px;
+    letter-spacing: 0.04em;
+  }
+  .treatment-card-desc {
+    font-size: 0.74rem;
+    line-height: 1.4;
+    margin-bottom: 10px;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .treatment-card-actions {
+    gap: 6px;
+  }
+  .btn-whatsapp-enquire {
+    padding: 7px 6px;
+    font-size: 0.72rem;
+    gap: 4px;
+    border-radius: 6px;
+    justify-content: center;
+  }
+  .btn-card-consult {
+    padding: 6px 4px;
+    font-size: 0.7rem;
+    gap: 4px;
+    border-radius: 6px;
+    justify-content: center;
+  }
+
+  /* Responsive Button Text Toggle */
+  .desktop-btn-label {
+    display: none;
+  }
+  .mobile-btn-label {
+    display: inline;
+  }
+
+  /* Consultation CTA Mobile */
   .treatment-consultation-cta {
-    padding: 45px 18px;
+    padding: 38px 16px;
+    margin-top: 10px;
+  }
+  .treatment-cta-inner h2 {
+    font-size: 1.7rem;
+  }
+  .treatment-cta-inner p {
+    font-size: 0.88rem;
+    margin-bottom: 22px;
   }
   .treatment-cta-buttons {
     flex-direction: column;
     width: 100%;
+    gap: 10px;
   }
   .btn-clinic-primary,
   .btn-clinic-outline,
   .btn-cta-consult,
   .btn-cta-whatsapp {
     width: 100%;
+    padding: 11px 18px;
+    font-size: 0.88rem;
   }
 }

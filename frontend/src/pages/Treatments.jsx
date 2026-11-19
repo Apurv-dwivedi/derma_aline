@@ -291,8 +291,9 @@ const Treatments = () => {
                               title={`Enquire about ${treatment.name} via WhatsApp`}
                               aria-label={`Enquire about ${treatment.name} on WhatsApp`}
                             >
-                              <MessageSquare size={16} />
-                              <span>Enquire on WhatsApp</span>
+                              <MessageSquare size={15} />
+                              <span className="desktop-btn-label">Enquire on WhatsApp</span>
+                              <span className="mobile-btn-label">WhatsApp</span>
                             </a>
 
                             <Link 
@@ -301,7 +302,8 @@ const Treatments = () => {
                               title={`Request an in-clinic consultation for ${treatment.name}`}
                             >
                               <Calendar size={14} />
-                              <span>Book In-Clinic Consultation</span>
+                              <span className="desktop-btn-label">Book In-Clinic Consultation</span>
+                              <span className="mobile-btn-label">Book Visit</span>
                             </Link>
                           </div>
                         </div>
