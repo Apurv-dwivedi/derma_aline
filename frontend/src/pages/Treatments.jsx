@@ -115,7 +115,7 @@ const Treatments = () => {
           <div className="treatment-hero-actions">
             <button 
               onClick={scrollToCatalogue}
-              className="btn-gold-primary"
+              className="btn-clinic-primary"
               aria-label="Explore all clinic treatments"
             >
               <span>Explore Treatments</span>
@@ -124,7 +124,7 @@ const Treatments = () => {
 
             <Link 
               to="/contact" 
-              className="btn-gold-outline"
+              className="btn-clinic-outline"
               aria-label="Book a consultation at Derma Aline Aesthetics"
             >
               <Calendar size={17} />
@@ -216,7 +216,7 @@ const Treatments = () => {
             </p>
             <button 
               onClick={handleClearFilters}
-              className="btn-gold-primary"
+              className="btn-clinic-primary"
               style={{ padding: '10px 22px', fontSize: '0.85rem' }}
             >
               View All Treatments
@@ -340,17 +340,17 @@ const Treatments = () => {
             alignItems: 'center',
             gap: '8px',
             padding: '5px 14px',
-            backgroundColor: 'rgba(197, 168, 128, 0.12)',
-            border: '1px solid rgba(197, 168, 128, 0.35)',
+            backgroundColor: '#FFFFFF',
+            border: '1px solid #D9CBBE',
             borderRadius: '20px',
-            color: '#DFC299',
+            color: '#5A4638',
             fontSize: '0.78rem',
             fontWeight: '600',
             textTransform: 'uppercase',
             letterSpacing: '0.08em',
             marginBottom: '18px'
           }}>
-            <CheckCircle2 size={14} color="#D4AF37" />
+            <CheckCircle2 size={14} color="#806657" />
             <span>Personalised Aesthetic Consultation</span>
           </div>
 
@@ -363,7 +363,7 @@ const Treatments = () => {
           <div className="treatment-cta-buttons">
             <Link 
               to="/contact" 
-              className="btn-gold-primary"
+              className="btn-cta-consult"
               aria-label="Book your clinical consultation online"
             >
               <Calendar size={17} />
