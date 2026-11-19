@@ -4,29 +4,47 @@ import Navbar from './components/layout/Navbar.jsx';
 import Footer from './components/layout/Footer.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 
-// Core public pages loaded eagerly or quickly
+// Core public pages loaded eagerly for instant navigation and 100% immunity to deployment chunk mismatches
 import Home from './pages/Home.jsx';
+import About from './pages/About.jsx';
+import Treatments from './pages/Treatments.jsx';
+import Contact from './pages/Contact.jsx';
+import Privacy from './pages/Privacy.jsx';
 
-// Route-level code-splitting: lazy load pages on-demand
-const About = lazy(() => import('./pages/About.jsx'));
-const Treatments = lazy(() => import('./pages/Treatments.jsx'));
-const Contact = lazy(() => import('./pages/Contact.jsx'));
-const Privacy = lazy(() => import('./pages/Privacy.jsx'));
-const NotFound = lazy(() => import('./pages/NotFound.jsx'));
+// Dynamic import with automatic deployment synchronization retry
+const lazyWithRetry = (componentImport) => {
+  return lazy(async () => {
+    try {
+      return await componentImport();
+    } catch (error) {
+      console.warn("Deployment chunk mismatch detected, synchronizing latest version:", error);
+      const isRefreshed = sessionStorage.getItem('deployment_retry');
+      if (!isRefreshed) {
+        sessionStorage.setItem('deployment_retry', 'true');
+        window.location.reload();
+        return new Promise(() => {});
+      }
+      sessionStorage.removeItem('deployment_retry');
+      throw error;
+    }
+  });
+};
+
+const NotFound = lazyWithRetry(() => import('./pages/NotFound.jsx'));
 
 // Portal 1: Owner / Admin Portal
-const Login = lazy(() => import('./pages/Login.jsx'));
-const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
+const Login = lazyWithRetry(() => import('./pages/Login.jsx'));
+const AdminDashboard = lazyWithRetry(() => import('./pages/AdminDashboard.jsx'));
 
 // Portal 2: Staff Portal
-const StaffDashboard = lazy(() => import('./pages/StaffDashboard.jsx'));
-const StaffActivate = lazy(() => import('./pages/StaffActivate.jsx'));
+const StaffDashboard = lazyWithRetry(() => import('./pages/StaffDashboard.jsx'));
+const StaffActivate = lazyWithRetry(() => import('./pages/StaffActivate.jsx'));
 
 // Portal 3: Client / Customer Portal
-const ClientAuth = lazy(() => import('./pages/ClientAuth.jsx'));
-const ClientDashboard = lazy(() => import('./pages/ClientDashboard.jsx'));
+const ClientAuth = lazyWithRetry(() => import('./pages/ClientAuth.jsx'));
+const ClientDashboard = lazyWithRetry(() => import('./pages/ClientDashboard.jsx'));
 
-// Sleek Error Boundary to prevent blank screens on unexpected client errors
+// Sleek Error Boundary with automatic recovery
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -37,6 +55,14 @@ class ErrorBoundary extends React.Component {
   }
   componentDidCatch(error, errorInfo) {
     console.error("Application Render Notice:", error, errorInfo);
+    // Auto-reload if an outdated deployment chunk was caught
+    if (error && (
+      error.message?.includes('dynamically imported module') || 
+      error.message?.includes('MIME type') ||
+      error.message?.includes('Failed to fetch')
+    )) {
+      window.location.reload();
+    }
   }
   render() {
     if (this.state.hasError) {
