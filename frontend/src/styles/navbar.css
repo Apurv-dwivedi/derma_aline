@@ -30,6 +30,21 @@
   align-items: center;
 }
 
+.desktop-nav a {
+  text-decoration: none !important;
+}
+
+.desktop-nav a:hover,
+.desktop-nav a:focus,
+.desktop-nav a:active {
+  text-decoration: none !important;
+}
+
+.desktop-nav button {
+  text-decoration: none !important;
+  outline: none !important;
+}
+
 .nav-link {
   font-size: 0.95rem;
   font-weight: 500;

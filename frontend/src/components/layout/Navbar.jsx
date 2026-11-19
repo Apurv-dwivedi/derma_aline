@@ -205,8 +205,8 @@ const Navbar = () => {
                                         <Link to="/client/login" style={{ color: 'var(--color-primary, #806657)', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', fontWeight: '600', fontSize: '0.9rem' }}>
                                             <User size={17} /> Client Portal
                                         </Link>
-                                        <Link to="/contact">
-                                            <button className="btn-primary" style={{ padding: '9px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <Link to="/contact" style={{ textDecoration: 'none' }}>
+                                            <button className="btn-primary" style={{ padding: '9px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px', textDecoration: 'none', border: 'none', outline: 'none' }}>
                                                 <Calendar size={15} /> Book Appointment
                                             </button>
                                         </Link>
@@ -214,16 +214,16 @@ const Navbar = () => {
                                 ) : (
                                     <>
                                         <Link to="/contact" style={{ textDecoration: 'none' }}>
-                                            <button style={{ backgroundColor: '#ffffff', color: '#806657', border: '1px solid #806657', padding: '8px 16px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                                            <button style={{ backgroundColor: '#ffffff', color: '#806657', border: '1px solid #806657', padding: '8px 16px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', textDecoration: 'none', outline: 'none' }}>
                                                 <Calendar size={14} /> Book Appointment
                                             </button>
                                         </Link>
-                                        <Link to={isOwner ? "/admin" : isStaff ? "/staff" : "/client/dashboard"}>
-                                            <button className="btn-primary" style={{ padding: '9px 18px', fontSize: '0.85rem' }}>
+                                        <Link to={isOwner ? "/admin" : isStaff ? "/staff" : "/client/dashboard"} style={{ textDecoration: 'none' }}>
+                                            <button className="btn-primary" style={{ padding: '9px 18px', fontSize: '0.85rem', textDecoration: 'none', border: 'none', outline: 'none' }}>
                                                 {isOwner ? "Executive Suite" : isStaff ? "Staff Workspace" : "My Dashboard"}
                                             </button>
                                         </Link>
-                                        <button onClick={handleLogout} style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem' }}>
+                                        <button onClick={handleLogout} style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', cursor: 'pointer', fontWeight: '600', fontSize: '0.9rem', textDecoration: 'none', outline: 'none' }}>
                                             <LogOut size={16} /> Sign Out
                                         </button>
                                     </>
