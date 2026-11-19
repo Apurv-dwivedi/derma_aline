@@ -1,10 +1,12 @@
 package com.dermaaline.backend.controller;
 
+import com.dermaaline.backend.entity.Appointment;
 import com.dermaaline.backend.entity.ContactMessage;
 import com.dermaaline.backend.entity.Customer;
 import com.dermaaline.backend.entity.Notification;
 import com.dermaaline.backend.entity.TreatmentRecord;
 import com.dermaaline.backend.entity.User;
+import com.dermaaline.backend.repository.AppointmentRepository;
 import com.dermaaline.backend.repository.ContactRepository;
 import com.dermaaline.backend.repository.CustomerRepository;
 import com.dermaaline.backend.repository.NotificationRepository;
@@ -38,6 +40,9 @@ public class ClientPortalController {
 
     @Autowired
     private NotificationRepository notificationRepository;
+
+    @Autowired
+    private AppointmentRepository appointmentRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -232,5 +237,80 @@ public class ClientPortalController {
             notificationRepository.save(notif);
             return ResponseEntity.ok(Map.of("success", true, "message", "Notification marked as read."));
         }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Notification not found.")));
+    }
+
+    /**
+     * Customer Appointments: GET /api/client/appointments
+     */
+    @GetMapping("/appointments")
+    public ResponseEntity<List<Appointment>> getMyAppointments() {
+        String email = getAuthenticatedEmail();
+        List<Appointment> appointments = appointmentRepository
+                .findByCustomerEmailIgnoreCaseOrEmailIgnoreCaseOrderByAppointmentDateDesc(email, email);
+        return ResponseEntity.ok(appointments);
+    }
+
+    /**
+     * Customer Self-Booking: POST /api/client/appointments
+     */
+    @PostMapping("/appointments")
+    public ResponseEntity<?> bookAppointment(@RequestBody Map<String, Object> payload) {
+        String email = getAuthenticatedEmail();
+        Optional<User> userOpt = userRepository.findByEmail(email);
+
+        String treatmentName = (String) payload.get("treatmentName");
+        String dateStr = (String) payload.get("appointmentDate");
+        String timeStr = (String) payload.get("appointmentTime");
+        String notes = (String) payload.get("notes");
+
+        if (treatmentName == null || treatmentName.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Treatment selection is required."));
+        }
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Appointment date is required."));
+        }
+
+        User user = userOpt.orElse(null);
+        String clientName = user != null && user.getFullName() != null ? user.getFullName() : "Valued Client";
+        String clientPhone = user != null && user.getPhone() != null ? user.getPhone() : "";
+
+        Appointment appt = new Appointment();
+        appt.setCustomerName(clientName);
+        appt.setPatientName(clientName);
+        appt.setCustomerEmail(email);
+        appt.setEmail(email);
+        appt.setCustomerPhone(clientPhone);
+        appt.setPhone(clientPhone);
+        appt.setTreatmentName(treatmentName.trim());
+        appt.setAppointmentTime(timeStr != null && !timeStr.trim().isEmpty() ? timeStr.trim() : "10:00 AM");
+        appt.setNotes(notes != null ? notes.trim() : "");
+        appt.setStatus("PENDING");
+        appt.setCreatedAt(java.time.LocalDateTime.now());
+
+        try {
+            java.time.LocalDate localDate = java.time.LocalDate.parse(dateStr.trim().substring(0, 10));
+            appt.setAppointmentDate(localDate.atStartOfDay());
+        } catch (Exception e) {
+            appt.setAppointmentDate(java.time.LocalDateTime.now().plusDays(1));
+        }
+
+        Appointment saved = appointmentRepository.save(appt);
+
+        try {
+            Notification notif = new Notification();
+            notif.setRecipientEmail(email);
+            notif.setTitle("Appointment Requested: " + treatmentName.trim());
+            notif.setMessage("Your consultation booking for " + treatmentName.trim() + " on " + dateStr.trim() + " (" + appt.getAppointmentTime() + ") has been received. Our clinical desk will confirm your scheduled slot.");
+            notif.setCategory("APPOINTMENT");
+            notif.setRead(false);
+            notif.setCreatedAt(java.time.LocalDateTime.now());
+            notificationRepository.save(notif);
+        } catch (Exception ignored) {}
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "message", "Appointment booked successfully! Our clinic desk will confirm your session.",
+            "appointment", saved
+        ));
     }
 }

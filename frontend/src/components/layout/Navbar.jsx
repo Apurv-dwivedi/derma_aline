@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   UserCircle, LogOut, Menu, X, 
-  Home, Info, Sparkles, Mail, Shield, ChevronRight, User
+  Home, Info, Sparkles, Mail, Shield, ChevronRight, User, Calendar
 } from 'lucide-react';
 import '../../styles/navbar.css';
 
@@ -206,13 +206,18 @@ const Navbar = () => {
                                             <User size={17} /> Client Portal
                                         </Link>
                                         <Link to="/contact">
-                                            <button className="btn-primary" style={{ padding: '9px 18px', fontSize: '0.85rem' }}>
-                                                Enquire Consultation
+                                            <button className="btn-primary" style={{ padding: '9px 18px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <Calendar size={15} /> Book Appointment
                                             </button>
                                         </Link>
                                     </>
                                 ) : (
                                     <>
+                                        <Link to="/contact" style={{ textDecoration: 'none' }}>
+                                            <button style={{ backgroundColor: '#ffffff', color: '#806657', border: '1px solid #806657', padding: '8px 16px', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                                                <Calendar size={14} /> Book Appointment
+                                            </button>
+                                        </Link>
                                         <Link to={isOwner ? "/admin" : isStaff ? "/staff" : "/client/dashboard"}>
                                             <button className="btn-primary" style={{ padding: '9px 18px', fontSize: '0.85rem' }}>
                                                 {isOwner ? "Executive Suite" : isStaff ? "Staff Workspace" : "My Dashboard"}
@@ -366,15 +371,22 @@ const Navbar = () => {
 
                 {/* Sidebar Bottom CTAs */}
                 <div className="sidebar-footer">
+                    <Link to="/contact" style={{ textDecoration: 'none' }} onClick={() => setIsSidebarOpen(false)}>
+                        <button className="btn-primary sidebar-booking-btn" style={{ width: '100%', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                            <Calendar size={18} />
+                            <span>Book Appointment</span>
+                        </button>
+                    </Link>
+
                     {!isLoggedIn ? (
                         <>
-                            <Link to="/client/login" style={{ textDecoration: 'none' }}>
-                                <button className="btn-primary sidebar-booking-btn" style={{ width: '100%', marginBottom: '10px' }}>
-                                    <User size={18} />
+                            <Link to="/client/login" style={{ textDecoration: 'none' }} onClick={() => setIsSidebarOpen(false)}>
+                                <button style={{ width: '100%', padding: '10px', backgroundColor: '#ffffff', border: '1px solid #806657', color: '#806657', borderRadius: '8px', fontWeight: '600', fontSize: '0.9rem', marginBottom: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                    <User size={16} />
                                     <span>Client Portal Sign In</span>
                                 </button>
                             </Link>
-                            <Link to="/client/register" style={{ display: 'block', textAlign: 'center', fontSize: '0.85rem', color: '#806657', textDecoration: 'none', fontWeight: '600', padding: '8px 0' }}>
+                            <Link to="/client/register" onClick={() => setIsSidebarOpen(false)} style={{ display: 'block', textAlign: 'center', fontSize: '0.85rem', color: '#806657', textDecoration: 'none', fontWeight: '600', padding: '6px 0' }}>
                                 New Client? Create Account &rarr;
                             </Link>
                         </>

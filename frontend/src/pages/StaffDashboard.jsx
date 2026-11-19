@@ -3,15 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { 
   HeartPulse, Users, MessageSquare, Calendar, RefreshCw, LogOut, 
   Search, CheckCircle2, AlertCircle, Plus, FileText, Phone, Mail, 
-  ShieldCheck, Info, X, Clock, CheckCircle
+  ShieldCheck, Info, X, Clock, CheckCircle, Sparkles, ArrowRight
 } from 'lucide-react';
 import API from '../services/api';
+import { TREATMENTS_DATA, TREATMENT_CATEGORIES } from '../data/treatmentsData';
 import '../styles/pages.css';
 
 const StaffDashboard = () => {
   const navigate = useNavigate();
 
-  // Active Tab: 'treatments' | 'customers' | 'enquiries' | 'queue'
+  // Active Tab: 'treatments' | 'catalogue' | 'queue' | 'customers' | 'enquiries'
   const [activeTab, setActiveTab] = useState('treatments');
 
   // Data States
@@ -30,6 +31,8 @@ const StaffDashboard = () => {
   // Search States
   const [searchTerm, setSearchTerm] = useState('');
   const [enquiryFilter, setEnquiryFilter] = useState('ACTIVE'); // 'ACTIVE' | 'RESOLVED' | 'ALL'
+  const [catalogueSearch, setCatalogueSearch] = useState('');
+  const [catalogueCategory, setCatalogueCategory] = useState('all');
 
   // Modals
   const [showRecordModal, setShowRecordModal] = useState(false);
@@ -416,6 +419,8 @@ const StaffDashboard = () => {
       }}>
         {[
           { id: 'treatments', label: `Clinical Treatment Records (${treatmentRecords.length})`, icon: HeartPulse },
+          { id: 'catalogue', label: 'Treatment Catalogue & Prices (55)', icon: Sparkles },
+          { id: 'queue', label: `Client Appointments (${appointments.length})`, icon: Calendar },
           { id: 'customers', label: `Client Directory (${customers.length})`, icon: Users },
           { id: 'enquiries', label: `Client Enquiries (${activeEnquiries.length})`, icon: MessageSquare }
         ].map((tab) => {
@@ -449,18 +454,20 @@ const StaffDashboard = () => {
       </div>
 
       {/* Search Bar for Records / Directory */}
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ position: 'relative', maxWidth: '400px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#a8988d' }} />
-          <input
-            type="text"
-            placeholder="Search by client name, email, or treatment..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width: '100%', padding: '10px 14px 10px 36px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.88rem' }}
-          />
+      {activeTab !== 'catalogue' && (
+        <div style={{ marginBottom: '20px' }}>
+          <div style={{ position: 'relative', maxWidth: '400px' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#a8988d' }} />
+            <input
+              type="text"
+              placeholder="Search by client name, email, or treatment..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ width: '100%', padding: '10px 14px 10px 36px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.88rem' }}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* TAB 1: CLINICAL TREATMENT RECORDS */}
       {activeTab === 'treatments' && (
@@ -511,6 +518,208 @@ const StaffDashboard = () => {
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {/* TAB: TREATMENT CATALOGUE & PRICING (STAFF ACCESS) */}
+      {activeTab === 'catalogue' && (
+        <div style={{ backgroundColor: '#ffffff', borderRadius: '16px', border: '1px solid #ebdcd0', padding: '30px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', flexWrap: 'wrap', gap: '15px' }}>
+            <div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#806657', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>
+                <Sparkles size={14} /> Clinic Service Directory
+              </div>
+              <h2 style={{ fontSize: '1.35rem', color: '#2c221e', margin: 0, fontWeight: '700' }}>
+                Master Treatment Catalogue & Pricing (55)
+              </h2>
+              <p style={{ color: '#8c7b70', fontSize: '0.85rem', margin: '4px 0 0 0' }}>
+                Complete list of all clinic services across 7 clinical categories. View exact pricing, clinical details, and record sessions directly for clients.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setShowRecordModal(true)}
+              style={{
+                backgroundColor: '#806657',
+                color: '#ffffff',
+                border: 'none',
+                padding: '10px 18px',
+                borderRadius: '8px',
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+            >
+              <Plus size={16} /> Record Treatment Session
+            </button>
+          </div>
+
+          {/* Search & Category Filter Controls */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={18} color="#a89a90" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                type="text"
+                placeholder="Filter treatments by name or area (e.g. PRP, MNRF, Phenol Peel, Botox, Full Body)..."
+                value={catalogueSearch}
+                onChange={(e) => setCatalogueSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px 12px 42px',
+                  borderRadius: '10px',
+                  border: '1px solid #ebdcd0',
+                  backgroundColor: '#fbf9f6',
+                  fontSize: '0.9rem',
+                  color: '#2c221e',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            {/* Category Filter Pills */}
+            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '6px' }}>
+              {TREATMENT_CATEGORIES.map((cat) => {
+                const isSelected = catalogueCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setCatalogueCategory(cat.id)}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '20px',
+                      border: '1px solid',
+                      borderColor: isSelected ? '#806657' : '#ebdcd0',
+                      backgroundColor: isSelected ? '#806657' : '#ffffff',
+                      color: isSelected ? '#ffffff' : '#6e5d53',
+                      fontSize: '0.8rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {cat.shortName || cat.name} {cat.count ? `(${cat.count})` : ''}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Treatment Cards Grid */}
+          {(() => {
+            const filtered = TREATMENTS_DATA.filter((item) => {
+              const matchesCategory = catalogueCategory === 'all' || item.categoryId === catalogueCategory;
+              const q = catalogueSearch.toLowerCase().trim();
+              const matchesSearch = !q ||
+                item.name.toLowerCase().includes(q) ||
+                (item.subcategory && item.subcategory.toLowerCase().includes(q)) ||
+                (item.categoryName && item.categoryName.toLowerCase().includes(q)) ||
+                (item.description && item.description.toLowerCase().includes(q));
+              return matchesCategory && matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+              return (
+                <div style={{ textAlign: 'center', padding: '50px 20px', color: '#8c7b70', border: '1px dashed #ebdcd0', borderRadius: '10px' }}>
+                  <Search size={36} color="#c2b4a8" style={{ marginBottom: '10px' }} />
+                  <p style={{ margin: '0 0 6px 0', fontWeight: '500' }}>No treatments match your search</p>
+                  <button
+                    onClick={() => { setCatalogueSearch(''); setCatalogueCategory('all'); }}
+                    style={{
+                      backgroundColor: '#fbf9f6',
+                      border: '1px solid #ebdcd0',
+                      color: '#806657',
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Reset Filters
+                  </button>
+                </div>
+              );
+            }
+
+            return (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: '16px'
+              }}>
+                {filtered.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #ebdcd0',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 2px 6px rgba(44, 34, 30, 0.02)'
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#806657', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          {item.subcategory || item.categoryName}
+                        </span>
+                        {item.pricingNote && (
+                          <span style={{ fontSize: '0.7rem', backgroundColor: '#f7f2ed', color: '#6e5d53', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+                            {item.pricingNote}
+                          </span>
+                        )}
+                      </div>
+                      <h4 style={{ fontSize: '1.05rem', color: '#2c221e', margin: '0 0 8px 0', fontWeight: '600', lineHeight: '1.3' }}>
+                        {item.name}
+                      </h4>
+                      <p style={{ color: '#6e5d53', fontSize: '0.83rem', lineHeight: '1.45', margin: '0 0 16px 0', minHeight: '44px' }}>
+                        {item.description}
+                      </p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #f3ece4', paddingTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ fontSize: '0.7rem', color: '#8c7b70', display: 'block', textTransform: 'uppercase', fontWeight: '600' }}>Official Price</span>
+                        <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#2c221e' }}>{item.price}</span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setRecordForm((prev) => ({
+                            ...prev,
+                            treatmentName: item.name,
+                            description: item.description
+                          }));
+                          setShowRecordModal(true);
+                        }}
+                        style={{
+                          backgroundColor: '#fbf9f6',
+                          border: '1px solid #ebdcd0',
+                          color: '#806657',
+                          padding: '8px 14px',
+                          borderRadius: '8px',
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        <Plus size={14} /> Record For Client
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -795,11 +1004,19 @@ const StaffDashboard = () => {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Chemical Peel, Glass Skin"
+                    list="staff-treatment-options"
+                    placeholder="e.g. Hair GFC + PRP, Chemical Peel"
                     value={recordForm.treatmentName}
                     onChange={(e) => setRecordForm({ ...recordForm, treatmentName: e.target.value })}
                     style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem' }}
                   />
+                  <datalist id="staff-treatment-options">
+                    {TREATMENTS_DATA.map((t) => (
+                      <option key={t.id} value={t.name}>
+                        {t.price} — {t.categoryName}
+                      </option>
+                    ))}
+                  </datalist>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '4px' }}>Session Date</label>

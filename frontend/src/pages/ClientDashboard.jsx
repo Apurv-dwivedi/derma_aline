@@ -3,26 +3,40 @@ import { useNavigate } from 'react-router-dom';
 import { 
   User, Sparkles, Calendar, Clock, FileText, MessageSquare, Bell, 
   ShieldCheck, LogOut, CheckCircle2, AlertCircle, Edit2, KeyRound, 
-  Lock, RefreshCw, ChevronRight, HeartPulse, Info, Camera, Trash2, Upload
+  Lock, RefreshCw, ChevronRight, HeartPulse, Info, Camera, Trash2, Upload,
+  Search, Plus, ArrowRight
 } from 'lucide-react';
 import API from '../services/api';
+import { TREATMENTS_DATA, TREATMENT_CATEGORIES } from '../data/treatmentsData';
 import '../styles/pages.css';
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
-  // Active Tab: 'overview' | 'treatments' | 'profile' | 'enquiries' | 'notifications' | 'security'
+  // Active Tab: 'overview' | 'appointments' | 'catalogue' | 'treatments' | 'profile' | 'enquiries' | 'notifications' | 'security'
   const [activeTab, setActiveTab] = useState('overview');
 
   // Client Data States
   const [profile, setProfile] = useState(null);
   const [treatments, setTreatments] = useState([]);
+  const [appointments, setAppointments] = useState([]);
   const [enquiries, setEnquiries] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Booking Form State
+  const [bookTreatment, setBookTreatment] = useState('Hair GFC + PRP');
+  const [bookDate, setBookDate] = useState('');
+  const [bookTime, setBookTime] = useState('11:00 AM');
+  const [bookNotes, setBookNotes] = useState('');
+  const [bookingLoading, setBookingLoading] = useState(false);
+
+  // Catalogue Browse State
+  const [catalogueSearch, setCatalogueSearch] = useState('');
+  const [catalogueCategory, setCatalogueCategory] = useState('all');
 
   // Refresh State
   const [refreshing, setRefreshing] = useState(false);
@@ -64,11 +78,12 @@ const ClientDashboard = () => {
     setError('');
 
     try {
-      const [profileRes, treatmentsRes, enquiriesRes, notificationsRes] = await Promise.all([
+      const [profileRes, treatmentsRes, enquiriesRes, notificationsRes, appointmentsRes] = await Promise.all([
         API.get('/client/profile'),
         API.get('/client/treatments'),
         API.get('/client/enquiries'),
-        API.get('/client/notifications')
+        API.get('/client/notifications'),
+        API.get('/client/appointments').catch(() => ({ data: [] }))
       ]);
 
       setProfile(profileRes.data);
@@ -83,6 +98,7 @@ const ClientDashboard = () => {
       setTreatments(treatmentsRes.data || []);
       setEnquiries(enquiriesRes.data || []);
       setNotifications(notificationsRes.data || []);
+      setAppointments(appointmentsRes.data || []);
 
       if (isManual) {
         setRefreshToast('Care suite records synchronized.');
@@ -100,6 +116,42 @@ const ClientDashboard = () => {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  // Self-Booking Handler from Client Suite
+  const handleBookAppointment = async (e) => {
+    e.preventDefault();
+    if (!bookTreatment || !bookDate) {
+      setError('Please select both a treatment procedure and your preferred appointment date.');
+      return;
+    }
+
+    setBookingLoading(true);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      const res = await API.post('/client/appointments', {
+        treatmentName: bookTreatment,
+        appointmentDate: bookDate,
+        appointmentTime: bookTime,
+        notes: bookNotes
+      });
+
+      setSuccessMessage(res.data.message || 'Appointment request submitted successfully!');
+      setBookNotes('');
+      fetchClientData();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to submit appointment request. Please try again.');
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
+  const handleSelectTreatmentToBook = (treatmentName) => {
+    setBookTreatment(treatmentName);
+    setActiveTab('appointments');
+    window.scrollTo({ top: 300, behavior: 'smooth' });
   };
 
   const handlePhotoUpload = (e) => {
@@ -463,7 +515,9 @@ const ClientDashboard = () => {
       }}>
         {[
           { id: 'overview', label: 'Suite Overview', icon: Sparkles },
-          { id: 'treatments', label: `My Treatments (${treatments.length})`, icon: HeartPulse },
+          { id: 'appointments', label: `My Appointments (${appointments.length})`, icon: Calendar },
+          { id: 'catalogue', label: 'Explore Treatments (55)', icon: HeartPulse },
+          { id: 'treatments', label: `Clinical Records (${treatments.length})`, icon: FileText },
           { id: 'profile', label: 'My Profile', icon: User },
           { id: 'enquiries', label: `My Enquiries (${enquiries.length})`, icon: MessageSquare },
           { id: 'notifications', label: `Notifications ${unreadNotifsCount > 0 ? `(${unreadNotifsCount})` : ''}`, icon: Bell },
@@ -503,7 +557,17 @@ const ClientDashboard = () => {
       {activeTab === 'overview' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
           {/* Quick Metrics */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '22px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
+              <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Appointments Booked
+              </div>
+              <div style={{ fontSize: '2.1rem', fontWeight: '700', color: '#806657', margin: '8px 0 4px' }}>
+                {appointments.length}
+              </div>
+              <span style={{ fontSize: '0.82rem', color: '#6e5d53' }}>In-clinic scheduled visits</span>
+            </div>
+
             <div style={{ backgroundColor: '#ffffff', padding: '22px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
               <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Total Treatments Recorded
@@ -516,22 +580,83 @@ const ClientDashboard = () => {
 
             <div style={{ backgroundColor: '#ffffff', padding: '22px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
               <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Account Standing
-              </div>
-              <div style={{ fontSize: '1.4rem', fontWeight: '700', color: '#166534', margin: '14px 0 6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <CheckCircle2 size={20} /> Verified & Active
-              </div>
-              <span style={{ fontSize: '0.82rem', color: '#6e5d53' }}>Strict patient data isolation active</span>
-            </div>
-
-            <div style={{ backgroundColor: '#ffffff', padding: '22px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
-              <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Submitted Enquiries
               </div>
               <div style={{ fontSize: '2.1rem', fontWeight: '700', color: '#2c221e', margin: '8px 0 4px' }}>
                 {enquiries.length}
               </div>
               <span style={{ fontSize: '0.82rem', color: '#6e5d53' }}>Direct communications with clinic</span>
+            </div>
+
+            <div style={{ backgroundColor: '#ffffff', padding: '22px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
+              <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Account Standing
+              </div>
+              <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#166534', margin: '14px 0 6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CheckCircle2 size={18} /> Verified & Active
+              </div>
+              <span style={{ fontSize: '0.82rem', color: '#6e5d53' }}>Strict patient data isolation active</span>
+            </div>
+          </div>
+
+          {/* Quick Actions Card */}
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '14px',
+            border: '1px solid #ebdcd0',
+            padding: '24px 28px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '16px',
+            background: 'linear-gradient(135deg, #ffffff 0%, #FAF7F2 100%)'
+          }}>
+            <div>
+              <h3 style={{ fontSize: '1.15rem', color: '#2c221e', margin: '0 0 4px 0', fontWeight: '600', fontFamily: 'var(--font-heading)' }}>
+                Need to schedule a treatment or explore services?
+              </h3>
+              <p style={{ margin: 0, color: '#8c7b70', fontSize: '0.88rem' }}>
+                Book your next in-clinic appointment directly or browse our full catalogue of 55 clinical treatments with transparent pricing.
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setActiveTab('appointments')}
+                style={{
+                  backgroundColor: '#806657',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Plus size={16} /> Book Appointment
+              </button>
+              <button
+                onClick={() => setActiveTab('catalogue')}
+                style={{
+                  backgroundColor: '#ffffff',
+                  color: '#806657',
+                  border: '1px solid #ebdcd0',
+                  padding: '10px 18px',
+                  borderRadius: '8px',
+                  fontWeight: '600',
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <HeartPulse size={16} /> Browse Treatment Menu
+              </button>
             </div>
           </div>
 
@@ -592,6 +717,416 @@ const ClientDashboard = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: MY APPOINTMENTS & SELF-BOOKING */}
+      {activeTab === 'appointments' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+          {/* Booking Card */}
+          <div style={{ backgroundColor: '#ffffff', padding: '32px', borderRadius: '16px', border: '1px solid #ebdcd0' }}>
+            <div style={{ marginBottom: '22px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#806657', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>
+                <Calendar size={14} /> Self-Service In-Clinic Scheduling
+              </div>
+              <h2 style={{ fontSize: '1.35rem', color: '#2c221e', fontFamily: 'var(--font-heading)', fontWeight: '600', margin: '0 0 6px 0' }}>
+                Schedule An Appointment
+              </h2>
+              <p style={{ color: '#8c7b70', fontSize: '0.88rem', margin: 0 }}>
+                Select your desired aesthetic procedure and preferred time. Your booking request will be securely confirmed by our clinical reception.
+              </p>
+            </div>
+
+            <form onSubmit={handleBookAppointment} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#4a3b32', marginBottom: '6px' }}>
+                    Procedure / Treatment <span style={{ color: '#b91c1c' }}>*</span>
+                  </label>
+                  <select
+                    value={bookTreatment}
+                    onChange={(e) => setBookTreatment(e.target.value)}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid #d4c3b3',
+                      backgroundColor: '#fdfbf9',
+                      fontSize: '0.9rem',
+                      color: '#2c221e',
+                      outline: 'none'
+                    }}
+                  >
+                    {TREATMENTS_DATA.map((t) => (
+                      <option key={t.id} value={t.name}>
+                        {t.name} — {t.price} ({t.categoryName})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#4a3b32', marginBottom: '6px' }}>
+                    Preferred Appointment Date <span style={{ color: '#b91c1c' }}>*</span>
+                  </label>
+                  <input
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={bookDate}
+                    onChange={(e) => setBookDate(e.target.value)}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid #d4c3b3',
+                      backgroundColor: '#fdfbf9',
+                      fontSize: '0.9rem',
+                      color: '#2c221e',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#4a3b32', marginBottom: '6px' }}>
+                    Preferred Time Slot
+                  </label>
+                  <select
+                    value={bookTime}
+                    onChange={(e) => setBookTime(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid #d4c3b3',
+                      backgroundColor: '#fdfbf9',
+                      fontSize: '0.9rem',
+                      color: '#2c221e',
+                      outline: 'none'
+                    }}
+                  >
+                    {['10:00 AM', '11:00 AM', '12:00 PM', '01:30 PM', '03:00 PM', '04:30 PM', '06:00 PM', '07:00 PM'].map((slot) => (
+                      <option key={slot} value={slot}>{slot}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#4a3b32', marginBottom: '6px' }}>
+                    Skin Concerns or Personal Notes (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={bookNotes}
+                    onChange={(e) => setBookNotes(e.target.value)}
+                    placeholder="e.g. Skin sensitivity, specific questions..."
+                    style={{
+                      width: '100%',
+                      padding: '12px 14px',
+                      borderRadius: '8px',
+                      border: '1px solid #d4c3b3',
+                      backgroundColor: '#fdfbf9',
+                      fontSize: '0.9rem',
+                      color: '#2c221e',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '10px' }}>
+                <button
+                  type="submit"
+                  disabled={bookingLoading}
+                  style={{
+                    backgroundColor: '#806657',
+                    color: '#ffffff',
+                    border: 'none',
+                    padding: '12px 28px',
+                    borderRadius: '8px',
+                    fontWeight: '600',
+                    fontSize: '0.92rem',
+                    cursor: bookingLoading ? 'wait' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    opacity: bookingLoading ? 0.7 : 1
+                  }}
+                >
+                  <Calendar size={16} />
+                  {bookingLoading ? 'Submitting Appointment...' : 'Request Appointment'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Appointments List */}
+          <div style={{ backgroundColor: '#ffffff', padding: '32px', borderRadius: '16px', border: '1px solid #ebdcd0' }}>
+            <h3 style={{ fontSize: '1.25rem', color: '#2c221e', fontFamily: 'var(--font-heading)', fontWeight: '600', margin: '0 0 16px 0' }}>
+              My In-Clinic Visits & Status ({appointments.length})
+            </h3>
+
+            {appointments.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '45px 20px', backgroundColor: '#faf8f5', borderRadius: '10px', border: '1px dashed #ebdcd0' }}>
+                <Calendar size={38} color="#c2b4a8" style={{ marginBottom: '12px' }} />
+                <p style={{ color: '#6e5d53', fontSize: '0.95rem', fontWeight: '500', margin: '0 0 6px 0' }}>
+                  No appointments scheduled currently.
+                </p>
+                <p style={{ color: '#8c7b70', fontSize: '0.85rem', margin: 0 }}>
+                  Select a procedure from the form above to book your upcoming in-clinic session.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {appointments.map((appt) => {
+                  const status = (appt.status || 'PENDING').toUpperCase();
+                  let badgeStyle = { bg: '#fef3c7', text: '#92400e', border: '#fde68a' };
+                  if (status === 'CONFIRMED') badgeStyle = { bg: '#ecfdf5', text: '#065f46', border: '#a7f3d0' };
+                  if (status === 'COMPLETED') badgeStyle = { bg: '#eff6ff', text: '#1e40af', border: '#bfdbfe' };
+                  if (status === 'CANCELLED') badgeStyle = { bg: '#fef2f2', text: '#991b1b', border: '#fecaca' };
+
+                  return (
+                    <div
+                      key={appt.id}
+                      style={{
+                        border: '1px solid #ebdcd0',
+                        borderRadius: '12px',
+                        padding: '20px 24px',
+                        backgroundColor: '#ffffff',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        flexWrap: 'wrap',
+                        gap: '16px'
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                          <h4 style={{ margin: 0, fontSize: '1.1rem', color: '#2c221e', fontWeight: '600' }}>
+                            {appt.treatmentName || appt.service || 'Aesthetic Consultation'}
+                          </h4>
+                          <span style={{
+                            backgroundColor: badgeStyle.bg,
+                            color: badgeStyle.text,
+                            border: `1px solid ${badgeStyle.border}`,
+                            padding: '3px 10px',
+                            borderRadius: '20px',
+                            fontSize: '0.75rem',
+                            fontWeight: '700'
+                          }}>
+                            {status}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.85rem', color: '#6e5d53' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                            <Calendar size={14} color="#806657" /> {appt.appointmentDate}
+                          </span>
+                          {appt.appointmentTime && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                              <Clock size={14} color="#806657" /> {appt.appointmentTime}
+                            </span>
+                          )}
+                        </div>
+                        {appt.notes && (
+                          <p style={{ margin: '8px 0 0', fontSize: '0.84rem', color: '#8c7b70', fontStyle: 'italic' }}>
+                            Note: "{appt.notes}"
+                          </p>
+                        )}
+                      </div>
+                      <div style={{ textAlign: 'right', fontSize: '0.8rem', color: '#8c7b70' }}>
+                        Ref: #{appt.id}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB: TREATMENT CATALOGUE & PRICING */}
+      {activeTab === 'catalogue' && (
+        <div style={{ backgroundColor: '#ffffff', padding: '32px', borderRadius: '16px', border: '1px solid #ebdcd0' }}>
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#806657', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>
+              <HeartPulse size={14} /> Comprehensive Clinic Menu
+            </div>
+            <h2 style={{ fontSize: '1.35rem', color: '#2c221e', fontFamily: 'var(--font-heading)', fontWeight: '600', margin: '0 0 6px 0' }}>
+              Treatments & Pricing Catalogue
+            </h2>
+            <p style={{ color: '#8c7b70', fontSize: '0.88rem', margin: 0 }}>
+              Browse all 55 verified aesthetic procedures across 7 specialized dermatological categories with transparent pricing in INR (₹).
+            </p>
+          </div>
+
+          {/* Search & Category Filter Controls */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
+            <div style={{ position: 'relative' }}>
+              <Search size={18} color="#a89a90" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                type="text"
+                placeholder="Search procedures by name or treatment area (e.g. PRP, Peels, Botox, Laser)..."
+                value={catalogueSearch}
+                onChange={(e) => setCatalogueSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px 12px 42px',
+                  borderRadius: '10px',
+                  border: '1px solid #ebdcd0',
+                  backgroundColor: '#fbf9f6',
+                  fontSize: '0.9rem',
+                  color: '#2c221e',
+                  outline: 'none'
+                }}
+              />
+            </div>
+
+            {/* Category Filter Pills */}
+            <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '6px' }}>
+              {TREATMENT_CATEGORIES.map((cat) => {
+                const isSelected = catalogueCategory === cat.id;
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => setCatalogueCategory(cat.id)}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '20px',
+                      border: '1px solid',
+                      borderColor: isSelected ? '#806657' : '#ebdcd0',
+                      backgroundColor: isSelected ? '#806657' : '#ffffff',
+                      color: isSelected ? '#ffffff' : '#6e5d53',
+                      fontSize: '0.8rem',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {cat.shortName || cat.name} {cat.count ? `(${cat.count})` : ''}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Treatment Cards Grid */}
+          {(() => {
+            const filtered = TREATMENTS_DATA.filter((item) => {
+              const matchesCategory = catalogueCategory === 'all' || item.categoryId === catalogueCategory;
+              const q = catalogueSearch.toLowerCase().trim();
+              const matchesSearch = !q ||
+                item.name.toLowerCase().includes(q) ||
+                (item.subcategory && item.subcategory.toLowerCase().includes(q)) ||
+                (item.categoryName && item.categoryName.toLowerCase().includes(q)) ||
+                (item.description && item.description.toLowerCase().includes(q));
+              return matchesCategory && matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+              return (
+                <div style={{ textAlign: 'center', padding: '50px 20px', backgroundColor: '#faf8f5', borderRadius: '10px', border: '1px dashed #ebdcd0' }}>
+                  <Search size={36} color="#c2b4a8" style={{ marginBottom: '10px' }} />
+                  <p style={{ color: '#6e5d53', fontSize: '0.95rem', fontWeight: '500', margin: '0 0 6px 0' }}>No treatments found</p>
+                  <p style={{ color: '#8c7b70', fontSize: '0.85rem', margin: '0 0 14px 0' }}>
+                    No procedures match your current search or category filter.
+                  </p>
+                  <button
+                    onClick={() => { setCatalogueSearch(''); setCatalogueCategory('all'); }}
+                    style={{
+                      backgroundColor: '#fbf9f6',
+                      border: '1px solid #ebdcd0',
+                      color: '#806657',
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '0.85rem',
+                      fontWeight: '600'
+                    }}
+                  >
+                    Reset Filters
+                  </button>
+                </div>
+              );
+            }
+
+            return (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: '16px'
+              }}>
+                {filtered.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #ebdcd0',
+                      borderRadius: '12px',
+                      padding: '20px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 2px 8px rgba(44, 34, 30, 0.02)',
+                      transition: 'transform 0.2s, box-shadow 0.2s'
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#806657', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          {item.subcategory || item.categoryName}
+                        </span>
+                        {item.pricingNote && (
+                          <span style={{ fontSize: '0.7rem', backgroundColor: '#f7f2ed', color: '#6e5d53', padding: '2px 8px', borderRadius: '10px', fontWeight: '600' }}>
+                            {item.pricingNote}
+                          </span>
+                        )}
+                      </div>
+                      <h4 style={{ fontSize: '1.05rem', color: '#2c221e', margin: '0 0 8px 0', fontWeight: '600', lineHeight: '1.3' }}>
+                        {item.name}
+                      </h4>
+                      <p style={{ color: '#6e5d53', fontSize: '0.83rem', lineHeight: '1.45', margin: '0 0 16px 0', minHeight: '48px' }}>
+                        {item.description}
+                      </p>
+                    </div>
+
+                    <div style={{ borderTop: '1px solid #f3ece4', paddingTop: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ fontSize: '0.7rem', color: '#8c7b70', display: 'block', textTransform: 'uppercase', fontWeight: '600' }}>Standard Fee</span>
+                        <span style={{ fontSize: '1.25rem', fontWeight: '700', color: '#2c221e' }}>{item.price}</span>
+                      </div>
+                      <button
+                        onClick={() => handleSelectTreatmentToBook(item.name)}
+                        style={{
+                          backgroundColor: '#806657',
+                          color: '#ffffff',
+                          border: 'none',
+                          padding: '8px 14px',
+                          borderRadius: '8px',
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        Book <ArrowRight size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Pricing Disclaimer */}
+          <div style={{ marginTop: '24px', padding: '14px 18px', backgroundColor: '#faf8f5', borderRadius: '8px', border: '1px solid #ebdcd0', fontSize: '0.8rem', color: '#8c7b70', lineHeight: '1.45' }}>
+            <strong>Clinical Notice:</strong> Treatment prices are indicative and may vary depending on individual consultation, treatment requirements and clinical assessment. Please contact our clinic for confirmation.
           </div>
         </div>
       )}
