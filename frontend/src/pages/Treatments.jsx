@@ -1,105 +1,388 @@
-import React from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, Clock } from 'lucide-react';
-import '../styles/pages.css';
+import { 
+  Search, X, MessageSquare, Calendar, Sparkles, 
+  Info, ArrowRight, CheckCircle2, ChevronRight 
+} from 'lucide-react';
+import { 
+  TREATMENTS_DATA, 
+  TREATMENT_CATEGORIES, 
+  getWhatsAppEnquiryUrl, 
+  getGeneralWhatsAppUrl,
+  CLINIC_PHONE_DISPLAY 
+} from '../data/treatmentsData';
+import '../styles/treatments.css';
 
 const Treatments = () => {
-  const treatmentList = [
-    {
-      id: 1,
-      title: "Korean Glass Skin",
-      description: "Achieve deep hydration, porcelain texture, and an unmatched luminous glow with our multi-step Korean aesthetic ritual.",
-      duration: "60 Mins",
-      price: "₹4,500",
-      image: "/glass Skin.webp"
-    },
-    {
-      id: 2,
-      title: "Skin Booster Therapy",
-      description: "Micro-injections of hyaluronic acid and vitamins to deeply nourish, hydrate, and restore youthful radiance from within.",
-      duration: "45 Mins",
-      price: "₹8,500",
-      image: "/skin booster.webp"
-    },
-    {
-      id: 3,
-      title: "Aesthetic Injectables & Fillers",
-      description: "Precision dermal fillers and anti-wrinkle treatments designed to restore facial volume and smooth fine lines naturally.",
-      duration: "45 Mins",
-      price: "₹12,000 onwards",
-      image: "/injectables.webp"
-    },
-    {
-      id: 4,
-      title: "Advanced Laser Hair Reduction",
-      description: "Painless, FDA-approved diode laser technology for permanent hair reduction suitable for all skin types.",
-      duration: "45 - 90 Mins",
-      price: "₹3,500 per session",
-      image: "/Laser hair.webp"
-    },
-    {
-      id: 5,
-      title: "Advanced Chemical Peel",
-      description: "Targeted medical-grade peels to exfoliate dead skin, diminish acne scars, reduce pigmentation, and unveil fresh skin.",
-      duration: "45 Mins",
-      price: "₹4,000",
-      image: "/chemical peel .webp"
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Update SEO Document Title & Meta Description
+  useEffect(() => {
+    document.title = "Skin, Hair & Aesthetic Treatments | Derma Aline Aesthetics";
+    
+    let metaDescription = document.querySelector('meta[name="description"]');
+    if (!metaDescription) {
+      metaDescription = document.createElement('meta');
+      metaDescription.name = 'description';
+      document.head.appendChild(metaDescription);
     }
-  ];
+    metaDescription.content = "Explore advanced skin, hair, laser, pigmentation and aesthetic treatments at Derma Aline Aesthetics Skin Clinic. Discover treatments and enquire about consultations.";
+  }, []);
+
+  // Filter treatments based on active category & search query
+  const filteredTreatments = useMemo(() => {
+    return TREATMENTS_DATA.filter((item) => {
+      const matchesCategory = selectedCategory === 'all' || item.categoryId === selectedCategory;
+      const matchesSearch = searchQuery.trim() === '' || 
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.subcategory.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.categoryName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.displayName && item.displayName.toLowerCase().includes(searchQuery.toLowerCase()));
+      return matchesCategory && matchesSearch;
+    });
+  }, [selectedCategory, searchQuery]);
+
+  // Group filtered treatments by Category -> Subcategory for structured hierarchy
+  const groupedTreatments = useMemo(() => {
+    const groups = {};
+    
+    // Maintain category ordering
+    TREATMENT_CATEGORIES.forEach((cat) => {
+      if (cat.id !== 'all') {
+        groups[cat.id] = {
+          categoryInfo: cat,
+          subcategories: {}
+        };
+      }
+    });
+
+    filteredTreatments.forEach((item) => {
+      if (groups[item.categoryId]) {
+        if (!groups[item.categoryId].subcategories[item.subcategory]) {
+          groups[item.categoryId].subcategories[item.subcategory] = [];
+        }
+        groups[item.categoryId].subcategories[item.subcategory].push(item);
+      }
+    });
+
+    // Remove empty categories from display
+    return Object.entries(groups).filter(([_, data]) => {
+      return Object.keys(data.subcategories).length > 0;
+    });
+  }, [filteredTreatments]);
+
+  const handleCategorySelect = (categoryId) => {
+    setSelectedCategory(categoryId);
+    const catalogueEl = document.getElementById('treatment-catalogue');
+    if (catalogueEl) {
+      catalogueEl.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleClearFilters = () => {
+    setSelectedCategory('all');
+    setSearchQuery('');
+  };
+
+  const scrollToCatalogue = () => {
+    const catalogueEl = document.getElementById('treatment-catalogue');
+    if (catalogueEl) {
+      catalogueEl.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   return (
-    <div className="internal-page">
-      <div className="page-header" style={{ textAlign: 'center', marginBottom: '50px' }}>
-        <Sparkles size={36} color="var(--color-accent)" style={{ marginBottom: '15px' }} />
-        <h1>Signature Treatments</h1>
-        <p style={{ color: 'var(--text-light)', maxWidth: '600px', margin: '10px auto 0 auto' }}>
-          Explore our range of medical-grade skincare and aesthetic treatments tailored to enhance your natural beauty.
-        </p>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '30px', marginBottom: '60px' }}>
-        {treatmentList.map((item) => (
-          <div key={item.id} style={{ backgroundColor: 'var(--bg-white)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)', display: 'flex', flexDirection: 'column', transition: 'transform 0.3s ease' }}>
-            
-            {/* Treatment Image Container */}
-            <div style={{ height: '220px', width: '100%', overflow: 'hidden', position: 'relative' }}>
-              <img 
-                src={item.image} 
-                alt={item.title} 
-                style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.5s ease', imageRendering: 'crisp-edges' }} 
-              />
-              <span style={{ position: 'absolute', top: '15px', right: '15px', backgroundColor: 'var(--color-primary)', color: 'var(--bg-cream)', padding: '6px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '700' }}>
-                {item.price}
-              </span>
-            </div>
-
-            {/* Content Container */}
-            <div style={{ padding: '30px', display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
-              <div>
-                <h3 style={{ fontSize: '1.5rem', color: 'var(--color-primary)', fontFamily: 'var(--font-heading)', marginBottom: '12px' }}>
-                  {item.title}
-                </h3>
-                <p style={{ color: 'var(--text-light)', fontSize: '0.95rem', lineHeight: '1.6', marginBottom: '20px' }}>
-                  {item.description}
-                </p>
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-light)', fontSize: '0.85rem', marginBottom: '20px' }}>
-                  <Clock size={16} color="var(--color-accent)" /> Duration: {item.duration}
-                </div>
-
-                <Link to="/contact" style={{ textDecoration: 'none' }}>
-                  <button className="btn-primary" style={{ width: '100%', padding: '12px', textAlign: 'center' }}>
-                    Enquire This Treatment
-                  </button>
-                </Link>
-              </div>
-            </div>
-
+    <div className="treatments-page">
+      {/* --------------------------------------------------------------------
+          A. HERO SECTION
+          -------------------------------------------------------------------- */}
+      <section className="treatment-hero" aria-label="Treatments Introduction">
+        <div className="treatment-hero-content">
+          <div className="treatment-hero-badge">
+            <Sparkles size={14} color="#D4AF37" />
+            <span>Clinical Aesthetics &bull; Official Treatment Menu</span>
           </div>
-        ))}
-      </div>
+
+          <h1 className="treatment-hero-title">
+            Discover Your Beauty, <span>Redefined.</span>
+          </h1>
+
+          <p className="treatment-hero-subtitle">
+            Explore our range of advanced skin, hair and aesthetic treatments, thoughtfully designed around your beauty goals.
+          </p>
+
+          <div className="treatment-hero-actions">
+            <button 
+              onClick={scrollToCatalogue}
+              className="btn-gold-primary"
+              aria-label="Explore all clinic treatments"
+            >
+              <span>Explore Treatments</span>
+              <ArrowRight size={17} />
+            </button>
+
+            <Link 
+              to="/contact" 
+              className="btn-gold-outline"
+              aria-label="Book a consultation at Derma Aline Aesthetics"
+            >
+              <Calendar size={17} />
+              <span>Book a Consultation</span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* --------------------------------------------------------------------
+          B. CONTROLS BAR: SEARCH & CATEGORY PILLS (STICKY)
+          -------------------------------------------------------------------- */}
+      <nav id="treatment-catalogue" className="treatment-controls-bar" aria-label="Treatment Category Filters">
+        <div className="treatment-search-row">
+          <div className="treatment-search-box">
+            <Search size={18} className="treatment-search-icon" aria-hidden="true" />
+            <input 
+              type="text" 
+              placeholder="Search treatments by name, procedure or area (e.g. PRP, Hydrafacial, Botox)..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Search treatments"
+            />
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="treatment-search-clear"
+                title="Clear search"
+                aria-label="Clear search input"
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+
+          <div className="treatment-results-meta">
+            <span className="treatment-count-pill">
+              {filteredTreatments.length} of {TREATMENTS_DATA.length} Treatments
+            </span>
+            {(selectedCategory !== 'all' || searchQuery.trim() !== '') && (
+              <button 
+                onClick={handleClearFilters}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#C5A880',
+                  fontSize: '0.82rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+              >
+                Reset Filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Category Navigation Tabs */}
+        <div className="treatment-categories-scroll" role="tablist">
+          {TREATMENT_CATEGORIES.map((cat) => {
+            const isActive = selectedCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => handleCategorySelect(cat.id)}
+                className={`category-tab-btn ${isActive ? 'active' : ''}`}
+              >
+                <span>{cat.shortName}</span>
+                {cat.count && <span className="category-tab-badge">{cat.count}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* --------------------------------------------------------------------
+          C. MAIN TREATMENTS CATALOGUE
+          -------------------------------------------------------------------- */}
+      <main className="treatments-content-container">
+        {filteredTreatments.length === 0 ? (
+          <div className="treatments-empty-state">
+            <Info size={40} color="#C5A880" style={{ margin: '0 auto 12px' }} />
+            <h3>No treatments match your search</h3>
+            <p>
+              We could not find any clinical procedures matching "{searchQuery}". Try searching by another keyword or reset the filters.
+            </p>
+            <button 
+              onClick={handleClearFilters}
+              className="btn-gold-primary"
+              style={{ padding: '10px 22px', fontSize: '0.85rem' }}
+            >
+              View All Treatments
+            </button>
+          </div>
+        ) : (
+          groupedTreatments.map(([catId, { categoryInfo, subcategories }]) => (
+            <section 
+              key={catId} 
+              id={`cat-${catId}`}
+              className="category-section-block"
+              aria-labelledby={`heading-${catId}`}
+            >
+              <div className="category-section-header">
+                <div className="category-section-title-wrap">
+                  <span className="category-section-subtitle">Clinical Specialty</span>
+                  <h2 id={`heading-${catId}`}>{categoryInfo.name}</h2>
+                </div>
+                <span style={{ color: '#A6968B', fontSize: '0.82rem', fontWeight: '500' }}>
+                  {Object.values(subcategories).reduce((acc, list) => acc + list.length, 0)} Procedures
+                </span>
+              </div>
+
+              {Object.entries(subcategories).map(([subcatName, items]) => (
+                <div key={subcatName} className="subcategory-group-block">
+                  <h3 className="subcategory-title">{subcatName}</h3>
+
+                  <div className="treatments-cards-grid">
+                    {items.map((treatment) => (
+                      <article 
+                        key={treatment.id} 
+                        className="treatment-card-item"
+                        aria-label={`${treatment.name} - ${treatment.price}`}
+                      >
+                        {/* Image Header with Price Badge */}
+                        <div className="treatment-card-top">
+                          <img 
+                            src={treatment.image || '/clinic-interior.webp'} 
+                            alt={`Derma Aline ${treatment.name}`} 
+                            loading="lazy"
+                          />
+                          <div className="treatment-card-top-overlay" />
+                          <div className="treatment-card-price-badge">
+                            {treatment.price}
+                          </div>
+                          <span className="treatment-card-subcat-badge">
+                            {treatment.pricingNote || treatment.subcategory}
+                          </span>
+                        </div>
+
+                        {/* Card Content Body */}
+                        <div className="treatment-card-body">
+                          <div>
+                            <h4 className="treatment-card-name">
+                              {treatment.displayName || treatment.name}
+                            </h4>
+                            <span className="treatment-card-note">
+                              {treatment.pricingNote}
+                            </span>
+                            <p className="treatment-card-desc">
+                              {treatment.description}
+                            </p>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="treatment-card-actions">
+                            <a 
+                              href={getWhatsAppEnquiryUrl(treatment.name)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn-whatsapp-enquire"
+                              title={`Enquire about ${treatment.name} via WhatsApp`}
+                              aria-label={`Enquire about ${treatment.name} on WhatsApp`}
+                            >
+                              <MessageSquare size={16} />
+                              <span>Enquire on WhatsApp</span>
+                            </a>
+
+                            <Link 
+                              to={`/contact?treatment=${encodeURIComponent(treatment.name)}`}
+                              className="btn-card-consult"
+                              title={`Request an in-clinic consultation for ${treatment.name}`}
+                            >
+                              <Calendar size={14} />
+                              <span>Book In-Clinic Consultation</span>
+                            </Link>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </section>
+          ))
+        )}
+
+        {/* ------------------------------------------------------------------
+            E. PRICING INFORMATION DISCLAIMER
+            ------------------------------------------------------------------ */}
+        <aside className="treatment-pricing-disclaimer-box" aria-label="Clinical Pricing Notice">
+          <div className="disclaimer-icon-wrap" aria-hidden="true">
+            <Info size={22} />
+          </div>
+          <div className="disclaimer-text-wrap">
+            <h4>Clinical Pricing & Assessment Policy</h4>
+            <p>
+              Treatment prices are indicative and may vary depending on individual consultation, treatment requirements and clinical assessment. Please contact our clinic for confirmation.
+            </p>
+          </div>
+        </aside>
+      </main>
+
+      {/* --------------------------------------------------------------------
+          F. CONSULTATION CTA SECTION
+          -------------------------------------------------------------------- */}
+      <footer className="treatment-consultation-cta" aria-label="Schedule a Consultation">
+        <div className="treatment-cta-inner">
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '5px 14px',
+            backgroundColor: 'rgba(197, 168, 128, 0.12)',
+            border: '1px solid rgba(197, 168, 128, 0.35)',
+            borderRadius: '20px',
+            color: '#DFC299',
+            fontSize: '0.78rem',
+            fontWeight: '600',
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            marginBottom: '18px'
+          }}>
+            <CheckCircle2 size={14} color="#D4AF37" />
+            <span>Personalised Aesthetic Consultation</span>
+          </div>
+
+          <h2>Your Skin Deserves Expert Care.</h2>
+
+          <p>
+            Begin your journey towards healthier-looking skin with a personalised consultation at Derma Aline Aesthetics Skin Clinic.
+          </p>
+
+          <div className="treatment-cta-buttons">
+            <Link 
+              to="/contact" 
+              className="btn-gold-primary"
+              aria-label="Book your clinical consultation online"
+            >
+              <Calendar size={17} />
+              <span>Book Your Consultation</span>
+            </Link>
+
+            <a 
+              href={getGeneralWhatsAppUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-cta-whatsapp"
+              aria-label="Chat directly with Derma Aline clinical team on WhatsApp"
+            >
+              <MessageSquare size={17} />
+              <span>Chat on WhatsApp ({CLINIC_PHONE_DISPLAY})</span>
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };

@@ -1,12 +1,30 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { MapPin, Phone, Mail, Clock, Send, MessageSquare } from 'lucide-react';
 import API from '../services/api';
 import '../styles/pages.css';
 
 const Contact = () => {
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', message: '' });
+  const [searchParams] = useSearchParams();
+  const treatmentParam = searchParams.get('treatment') || '';
+
+  const [formData, setFormData] = useState({ 
+    name: '', 
+    email: '', 
+    phone: '', 
+    message: treatmentParam ? `I would like to enquire and schedule an in-clinic consultation for ${treatmentParam}.` : '' 
+  });
   const [status, setStatus] = useState({ type: '', message: '' });
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (treatmentParam) {
+      setFormData((prev) => ({
+        ...prev,
+        message: `I would like to enquire and schedule an in-clinic consultation for ${treatmentParam}.`
+      }));
+    }
+  }, [treatmentParam]);
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
