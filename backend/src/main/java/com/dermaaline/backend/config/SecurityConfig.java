@@ -11,7 +11,6 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -37,15 +36,10 @@ public class SecurityConfig {
             .headers(headers -> headers
                 .frameOptions(frame -> frame.deny())
                 .contentTypeOptions(content -> {})
-                .xssProtection(xss -> xss.disable())
                 .httpStrictTransportSecurity(hsts -> hsts
                     .includeSubDomains(true)
                     .maxAgeInSeconds(31536000)
-                    .preload(true)
                 )
-                .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
-                .permissionsPolicy(permissions -> permissions.policy("geolocation=(), microphone=(), camera=()"))
-                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self' https:; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none';"))
             )
             .authorizeHttpRequests(auth -> auth
                 // Allow browser preflight OPTIONS
