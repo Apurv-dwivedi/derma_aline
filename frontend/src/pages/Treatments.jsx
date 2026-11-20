@@ -251,31 +251,30 @@ const Treatments = () => {
                         className="treatment-card-item"
                         aria-label={`${treatment.name} - ${treatment.price}`}
                       >
-                        {/* Image Header with Price Badge */}
+                        {/* Image Header (Full, uncropped treatment photo) */}
                         <div className="treatment-card-top">
                           <img 
                             src={treatment.image || '/clinic-interior.webp'} 
                             alt={`Derma Aline ${treatment.name}`} 
                             loading="lazy"
                           />
-                          <div className="treatment-card-top-overlay" />
-                          <div className="treatment-card-price-badge">
-                            {treatment.price}
-                          </div>
-                          <span className="treatment-card-subcat-badge">
-                            {treatment.pricingNote || treatment.subcategory}
-                          </span>
                         </div>
 
                         {/* Card Content Body */}
                         <div className="treatment-card-body">
                           <div>
+                            <div className="treatment-card-price-row">
+                              <span className="treatment-card-price-display">
+                                {treatment.price}
+                              </span>
+                              <span className="treatment-card-subcat-badge-clean">
+                                {treatment.pricingNote || treatment.subcategory}
+                              </span>
+                            </div>
+
                             <h4 className="treatment-card-name">
                               {treatment.displayName || treatment.name}
                             </h4>
-                            <span className="treatment-card-note">
-                              {treatment.pricingNote}
-                            </span>
                             <p className="treatment-card-desc">
                               {treatment.description}
                             </p>

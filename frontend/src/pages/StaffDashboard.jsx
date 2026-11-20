@@ -667,12 +667,12 @@ const StaffDashboard = () => {
                   >
                     <div>
                       {item.image && (
-                        <div style={{ width: '100%', height: '130px', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px', backgroundColor: '#faf7f2' }}>
+                        <div style={{ width: '100%', aspectRatio: '3 / 2', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px', backgroundColor: '#faf7f2', border: '1px solid #ebdcd0' }}>
                           <img 
                             src={item.image} 
                             alt={item.name} 
                             loading="lazy" 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
                           />
                         </div>
                       )}

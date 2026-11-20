@@ -1086,12 +1086,12 @@ const ClientDashboard = () => {
                   >
                     <div>
                       {item.image && (
-                        <div style={{ width: '100%', height: '140px', borderRadius: '8px', overflow: 'hidden', marginBottom: '14px', backgroundColor: '#faf7f2' }}>
+                        <div style={{ width: '100%', aspectRatio: '3 / 2', borderRadius: '8px', overflow: 'hidden', marginBottom: '14px', backgroundColor: '#faf7f2', border: '1px solid #ebdcd0' }}>
                           <img 
                             src={item.image} 
                             alt={item.name} 
                             loading="lazy" 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                            style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
                           />
                         </div>
                       )}

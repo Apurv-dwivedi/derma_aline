@@ -373,51 +373,51 @@
 
 .treatment-card-top {
   position: relative;
-  height: 160px;
   width: 100%;
+  aspect-ratio: 3 / 2;
+  height: auto;
   overflow: hidden;
-  background-color: #EFE9DF;
+  background-color: #FAF7F2;
+  border-bottom: 1px solid #EBDCD0;
 }
 
 .treatment-card-top img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  transition: transform 0.5s ease;
+  object-fit: contain;
+  display: block;
 }
 
 .treatment-card-item:hover .treatment-card-top img {
-  transform: scale(1.05);
+  transform: none;
 }
 
-.treatment-card-price-badge {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  background-color: var(--color-primary, #806657);
-  color: #FFFFFF;
-  padding: 6px 14px;
-  border-radius: 20px;
-  font-size: 0.95rem;
+.treatment-card-price-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.treatment-card-price-display {
+  font-size: 1.25rem;
   font-weight: 700;
+  color: var(--color-primary, #806657);
   letter-spacing: 0.02em;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
 }
 
-.treatment-card-subcat-badge {
-  position: absolute;
-  bottom: 12px;
-  left: 14px;
-  background-color: rgba(255, 255, 255, 0.95);
+.treatment-card-subcat-badge-clean {
+  background-color: #FAF7F2;
   border: 1px solid #D9CBBE;
-  color: #5A4638;
+  color: #6E5D53;
   font-size: 0.72rem;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 3px 9px;
   border-radius: 12px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  letter-spacing: 0.04em;
 }
 
 .treatment-card-body {
@@ -747,23 +747,26 @@
     border-radius: 10px;
   }
   .treatment-card-top {
-    height: 110px;
+    height: auto;
+    aspect-ratio: 3 / 2;
   }
-  .treatment-card-price-badge {
-    top: 6px;
-    right: 6px;
-    font-size: 0.75rem;
-    font-weight: 700;
-    padding: 3px 7px;
-    border-radius: 12px;
+  .treatment-card-top img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
-  .treatment-card-subcat-badge {
-    bottom: 5px;
-    left: 5px;
+  .treatment-card-price-row {
+    margin-bottom: 6px;
+    gap: 4px;
+  }
+  .treatment-card-price-display {
+    font-size: 0.95rem;
+  }
+  .treatment-card-subcat-badge-clean {
     font-size: 0.58rem;
-    padding: 2px 5px;
-    border-radius: 6px;
-    max-width: 88%;
+    padding: 2px 6px;
+    border-radius: 8px;
+    max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
