@@ -21,7 +21,7 @@ public class EmailService {
     @Autowired(required = false)
     private JavaMailSender mailSender;
 
-    @Value("${spring.mail.username:dermaalineskinaesthetics@gmail.com}")
+    @Value("${spring.mail.username:dermaalineaesthetics@gmail.com}")
     private String fromEmail;
 
     @Value("${BREVO_SENDER_EMAIL:}")
@@ -52,7 +52,7 @@ public class EmailService {
                 + body.replace("\n", "<br/>")
                 + "</div>"
                 + "<div style=\"margin-top: 24px; padding-top: 16px; border-top: 1px solid #E8E5E0; text-align: center; font-size: 12px; color: #A09891;\">"
-                + "<p style=\"margin: 0;\">Derma Aline Aesth\u00e9tics Skin Clinic &bull; +91 87007 51880</p>"
+                + "<p style=\"margin: 0;\">Derma Aline Aesth\u00e9tics Skin Clinic &bull; +91 93195 44704</p>"
                 + "<p style=\"margin: 4px 0 0 0;\"><a href=\"https://derma-aline.vercel.app\" style=\"color: #8F857D; text-decoration: underline;\">Visit Official Clinic Portal</a></p>"
                 + "</div>"
                 + "</div>";

@@ -4,8 +4,8 @@
  * All prices in Indian Rupees (INR - ₹).
  */
 
-export const CLINIC_WHATSAPP_NUMBER = "918700751880";
-export const CLINIC_PHONE_DISPLAY = "+91 87007 51880";
+export const CLINIC_WHATSAPP_NUMBER = "919319544704";
+export const CLINIC_PHONE_DISPLAY = "+91 93195 44704";
 
 export const TREATMENT_CATEGORIES = [
   { id: "all", name: "All Treatments", shortName: "All" },

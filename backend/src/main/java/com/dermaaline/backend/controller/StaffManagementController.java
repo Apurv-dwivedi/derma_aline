@@ -17,7 +17,6 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin/staff")
-@CrossOrigin(origins = "*")
 public class StaffManagementController {
 
     @Autowired

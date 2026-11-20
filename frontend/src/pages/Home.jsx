@@ -321,8 +321,7 @@ const Home = () => {
               <div style={{ display: 'flex', gap: '14px', alignItems: 'center', marginBottom: '25px' }}>
                 <Phone size={22} style={{ flexShrink: 0, color: '#d9cbbe' }} />
                 <p style={{ fontSize: '0.95rem', color: '#f5efe6', lineHeight: '1.6', margin: 0 }}>
-                  <a href="tel:9319544704" style={{ color: '#ffffff', textDecoration: 'none' }}>+91 93195 44704</a><br/>
-                  <a href="tel:8700751880" style={{ color: '#ffffff', textDecoration: 'none' }}>+91 87007 51880</a>
+                  <a href="tel:9319544704" style={{ color: '#ffffff', textDecoration: 'none' }}>+91 93195 44704</a>
                 </p>
               </div>
             </div>

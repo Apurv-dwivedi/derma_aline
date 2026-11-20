@@ -10,7 +10,6 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/audit-logs")
-@CrossOrigin(origins = "*")
 public class AuditLogController {
 
     @Autowired

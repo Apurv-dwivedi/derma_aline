@@ -2,6 +2,7 @@ package com.dermaaline.backend.controller;
 
 import com.dermaaline.backend.entity.ContactMessage;
 import com.dermaaline.backend.repository.ContactRepository;
+import com.dermaaline.backend.security.SecuritySanitizer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -11,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/contact")
-@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class ContactController {
 
     @Autowired
@@ -25,10 +25,38 @@ public class ContactController {
     @PostMapping
     public ResponseEntity<?> submitContactMessage(@RequestBody ContactMessage contactMessage) {
         try {
+            if (contactMessage == null) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Request body cannot be empty."));
+            }
+
+            // Input Sanitization & Validation to prevent Stored XSS and injection
+            String sanitizedName = SecuritySanitizer.sanitizeText(contactMessage.getName(), 100);
+            String sanitizedEmail = SecuritySanitizer.sanitizeEmail(contactMessage.getEmail());
+            String sanitizedPhone = SecuritySanitizer.sanitizePhone(contactMessage.getPhone());
+            String sanitizedMessage = SecuritySanitizer.sanitizeText(contactMessage.getMessage(), 2000);
+
+            if (sanitizedName == null || sanitizedName.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "A valid name is required."));
+            }
+            if (sanitizedEmail == null) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "A valid email address is required."));
+            }
+            if (sanitizedPhone == null) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "A valid phone number is required."));
+            }
+            if (sanitizedMessage == null || sanitizedMessage.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Message content cannot be blank."));
+            }
+
+            contactMessage.setName(sanitizedName);
+            contactMessage.setEmail(sanitizedEmail);
+            contactMessage.setPhone(sanitizedPhone);
+            contactMessage.setMessage(sanitizedMessage);
+
             contactRepository.save(contactMessage);
-            return ResponseEntity.ok(Map.of("message", "Message received successfully!"));
+            return ResponseEntity.ok(Map.of("success", true, "message", "Message received successfully!"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Failed to save message"));
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Failed to submit message."));
         }
     }
 

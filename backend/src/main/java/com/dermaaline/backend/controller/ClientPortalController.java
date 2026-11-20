@@ -12,6 +12,7 @@ import com.dermaaline.backend.repository.CustomerRepository;
 import com.dermaaline.backend.repository.NotificationRepository;
 import com.dermaaline.backend.repository.TreatmentRecordRepository;
 import com.dermaaline.backend.repository.UserRepository;
+import com.dermaaline.backend.security.SecuritySanitizer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -23,7 +24,6 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/client")
-@CrossOrigin(origins = "*")
 public class ClientPortalController {
 
     @Autowired
@@ -100,8 +100,8 @@ public class ClientPortalController {
         }
 
         User user = userOpt.get();
-        String newFullName = payload.get("fullName");
-        String newPhone = payload.get("phone");
+        String newFullName = SecuritySanitizer.sanitizeText(payload.get("fullName"), 100);
+        String newPhone = SecuritySanitizer.sanitizePhone(payload.get("phone"));
         String newProfilePicture = payload.get("profilePicture");
 
         if (newFullName != null && !newFullName.trim().isEmpty()) {

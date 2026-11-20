@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Production Rate Limiting Filter to mitigate brute-force authentication,
- * OTP flooding, and contact submission abuse.
+ * OTP flooding, contact submission spam, and appointment booking abuse.
  */
 @Component
 public class RateLimitingFilter extends OncePerRequestFilter {
@@ -23,7 +23,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
     private static final Logger logger = LoggerFactory.getLogger(RateLimitingFilter.class);
 
     private static final int MAX_AUTH_REQUESTS_PER_MINUTE = 15;
-    private static final int MAX_CONTACT_REQUESTS_PER_MINUTE = 6;
+    private static final int MAX_SUBMISSION_REQUESTS_PER_MINUTE = 6;
     private static final long ONE_MINUTE_MS = 60_000L;
 
     // In-memory sliding window bucket tracker: Key = IP + ":" + endpointCategory
@@ -63,6 +63,7 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         }
 
         String path = request.getRequestURI();
+        String method = request.getMethod();
         String ip = extractClientIp(request);
         long now = System.currentTimeMillis();
 
@@ -73,12 +74,16 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             maxAllowed = MAX_AUTH_REQUESTS_PER_MINUTE;
             bucketCategory = "login";
         } else if (path.startsWith("/api/auth/register") || path.startsWith("/api/auth/verify-email") 
-                || path.startsWith("/api/auth/send-otp") || path.startsWith("/api/auth/forgot-password")) {
+                || path.startsWith("/api/auth/send-otp") || path.startsWith("/api/auth/forgot-password")
+                || path.startsWith("/api/auth/reset-password") || path.startsWith("/api/auth/verify-otp")) {
             maxAllowed = MAX_AUTH_REQUESTS_PER_MINUTE;
             bucketCategory = "auth-action";
-        } else if (path.startsWith("/api/contact") && "POST".equalsIgnoreCase(request.getMethod())) {
-            maxAllowed = MAX_CONTACT_REQUESTS_PER_MINUTE;
+        } else if (path.startsWith("/api/contact") && "POST".equalsIgnoreCase(method)) {
+            maxAllowed = MAX_SUBMISSION_REQUESTS_PER_MINUTE;
             bucketCategory = "contact";
+        } else if (path.startsWith("/api/appointments") && "POST".equalsIgnoreCase(method)) {
+            maxAllowed = MAX_SUBMISSION_REQUESTS_PER_MINUTE;
+            bucketCategory = "appointment";
         }
 
         if (bucketCategory != null) {

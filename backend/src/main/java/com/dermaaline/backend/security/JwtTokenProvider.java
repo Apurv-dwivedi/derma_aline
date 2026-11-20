@@ -1,23 +1,45 @@
 package com.dermaaline.backend.security;
+
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
+
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.Date;
 
 @Component
 public class JwtTokenProvider {
-    // In production, this must be injected via environment variable
-    @Value("${app.jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}")
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtTokenProvider.class);
+
+    @Value("${app.jwt.secret:}")
     private String jwtSecret;
-    
+
     @Value("${app.jwt.expiration-milliseconds:86400000}")
     private long jwtExpirationDate;
 
-    private Key key() { return Keys.hmacShaKeyFor(jwtSecret.getBytes()); }
+    private Key signingKey;
+
+    @PostConstruct
+    public void init() {
+        if (jwtSecret != null && jwtSecret.trim().length() >= 32) {
+            this.signingKey = Keys.hmacShaKeyFor(jwtSecret.trim().getBytes(StandardCharsets.UTF_8));
+            logger.info("Cryptographic JWT Token Provider initialized using injected secure environment key.");
+        } else {
+            logger.warn("WARNING: JWT_SECRET environment variable is not configured or is under 32 bytes. Generating an ephemeral cryptographic HS256 key for process lifetime.");
+            this.signingKey = Keys.secretKeyFor(SignatureAlgorithm.HS256);
+        }
+    }
+
+    private Key key() {
+        return this.signingKey;
+    }
 
     public String generateToken(Authentication authentication) {
         String username = authentication.getName();

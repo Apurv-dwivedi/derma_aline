@@ -10,6 +10,7 @@ import com.dermaaline.backend.repository.UserRepository;
 import com.dermaaline.backend.security.JwtTokenProvider;
 import com.dermaaline.backend.service.EmailService;
 import com.dermaaline.backend.service.OtpService;
+import com.dermaaline.backend.security.SecuritySanitizer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -24,7 +25,6 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
 public class AuthController {
 
     @Autowired
@@ -67,7 +67,16 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Password must be at least 6 characters long."));
         }
 
-        String email = request.getEmail().trim().toLowerCase();
+        String email = SecuritySanitizer.sanitizeEmail(request.getEmail());
+        if (email == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "A valid email address is required."));
+        }
+        String fullName = SecuritySanitizer.sanitizeText(request.getFullName(), 100);
+        if (fullName == null || fullName.isEmpty()) {
+            fullName = "Valued Client";
+        }
+        String phone = SecuritySanitizer.sanitizePhone(request.getPhone());
+
         Optional<User> existingUserOpt = userRepository.findByEmail(email);
 
         User user;
@@ -79,9 +88,8 @@ public class AuthController {
                     "message", "This email address is already registered. Please sign in."
                 ));
             }
-            existing.setFullName(request.getFullName() != null && !request.getFullName().trim().isEmpty() 
-                    ? request.getFullName().trim() : "Valued Client");
-            existing.setPhone(request.getPhone() != null ? request.getPhone().trim() : null);
+            existing.setFullName(fullName);
+            existing.setPhone(phone);
             existing.setPassword(passwordEncoder.encode(request.getPassword()));
             existing.setRole(User.Role.CUSTOMER);
             existing.setStatus(User.AccountStatus.ACTIVE);
@@ -89,9 +97,8 @@ public class AuthController {
         } else {
             User newUser = new User();
             newUser.setEmail(email);
-            newUser.setFullName(request.getFullName() != null && !request.getFullName().trim().isEmpty() 
-                    ? request.getFullName().trim() : "Valued Client");
-            newUser.setPhone(request.getPhone() != null ? request.getPhone().trim() : null);
+            newUser.setFullName(fullName);
+            newUser.setPhone(phone);
             newUser.setPassword(passwordEncoder.encode(request.getPassword()));
             newUser.setRole(User.Role.CUSTOMER);
             newUser.setStatus(User.AccountStatus.ACTIVE);

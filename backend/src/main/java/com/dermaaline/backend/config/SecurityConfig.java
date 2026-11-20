@@ -11,9 +11,10 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
 
 import java.util.Arrays;
 
@@ -32,7 +33,20 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .cors(cors -> {})
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .headers(headers -> headers
+                .frameOptions(frame -> frame.deny())
+                .contentTypeOptions(content -> {})
+                .xssProtection(xss -> xss.disable())
+                .httpStrictTransportSecurity(hsts -> hsts
+                    .includeSubDomains(true)
+                    .maxAgeInSeconds(31536000)
+                    .preload(true)
+                )
+                .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                .permissionsPolicy(permissions -> permissions.policy("geolocation=(), microphone=(), camera=()"))
+                .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self' https:; img-src 'self' data: https:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none';"))
+            )
             .authorizeHttpRequests(auth -> auth
                 // Allow browser preflight OPTIONS
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
@@ -40,9 +54,10 @@ public class SecurityConfig {
                 // Public Authentication, Registration & Verification
                 .requestMatchers("/api/auth/**").permitAll()
 
-                // Public informational endpoints (read-only treatments, public contact submission)
+                // Public informational endpoints & submissions (read-only treatments, contact, appointment booking)
                 .requestMatchers(HttpMethod.GET, "/api/treatments/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/contact").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/appointments").permitAll()
                 .requestMatchers("/api/health/**", "/health", "/error").permitAll()
 
                 // Owner-only Treatment Catalogue modifications
@@ -63,7 +78,7 @@ public class SecurityConfig {
                 // Owner / Super Admin APIs (Executive suite, staff management, settings, audit logs)
                 .requestMatchers("/api/admin/**").hasAnyRole("SUPER_ADMIN", "ADMIN")
 
-                // Historical appointments fallback during migration
+                // Protected Appointment Management
                 .requestMatchers("/api/appointments/my").authenticated()
                 .requestMatchers("/api/appointments/**").hasAnyRole("STAFF", "SUPER_ADMIN", "ADMIN")
 
@@ -77,8 +92,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public CorsFilter corsFilter() {
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowCredentials(true);
         config.setAllowedOriginPatterns(Arrays.asList(
@@ -86,9 +100,13 @@ public class SecurityConfig {
             "http://localhost:3000",
             "http://localhost:5173"
         ));
-        config.addAllowedHeader("*");
-        config.addAllowedMethod("*");
+        config.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin"));
+        config.setExposedHeaders(Arrays.asList("Authorization"));
+        config.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
-        return new CorsFilter(source);
+        return source;
     }
 }

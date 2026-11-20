@@ -30,7 +30,7 @@ public class DatabaseFixRunner {
                 "ALTER TABLE customers ADD COLUMN IF NOT EXISTS profile_picture TEXT;",
                 "UPDATE users SET status = 'ACTIVE' WHERE status IS NULL;",
                 "UPDATE users SET role = 'CUSTOMER' WHERE role IS NULL;",
-                "UPDATE users SET role = 'SUPER_ADMIN' WHERE email = 'apurvdwivedi2205@gmail.com';",
+                "UPDATE users SET role = 'SUPER_ADMIN' WHERE email IN ('dermaalineaesthetics@gmail.com', 'apurvdwivedi2205@gmail.com');",
 
                 // 2. Appointments table backward-compatible column mappings
                 "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255);",

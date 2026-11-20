@@ -53,7 +53,6 @@ const Footer = () => {
             <p style={{ marginBottom: '10px' }}>First Floor, F-121, near Roshan di Kulfi, Main Market, Block F, Rajouri Garden, New Delhi, 110027</p>
             <p style={{ marginBottom: '15px', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <Phone size={15} color="var(--color-accent, #c5a880)" />
-              <a href="tel:8700751880" style={{ color: '#ffffff', textDecoration: 'none' }}>+91 87007 51880</a>, 
               <a href="tel:9319544704" style={{ color: '#ffffff', textDecoration: 'none' }}>+91 93195 44704</a>
             </p>
             

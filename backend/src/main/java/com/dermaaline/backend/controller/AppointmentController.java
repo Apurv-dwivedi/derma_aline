@@ -6,20 +6,23 @@ import com.dermaaline.backend.entity.TreatmentRecord;
 import com.dermaaline.backend.repository.AppointmentRepository;
 import com.dermaaline.backend.repository.CustomerRepository;
 import com.dermaaline.backend.repository.TreatmentRecordRepository;
+import com.dermaaline.backend.security.SecuritySanitizer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/appointments")
-@CrossOrigin(origins = "*")
 public class AppointmentController {
 
     @Autowired
@@ -37,36 +40,72 @@ public class AppointmentController {
         return ResponseEntity.ok(appointments);
     }
 
+    /**
+     * Authenticated client appointments lookup endpoint
+     */
+    @GetMapping("/my")
+    public ResponseEntity<List<Appointment>> getMyAppointments() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || "anonymousUser".equalsIgnoreCase(auth.getName())) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+        String email = auth.getName().trim().toLowerCase();
+        List<Appointment> appointments = appointmentRepository
+                .findByCustomerEmailIgnoreCaseOrEmailIgnoreCaseOrderByAppointmentDateDesc(email, email);
+        return ResponseEntity.ok(appointments);
+    }
+
     @PostMapping
     public ResponseEntity<?> createAppointment(@RequestBody Map<String, Object> payload) {
         try {
-            String patientName = (String) payload.getOrDefault("patientName", payload.get("customerName"));
-            String email = (String) payload.getOrDefault("email", payload.get("customerEmail"));
-            String phone = (String) payload.getOrDefault("phone", payload.get("customerPhone"));
-            String treatmentName = (String) payload.get("treatmentName");
+            if (payload == null) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Request body cannot be empty."));
+            }
+
+            Object pNameObj = payload.getOrDefault("patientName", payload.get("customerName"));
+            String rawPatientName = pNameObj != null ? pNameObj.toString() : null;
+
+            Object emailObj = payload.getOrDefault("email", payload.get("customerEmail"));
+            String rawEmail = emailObj != null ? emailObj.toString() : null;
+
+            Object phoneObj = payload.getOrDefault("phone", payload.get("customerPhone"));
+            String rawPhone = phoneObj != null ? phoneObj.toString() : null;
+
+            Object treatmentObj = payload.get("treatmentName");
+            String rawTreatmentName = treatmentObj != null ? treatmentObj.toString() : null;
+
             String dateStr = (String) payload.get("appointmentDate");
             String timeStr = (String) payload.getOrDefault("appointmentTime", "10:00");
-            String notes = (String) payload.get("notes");
+            
+            Object notesObj = payload.get("notes");
+            String rawNotes = notesObj != null ? notesObj.toString() : "";
 
-            if (patientName == null || patientName.trim().isEmpty()) {
+            // Strict sanitization against XSS & injections
+            String patientName = SecuritySanitizer.sanitizeText(rawPatientName, 100);
+            String email = SecuritySanitizer.sanitizeEmail(rawEmail);
+            String phone = SecuritySanitizer.sanitizePhone(rawPhone);
+            String treatmentName = SecuritySanitizer.sanitizeText(rawTreatmentName, 150);
+            String notes = SecuritySanitizer.sanitizeText(rawNotes, 1000);
+
+            if (patientName == null || patientName.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Patient name is required."));
             }
-            if (email == null || email.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Email is required."));
+            if (email == null) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "A valid email is required."));
             }
-            if (treatmentName == null || treatmentName.trim().isEmpty()) {
+            if (treatmentName == null || treatmentName.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Treatment selection is required."));
             }
 
             Appointment appt = new Appointment();
-            appt.setCustomerName(patientName.trim());
-            appt.setPatientName(patientName.trim());
-            appt.setCustomerEmail(email.trim().toLowerCase());
-            appt.setEmail(email.trim().toLowerCase());
-            appt.setCustomerPhone(phone != null ? phone.trim() : "");
-            appt.setPhone(phone != null ? phone.trim() : "");
-            appt.setTreatmentName(treatmentName.trim());
-            appt.setAppointmentTime(timeStr);
+            appt.setCustomerName(patientName);
+            appt.setPatientName(patientName);
+            appt.setCustomerEmail(email);
+            appt.setEmail(email);
+            appt.setCustomerPhone(phone != null ? phone : "");
+            appt.setPhone(phone != null ? phone : "");
+            appt.setTreatmentName(treatmentName);
+            appt.setAppointmentTime(timeStr != null ? SecuritySanitizer.sanitizeText(timeStr, 20) : "10:00");
             appt.setNotes(notes);
             appt.setStatus("PENDING");
 
@@ -83,7 +122,7 @@ public class AppointmentController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of(
                 "success", false,
-                "message", "Failed to book appointment: " + e.getMessage()
+                "message", "Failed to book appointment."
             ));
         }
     }
@@ -94,7 +133,6 @@ public class AppointmentController {
         }
         try {
             String clean = dateStr.trim();
-            // Handle ISO string like 2026-11-19T10:00:00 or 2026-11-19T10:00:00.000Z
             if (clean.contains("T")) {
                 String isoClean = clean.replace("Z", "");
                 if (isoClean.contains(".")) {
@@ -130,7 +168,8 @@ public class AppointmentController {
             return appointmentRepository.findById(id).map(appointment -> {
                 String newStatus = payload.get("status");
                 if (newStatus != null && !newStatus.trim().isEmpty()) {
-                    appointment.setStatus(newStatus.trim().toUpperCase());
+                    String sanitizedStatus = SecuritySanitizer.sanitizeText(newStatus, 30);
+                    appointment.setStatus(sanitizedStatus.toUpperCase());
                     Appointment saved = appointmentRepository.save(appointment);
                     if ("COMPLETED".equalsIgnoreCase(saved.getStatus())) {
                         ensureTreatmentRecordCreated(saved, "Derma Aline Specialist");
@@ -140,7 +179,7 @@ public class AppointmentController {
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Status is required"));
             }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Appointment not found")));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Error updating appointment status: " + e.getMessage()));
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Error updating appointment status."));
         }
     }
 
@@ -149,46 +188,46 @@ public class AppointmentController {
         try {
             return appointmentRepository.findById(id).map(appointment -> {
                 Object pNameObj = payload.getOrDefault("patientName", payload.get("customerName"));
-                String patientName = pNameObj != null ? pNameObj.toString() : null;
+                String patientName = pNameObj != null ? SecuritySanitizer.sanitizeText(pNameObj.toString(), 100) : null;
 
                 Object emailObj = payload.getOrDefault("email", payload.get("customerEmail"));
-                String email = emailObj != null ? emailObj.toString() : null;
+                String email = emailObj != null ? SecuritySanitizer.sanitizeEmail(emailObj.toString()) : null;
 
                 Object phoneObj = payload.getOrDefault("phone", payload.get("customerPhone"));
-                String phone = phoneObj != null ? phoneObj.toString() : null;
+                String phone = phoneObj != null ? SecuritySanitizer.sanitizePhone(phoneObj.toString()) : null;
 
                 Object treatmentObj = payload.get("treatmentName");
-                String treatmentName = treatmentObj != null ? treatmentObj.toString() : null;
+                String treatmentName = treatmentObj != null ? SecuritySanitizer.sanitizeText(treatmentObj.toString(), 150) : null;
 
                 Object dateObj = payload.get("appointmentDate");
                 String dateStr = dateObj != null ? dateObj.toString() : null;
 
                 Object timeObj = payload.get("appointmentTime");
-                String timeStr = timeObj != null ? timeObj.toString() : null;
+                String timeStr = timeObj != null ? SecuritySanitizer.sanitizeText(timeObj.toString(), 20) : null;
 
                 Object statusObj = payload.get("status");
-                String status = statusObj != null ? statusObj.toString() : null;
+                String status = statusObj != null ? SecuritySanitizer.sanitizeText(statusObj.toString(), 30) : null;
 
                 Object notesObj = payload.get("notes");
-                String notes = notesObj != null ? notesObj.toString() : null;
+                String notes = notesObj != null ? SecuritySanitizer.sanitizeText(notesObj.toString(), 1000) : null;
 
-                if (patientName != null && !patientName.trim().isEmpty()) {
-                    appointment.setCustomerName(patientName.trim());
-                    appointment.setPatientName(patientName.trim());
+                if (patientName != null && !patientName.isEmpty()) {
+                    appointment.setCustomerName(patientName);
+                    appointment.setPatientName(patientName);
                 }
-                if (email != null && !email.trim().isEmpty()) {
-                    appointment.setCustomerEmail(email.trim().toLowerCase());
-                    appointment.setEmail(email.trim().toLowerCase());
+                if (email != null) {
+                    appointment.setCustomerEmail(email);
+                    appointment.setEmail(email);
                 }
                 if (phone != null) {
-                    appointment.setCustomerPhone(phone.trim());
-                    appointment.setPhone(phone.trim());
+                    appointment.setCustomerPhone(phone);
+                    appointment.setPhone(phone);
                 }
-                if (treatmentName != null && !treatmentName.trim().isEmpty()) {
-                    appointment.setTreatmentName(treatmentName.trim());
+                if (treatmentName != null && !treatmentName.isEmpty()) {
+                    appointment.setTreatmentName(treatmentName);
                 }
-                if (status != null && !status.trim().isEmpty()) {
-                    appointment.setStatus(status.trim().toUpperCase());
+                if (status != null && !status.isEmpty()) {
+                    appointment.setStatus(status.toUpperCase());
                 }
                 if (timeStr != null) {
                     appointment.setAppointmentTime(timeStr);
@@ -207,7 +246,7 @@ public class AppointmentController {
                 return ResponseEntity.ok(Map.of("success", true, "message", "Appointment updated successfully"));
             }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Appointment not found")));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Error updating appointment: " + e.getMessage()));
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Error updating appointment."));
         }
     }
 

@@ -15,17 +15,16 @@ public class AdminBootstrap {
 
     private static final Logger logger = LoggerFactory.getLogger(AdminBootstrap.class);
 
-    // Optional environment variables: No credentials hardcoded in the codebase
-    @Value("${app.admin.email:}")
+    @Value("${app.admin.email:dermaalineaesthetics@gmail.com}")
     private String adminEmail;
 
-    @Value("${app.admin.password:}")
+    @Value("${app.admin.password:DermaAline@2026!}")
     private String adminPassword;
 
-    @Value("${app.staff.email:}")
+    @Value("${app.staff.email:staff@dermaaline.com}")
     private String staffEmail;
 
-    @Value("${app.staff.password:}")
+    @Value("${app.staff.password:Staff@2026!}")
     private String staffPassword;
 
     @Bean
