@@ -63,19 +63,10 @@ public class OtpService {
         record.setCreatedAt(LocalDateTime.now());
         otpRepository.save(record);
 
-        // Compose luxury aesthetic email
-        String subject = "Verify Your Account | Derma Aline Aesthétics Clinic";
-        String body = "Dear " + (fullName != null && !fullName.trim().isEmpty() ? fullName.trim() : "Valued Client") + ",\n\n"
-                + "Welcome to Derma Aline Aesthétics Skin Clinic.\n\n"
-                + "Your 6-digit verification code is: " + codeStr + "\n\n"
-                + "This verification code will expire in " + OTP_EXPIRY_MINUTES + " minutes. "
-                + "For your privacy and security, never share this code with anyone.\n\n"
-                + "Warm regards,\n"
-                + "Derma Aline Aesthétics Skin Clinic";
-
-        boolean sent = emailService.sendEmail(cleanEmail, subject, body);
+        // Compose and dispatch luxury aesthetic email via Brevo
+        boolean sent = emailService.sendOtpEmail(cleanEmail, fullName, codeStr, OTP_EXPIRY_MINUTES);
         if (!sent) {
-            logger.warn("Failed to dispatch OTP email to: {}", cleanEmail);
+            logger.warn("Failed to dispatch Brevo OTP email to: {}", cleanEmail);
         }
         return sent;
     }

@@ -75,7 +75,8 @@ public class RateLimitingFilter extends OncePerRequestFilter {
             bucketCategory = "login";
         } else if (path.startsWith("/api/auth/register") || path.startsWith("/api/auth/verify-email") 
                 || path.startsWith("/api/auth/send-otp") || path.startsWith("/api/auth/forgot-password")
-                || path.startsWith("/api/auth/reset-password") || path.startsWith("/api/auth/verify-otp")) {
+                || path.startsWith("/api/auth/reset-password") || path.startsWith("/api/auth/verify-otp")
+                || path.startsWith("/api/auth/resend-otp")) {
             maxAllowed = MAX_AUTH_REQUESTS_PER_MINUTE;
             bucketCategory = "auth-action";
         } else if (path.startsWith("/api/contact") && "POST".equalsIgnoreCase(method)) {

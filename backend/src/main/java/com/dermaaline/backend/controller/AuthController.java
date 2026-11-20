@@ -92,7 +92,7 @@ public class AuthController {
             existing.setPhone(phone);
             existing.setPassword(passwordEncoder.encode(request.getPassword()));
             existing.setRole(User.Role.CUSTOMER);
-            existing.setStatus(User.AccountStatus.ACTIVE);
+            existing.setStatus(User.AccountStatus.PENDING_VERIFICATION);
             user = userRepository.save(existing);
         } else {
             User newUser = new User();
@@ -101,36 +101,25 @@ public class AuthController {
             newUser.setPhone(phone);
             newUser.setPassword(passwordEncoder.encode(request.getPassword()));
             newUser.setRole(User.Role.CUSTOMER);
-            newUser.setStatus(User.AccountStatus.ACTIVE);
+            newUser.setStatus(User.AccountStatus.PENDING_VERIFICATION);
             user = userRepository.save(newUser);
         }
 
-        // Link/create customer profile
-        Optional<Customer> customerOpt = customerRepository.findByEmailIgnoreCase(email);
-        if (customerOpt.isEmpty()) {
-            Customer newCustomer = new Customer();
-            newCustomer.setEmail(email);
-            newCustomer.setFullName(user.getFullName());
-            newCustomer.setPhone(user.getPhone());
-            customerRepository.save(newCustomer);
+        // Generate and dispatch 6-digit OTP verification code via Brevo
+        try {
+            otpService.generateAndSendOtp(email, fullName);
+        } catch (Exception e) {
+            // Log notice, still allow user to enter verification mode and request resend if needed
+            System.err.println("OTP dispatch notice for " + email + ": " + e.getMessage());
         }
 
-        // Issue JWT token immediately
-        String token = jwtTokenProvider.generateToken(
-            new UsernamePasswordAuthenticationToken(user.getEmail(), null, 
-                Collections.singletonList(new SimpleGrantedAuthority("ROLE_CUSTOMER")))
-        );
-        auditLogService.record("REGISTER_SUCCESS", email, user.getRole().name(), "USER", user.getId().toString(), "Client registered and directly activated");
+        auditLogService.record("REGISTER_PENDING_OTP", email, user.getRole().name(), "USER", user.getId().toString(), "Client registered; awaiting 6-digit OTP email verification");
 
-        java.util.Map<String, Object> resp = new java.util.HashMap<>();
+        Map<String, Object> resp = new HashMap<>();
         resp.put("success", true);
-        resp.put("requiresVerification", false);
-        resp.put("token", token);
-        resp.put("role", user.getRole().name());
+        resp.put("requiresVerification", true);
         resp.put("email", user.getEmail());
-        resp.put("fullName", user.getFullName());
-        resp.put("profilePicture", user.getProfilePicture() != null ? user.getProfilePicture() : "");
-        resp.put("message", "Registration successful! Welcome to Derma Aline Aesthétics.");
+        resp.put("message", "A 6-digit verification code has been dispatched to " + user.getEmail() + ". Please enter the code below to complete your registration.");
 
         return ResponseEntity.ok(resp);
     }
@@ -260,10 +249,17 @@ public class AuthController {
             return ResponseEntity.status(401).body(Map.of("success", false, "message", "Invalid email or password."));
         }
 
-        // Account status check: auto-activate any pending accounts for seamless client access
+        // Account status check: require 6-digit OTP email verification
         if (user.getStatus() == User.AccountStatus.PENDING_VERIFICATION) {
-            user.setStatus(User.AccountStatus.ACTIVE);
-            userRepository.save(user);
+            try {
+                otpService.generateAndSendOtp(cleanEmail, user.getFullName());
+            } catch (Exception ignored) {}
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                "success", false,
+                "requiresVerification", true,
+                "email", cleanEmail,
+                "message", "Your email address is pending verification. A fresh 6-digit verification code has been dispatched to your email."
+            ));
         }
 
         if (user.getStatus() == User.AccountStatus.DISABLED) {

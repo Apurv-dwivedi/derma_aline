@@ -39,6 +39,76 @@ public class EmailService {
         return lastError;
     }
 
+    public boolean sendOtpEmail(String to, String fullName, String codeStr, int expiryMinutes) {
+        lastError = null;
+        String recipientName = (fullName != null && !fullName.trim().isEmpty()) ? fullName.trim() : "Valued Client";
+        String subject = "Your 6-Digit Verification Code | Derma Aline Aesthétics";
+        
+        String textBody = "Dear " + recipientName + ",\n\n"
+                + "Welcome to Derma Aline Aesthétics Skin Clinic.\n\n"
+                + "Your 6-digit verification code is: " + codeStr + "\n\n"
+                + "This verification code will expire in " + expiryMinutes + " minutes. "
+                + "For your privacy and security, never share this code with anyone.\n\n"
+                + "Warm regards,\n"
+                + "Derma Aline Aesthétics Skin Clinic";
+
+        String htmlBody = "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 36px 28px; background-color: #FAFAF8; border-radius: 12px; border: 1px solid #E8E5E0;\">"
+                + "<div style=\"text-align: center; padding-bottom: 24px; border-bottom: 1px solid #E8E5E0;\">"
+                + "<h2 style=\"margin: 0; font-size: 20px; font-weight: 700; letter-spacing: 0.08em; color: #806657; text-transform: uppercase;\">DERMA ALINE AESTH\u00c9TICS</h2>"
+                + "<p style=\"margin: 4px 0 0 0; font-size: 11px; letter-spacing: 0.15em; color: #8F857D; text-transform: uppercase;\">Skin Clinic & Aesthetic Centre</p>"
+                + "</div>"
+                + "<div style=\"padding: 28px 0; color: #3E3834; font-size: 15px; line-height: 1.7;\">"
+                + "<p style=\"margin-top: 0;\">Dear <strong>" + recipientName + "</strong>,</p>"
+                + "<p>Thank you for choosing Derma Aline Aesth\u00e9tics Skin Clinic. To verify your email address and activate your personal client portal suite, please use the 6-digit security code below:</p>"
+                + "<div style=\"text-align: center; margin: 28px 0;\">"
+                + "<span style=\"display: inline-block; font-size: 34px; font-weight: 700; letter-spacing: 10px; color: #806657; background: #FAF7F2; padding: 14px 28px; border-radius: 8px; border: 2px solid #806657;\">"
+                + codeStr
+                + "</span>"
+                + "<p style=\"margin: 10px 0 0 0; font-size: 13px; color: #8F857D;\">Code expires in " + expiryMinutes + " minutes</p>"
+                + "</div>"
+                + "<p style=\"font-size: 13px; color: #736B63; background: #F3EFEA; padding: 12px 16px; border-radius: 6px;\">Security Note: Our clinical team will never ask for your verification code. Never share this code with anyone.</p>"
+                + "</div>"
+                + "<div style=\"margin-top: 24px; padding-top: 20px; border-top: 1px solid #E8E5E0; text-align: center; font-size: 12px; color: #A09891;\">"
+                + "<p style=\"margin: 0; font-weight: 600;\">Derma Aline Aesth\u00e9tics Skin Clinic</p>"
+                + "<p style=\"margin: 4px 0 0 0;\">First Floor, F-121, near Roshan di Kulfi, Main Market, Rajouri Garden, New Delhi &bull; +91 93195 44704</p>"
+                + "<p style=\"margin: 4px 0 0 0;\"><a href=\"https://derma-aline.vercel.app\" style=\"color: #806657; text-decoration: underline;\">Visit Official Clinic Portal</a></p>"
+                + "</div>"
+                + "</div>";
+
+        // 1. Try Brevo HTTP API (Port 443 - Primary Brevo Delivery)
+        if (brevoApiKey != null && !brevoApiKey.trim().isEmpty()) {
+            if (sendViaBrevoHttpApi(to, subject, textBody, htmlBody)) {
+                return true;
+            }
+        }
+
+        // 2. Try Resend HTTP API as secondary fallback
+        if (resendApiKey != null && !resendApiKey.trim().isEmpty()) {
+            if (sendViaResendHttpApi(to, subject, textBody, htmlBody)) {
+                return true;
+            }
+        }
+
+        // 3. Try standard SMTP as fallback
+        if (mailSender != null) {
+            try {
+                SimpleMailMessage message = new SimpleMailMessage();
+                message.setTo(to);
+                message.setSubject(subject);
+                message.setText(textBody);
+                message.setFrom(fromEmail);
+                mailSender.send(message);
+                logger.info("OTP dispatched via SMTP fallback to {}", to);
+                return true;
+            } catch (Exception e) {
+                lastError = e.getMessage();
+                logger.warn("SMTP fallback failed: {}", e.getMessage());
+            }
+        }
+
+        return false;
+    }
+
     public boolean sendEmail(String to, String subject, String body) {
         lastError = null;
 

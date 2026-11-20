@@ -83,13 +83,19 @@ const ClientAuth = () => {
 
       navigate('/client/dashboard');
     } catch (err) {
+      if (err.response?.data?.requiresVerification) {
+        setError(err.response.data.message || 'Please verify your email with the 6-digit code sent to your inbox.');
+        setMode('verify');
+        setCooldown(60);
+        return;
+      }
       setError(err.response?.data?.message || 'Invalid email or password.');
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. Client Self-Registration (Direct Instant Activation)
+  // 2. Client Self-Registration with 6-Digit Email Verification
   const handleRegister = async (e) => {
     e.preventDefault();
     setError('');
@@ -118,8 +124,12 @@ const ClientAuth = () => {
         password
       });
 
-      const { token, role, fullName: userFullName, profilePicture } = res.data;
-      if (token) {
+      if (res.data?.requiresVerification || !res.data?.token) {
+        setSuccessMessage(res.data?.message || `A 6-digit verification code has been dispatched to ${email.trim()}. Please enter it below.`);
+        setMode('verify');
+        setCooldown(60);
+      } else if (res.data?.token) {
+        const { token, role, fullName: userFullName, profilePicture } = res.data;
         localStorage.setItem('token', token);
         localStorage.setItem('role', role || 'CUSTOMER');
         localStorage.setItem('fullName', userFullName || 'Client');
@@ -611,6 +621,11 @@ const ClientAuth = () => {
                 >
                   {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend Code'}
                 </button>
+              </div>
+              <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                <span style={{ fontSize: '0.75rem', color: '#8c7b70', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                  <ShieldCheck size={14} color="#806657" /> Secure 6-digit email verification via Brevo HTTPS delivery
+                </span>
               </div>
             </div>
 
