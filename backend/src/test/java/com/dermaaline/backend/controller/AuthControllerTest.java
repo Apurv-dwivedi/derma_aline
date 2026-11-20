@@ -111,10 +111,9 @@ public class AuthControllerTest {
         when(passwordEncoder.matches("Password123", "encodedPassword")).thenReturn(true);
 
         Map<String, String> credentials = Map.of(
-            "email", "admin@dermaaline.com", 
-            "password", "Password123",
-            "portal", "public"
-        );
+                "email", "admin@dermaaline.com",
+                "password", "Password123",
+                "portal", "public");
 
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -135,10 +134,9 @@ public class AuthControllerTest {
         when(passwordEncoder.matches("Password123", "encodedPassword")).thenReturn(true);
 
         Map<String, String> credentials = Map.of(
-            "email", "staff@dermaaline.com", 
-            "password", "Password123",
-            "portal", "public"
-        );
+                "email", "staff@dermaaline.com",
+                "password", "Password123",
+                "portal", "public");
 
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -163,10 +161,9 @@ public class AuthControllerTest {
         when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("mock-patient-jwt");
 
         Map<String, String> credentials = Map.of(
-            "email", "patient@example.com", 
-            "password", "Password123",
-            "portal", "client"
-        );
+                "email", "patient@example.com",
+                "password", "Password123",
+                "portal", "client");
 
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -192,9 +189,8 @@ public class AuthControllerTest {
         when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("mock-staff-jwt");
 
         Map<String, String> credentials = Map.of(
-            "email", "staff@dermaaline.com", 
-            "password", "Staff@2026"
-        );
+                "email", "staff@dermaaline.com",
+                "password", "Staff@2026");
 
         mockMvc.perform(post("/api/auth/internal-login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -220,9 +216,8 @@ public class AuthControllerTest {
         when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("mock-admin-jwt");
 
         Map<String, String> credentials = Map.of(
-            "email", "admin@dermaaline.com", 
-            "password", "Admin@2026"
-        );
+                "email", "admin@dermaaline.com",
+                "password", "Admin@2026");
 
         mockMvc.perform(post("/api/auth/internal-login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -245,9 +240,8 @@ public class AuthControllerTest {
         when(passwordEncoder.matches("Password123", "encodedPassword")).thenReturn(true);
 
         Map<String, String> credentials = Map.of(
-            "email", "patient@example.com", 
-            "password", "Password123"
-        );
+                "email", "patient@example.com",
+                "password", "Password123");
 
         mockMvc.perform(post("/api/auth/internal-login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -273,7 +267,8 @@ public class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(payload)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsStringIgnoringCase("password reset")));
+                .andExpect(jsonPath("$.message")
+                        .value(org.hamcrest.Matchers.containsStringIgnoringCase("password reset")));
 
         verify(userRepository, times(1)).save(any(User.class));
         verify(emailService, times(1)).sendPasswordResetEmail(eq("user@example.com"), eq("User Test"), anyString());
@@ -290,9 +285,8 @@ public class AuthControllerTest {
         when(passwordEncoder.encode("NewSecret123")).thenReturn("encodedNewSecret");
 
         Map<String, String> payload = Map.of(
-            "token", "valid-token-123",
-            "newPassword", "NewSecret123"
-        );
+                "token", "valid-token-123",
+                "newPassword", "NewSecret123");
 
         mockMvc.perform(post("/api/auth/reset-password")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -311,11 +305,10 @@ public class AuthControllerTest {
     @Test
     void testSyncSupabaseUserNewCustomer() throws Exception {
         Map<String, String> payload = Map.of(
-            "email", "googleclient@example.com",
-            "fullName", "Google Client",
-            "phone", "+919988776655",
-            "provider", "google"
-        );
+                "email", "googleclient@example.com",
+                "fullName", "Google Client",
+                "phone", "+919988776655",
+                "provider", "google");
 
         User savedUser = new User();
         savedUser.setId(101L);
@@ -341,16 +334,16 @@ public class AuthControllerTest {
 
         verify(userRepository, times(1)).save(any(User.class));
         verify(customerRepository, times(1)).save(any(Customer.class));
-        verify(auditLogService, times(1)).record(eq("SUPABASE_AUTH_SYNC"), eq("googleclient@example.com"), anyString(), anyString(), anyString(), anyString());
+        verify(auditLogService, times(1)).record(eq("SUPABASE_AUTH_SYNC"), eq("googleclient@example.com"), anyString(),
+                anyString(), anyString(), anyString());
     }
 
     @Test
     void testSyncSupabaseUserExistingPendingCustomerActivates() throws Exception {
         Map<String, String> payload = Map.of(
-            "email", "pendingclient@example.com",
-            "fullName", "Pending Client",
-            "provider", "supabase_email_otp"
-        );
+                "email", "pendingclient@example.com",
+                "fullName", "Pending Client",
+                "provider", "supabase_email_otp");
 
         User existingUser = new User();
         existingUser.setId(102L);
@@ -372,16 +365,16 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.token").value("activated-customer-jwt"))
                 .andExpect(jsonPath("$.role").value("CUSTOMER"));
 
-        assertEquals(User.AccountStatus.ACTIVE, existingUser.getStatus(), "Customer status should be updated to ACTIVE upon Supabase sync");
+        assertEquals(User.AccountStatus.ACTIVE, existingUser.getStatus(),
+                "Customer status should be updated to ACTIVE upon Supabase sync");
         verify(userRepository, times(1)).save(existingUser);
     }
 
     @Test
     void testSyncSupabaseUserPreservesAdminStaffRole() throws Exception {
         Map<String, String> payload = Map.of(
-            "email", "admin@dermaaline.com",
-            "provider", "google"
-        );
+                "email", "admin@dermaaline.com",
+                "provider", "google");
 
         User adminUser = new User();
         adminUser.setId(1L);
@@ -405,9 +398,8 @@ public class AuthControllerTest {
     @Test
     void testSyncSupabaseUserRejectsDisabledAccount() throws Exception {
         Map<String, String> payload = Map.of(
-            "email", "deactivated@example.com",
-            "provider", "google"
-        );
+                "email", "deactivated@example.com",
+                "provider", "google");
 
         User deactivatedUser = new User();
         deactivatedUser.setEmail("deactivated@example.com");
@@ -434,9 +426,8 @@ public class AuthControllerTest {
         when(passwordEncoder.encode("NewSecret2026")).thenReturn("hashedNewSecret2026");
 
         Map<String, String> payload = Map.of(
-            "email", "user@example.com",
-            "newPassword", "NewSecret2026"
-        );
+                "email", "user@example.com",
+                "newPassword", "NewSecret2026");
 
         mockMvc.perform(post("/api/auth/sync-password")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -452,9 +443,8 @@ public class AuthControllerTest {
     @Test
     void testSyncPasswordRejectsShortPassword() throws Exception {
         Map<String, String> payload = Map.of(
-            "email", "user@example.com",
-            "newPassword", "123"
-        );
+                "email", "user@example.com",
+                "newPassword", "123");
 
         mockMvc.perform(post("/api/auth/sync-password")
                 .contentType(MediaType.APPLICATION_JSON)

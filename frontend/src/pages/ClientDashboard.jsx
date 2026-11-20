@@ -4,7 +4,7 @@ import {
   User, Sparkles, Calendar, Clock, FileText, MessageSquare, Bell, 
   ShieldCheck, LogOut, CheckCircle2, AlertCircle, Edit2, KeyRound, 
   Lock, RefreshCw, ChevronRight, HeartPulse, Info, Camera, Trash2, Upload,
-  Search, Plus, ArrowRight
+  Search, Plus, ArrowRight, Menu, X
 } from 'lucide-react';
 import API from '../services/api';
 import { TREATMENTS_DATA, TREATMENT_CATEGORIES } from '../data/treatmentsData';
@@ -17,6 +17,7 @@ const ClientDashboard = () => {
 
   // Active Tab: 'overview' | 'appointments' | 'catalogue' | 'treatments' | 'profile' | 'enquiries' | 'notifications' | 'security'
   const [activeTab, setActiveTab] = useState('overview');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Client Data States
   const [profile, setProfile] = useState(null);
@@ -324,6 +325,20 @@ const ClientDashboard = () => {
 
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
 
+  const clientTabs = [
+    { id: 'overview', label: 'Suite Overview', icon: Sparkles },
+    { id: 'appointments', label: 'My Appointments', count: appointments.length, icon: Calendar },
+    { id: 'catalogue', label: 'Explore Treatments', count: 55, icon: HeartPulse },
+    { id: 'treatments', label: 'Clinical Records', count: treatments.length, icon: FileText },
+    { id: 'profile', label: 'My Profile', icon: User },
+    { id: 'enquiries', label: 'My Enquiries', count: enquiries.length, icon: MessageSquare },
+    { id: 'notifications', label: 'Notifications', count: unreadNotifsCount, icon: Bell },
+    { id: 'security', label: 'Privacy & Security', icon: Lock }
+  ];
+
+  const currentActiveTabObj = clientTabs.find((t) => t.id === activeTab) || clientTabs[0];
+  const ActiveTabIcon = currentActiveTabObj.icon;
+
   if (loading && !profile) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 20px', color: '#8c7b70' }}>
@@ -334,141 +349,15 @@ const ClientDashboard = () => {
   }
 
   return (
-    <div style={{ maxWidth: '1180px', margin: '0 auto', padding: '10px 0 60px 0' }}>
-      {/* Top Banner */}
-      <div style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '16px',
-        padding: '30px 36px',
-        border: '1px solid #ebdcd0',
-        boxShadow: '0 4px 20px rgba(44, 34, 30, 0.03)',
-        marginBottom: '25px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '20px'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-          <div 
-            onClick={() => {
-              setActiveTab('profile');
-              fileInputRef.current?.click();
-            }}
-            title="Click to update profile photo"
-            style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              backgroundColor: '#f7f2ed',
-              color: '#806657',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              border: '2px solid #d4c3b3',
-              overflow: 'hidden',
-              cursor: 'pointer',
-              position: 'relative',
-              boxShadow: '0 2px 8px rgba(128, 102, 87, 0.15)',
-              flexShrink: 0
-            }}
-          >
-            {profile?.profilePicture ? (
-              <img 
-                src={profile.profilePicture} 
-                alt={profile.fullName || 'Client'} 
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-              />
-            ) : (
-              <User size={30} />
-            )}
-            <div style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              backgroundColor: 'rgba(44, 34, 30, 0.65)',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: '2px 0',
-              color: '#ffffff'
-            }}>
-              <Camera size={11} />
-            </div>
-          </div>
-          <div>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              color: '#806657',
-              fontSize: '0.75rem',
-              fontWeight: '700',
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-              marginBottom: '4px'
-            }}>
-              <ShieldCheck size={14} color="#16a34a" /> Verified Client Suite
-            </div>
-            <h1 style={{
-              fontSize: '1.75rem',
-              color: '#2c221e',
-              fontFamily: 'var(--font-heading)',
-              fontWeight: '600',
-              margin: '0 0 4px 0'
-            }}>
-              Welcome, {profile?.fullName || 'Valued Client'}
-            </h1>
-            <p style={{ margin: 0, color: '#8c7b70', fontSize: '0.88rem' }}>
-              {profile?.email} • Member since {profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '2026'}
-            </p>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button
-            onClick={() => fetchClientData(true)}
-            disabled={refreshing || loading}
-            title="Refresh care suite records"
-            style={{
-              backgroundColor: '#fbf9f6',
-              border: '1px solid #ebdcd0',
-              color: '#6e5d53',
-              padding: '10px 14px',
-              borderRadius: '8px',
-              cursor: (refreshing || loading) ? 'wait' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '0.85rem',
-              fontWeight: '600',
-              opacity: (refreshing || loading) ? 0.75 : 1
-            }}
-          >
-            <RefreshCw size={14} style={{ animation: (refreshing || loading) ? 'spin 0.8s linear infinite' : 'none' }} />
-            {refreshing ? 'Syncing...' : 'Refresh'}
-          </button>
-          <button
-            onClick={handleLogout}
-            style={{
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              color: '#991b1b',
-              padding: '10px 16px',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '0.85rem',
-              fontWeight: '600'
-            }}
-          >
-            <LogOut size={14} /> Sign Out
-          </button>
-        </div>
-      </div>
+    <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '10px 20px 60px 20px' }}>
+      {/* Hidden File Input for Avatar Photo Upload */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handlePhotoUpload} 
+        accept="image/*" 
+        style={{ display: 'none' }} 
+      />
 
       {/* Floating Refresh Confirmation Toast */}
       {refreshToast && (
@@ -513,54 +402,177 @@ const ClientDashboard = () => {
         </div>
       )}
 
-      {/* Navigation Tabs */}
-      <div style={{
-        display: 'flex',
-        gap: '10px',
-        overflowX: 'auto',
-        paddingBottom: '6px',
-        marginBottom: '25px',
-        borderBottom: '1px solid #ebdcd0'
-      }}>
-        {[
-          { id: 'overview', label: 'Suite Overview', icon: Sparkles },
-          { id: 'appointments', label: `My Appointments (${appointments.length})`, icon: Calendar },
-          { id: 'catalogue', label: 'Explore Treatments (55)', icon: HeartPulse },
-          { id: 'treatments', label: `Clinical Records (${treatments.length})`, icon: FileText },
-          { id: 'profile', label: 'My Profile', icon: User },
-          { id: 'enquiries', label: `My Enquiries (${enquiries.length})`, icon: MessageSquare },
-          { id: 'notifications', label: `Notifications ${unreadNotifsCount > 0 ? `(${unreadNotifsCount})` : ''}`, icon: Bell },
-          { id: 'security', label: 'Privacy & Security', icon: Lock }
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              onClick={() => { setActiveTab(tab.id); setError(''); setSuccessMessage(''); }}
-              style={{
-                backgroundColor: isActive ? '#806657' : '#ffffff',
-                color: isActive ? '#ffffff' : '#5c4d44',
-                border: '1px solid',
-                borderColor: isActive ? '#806657' : '#ebdcd0',
-                padding: '10px 18px',
-                borderRadius: '8px',
-                fontSize: '0.88rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.2s'
-              }}
+      {/* Client Suite Responsive Layout with Left Sidebar */}
+      <div className="client-suite-layout">
+        {/* Left Navigation Sidebar (Desktop Pinned Left / Mobile Slide-Over Drawer) */}
+        <aside className={`client-suite-sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+          {/* Mobile-Only Header with Close Button */}
+          <div className="client-sidebar-mobile-header">
+            <span className="client-sidebar-title">Client Suite Menu</span>
+            <button 
+              type="button" 
+              className="client-sidebar-close-btn"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Close navigation menu"
             >
-              <Icon size={16} />
-              {tab.label}
+              <X size={18} />
             </button>
-          );
-        })}
-      </div>
+          </div>
+
+          {/* User Profile Card & Quick Actions in Left Sidebar */}
+          <div className="client-sidebar-profile-card">
+            <div 
+              onClick={() => {
+                setActiveTab('profile');
+                fileInputRef.current?.click();
+              }}
+              title="Click to update profile photo"
+              className="client-sidebar-avatar-wrap"
+            >
+              {profile?.profilePicture ? (
+                <img 
+                  src={profile.profilePicture} 
+                  alt={profile.fullName || 'Client'} 
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                />
+              ) : (
+                <User size={34} />
+              )}
+              <div className="client-sidebar-avatar-badge">
+                <Camera size={11} />
+              </div>
+            </div>
+
+            <div className="client-sidebar-verified-badge">
+              <ShieldCheck size={13} color="#16a34a" /> Verified Client Suite
+            </div>
+
+            <h2 className="client-sidebar-user-name">
+              {profile?.fullName || 'Valued Client'}
+            </h2>
+
+            <div className="client-sidebar-user-meta">
+              {profile?.email}
+            </div>
+
+            <div className="client-sidebar-actions">
+              <button
+                type="button"
+                onClick={() => fetchClientData(true)}
+                disabled={refreshing || loading}
+                title="Refresh care suite records"
+                className="client-sidebar-action-btn client-sidebar-refresh-btn"
+              >
+                <RefreshCw size={13} style={{ animation: (refreshing || loading) ? 'spin 0.8s linear infinite' : 'none' }} />
+                <span>{refreshing ? 'Syncing...' : 'Refresh'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="client-sidebar-action-btn client-sidebar-logout-btn"
+              >
+                <LogOut size={13} />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Suite Navigation Items */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div className="client-sidebar-title">Suite Navigation</div>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {clientTabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setMobileMenuOpen(false);
+                      setError('');
+                      setSuccessMessage('');
+                    }}
+                    className={`client-nav-btn ${isActive ? 'active' : ''}`}
+                  >
+                    <span className="client-nav-btn-content">
+                      <Icon size={17} style={{ flexShrink: 0 }} />
+                      <span>{tab.label}</span>
+                    </span>
+                    {tab.count !== undefined && (
+                      <span className="client-nav-badge">
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </aside>
+
+        {/* Mobile Backdrop Overlay (Active only when mobile drawer is open) */}
+        {mobileMenuOpen && (
+          <div 
+            className="client-suite-backdrop"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Main Content Area */}
+        <main className="client-suite-content">
+          {/* Mobile-Only Bar with Hamburger: Strictly hidden on desktop, visible on phone */}
+          <div className="client-mobile-bar">
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="client-mobile-hamburger-btn"
+              aria-label="Toggle navigation menu"
+            >
+              <Menu size={18} />
+              <span>Menu</span>
+            </button>
+            <div className="client-mobile-active-tab">
+              <ActiveTabIcon size={15} />
+              <span>{currentActiveTabObj.label}</span>
+            </div>
+          </div>
+
+          {/* Desktop Content Header */}
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '14px',
+            padding: '16px 24px',
+            border: '1px solid #ebdcd0',
+            boxShadow: '0 2px 10px rgba(44, 34, 30, 0.02)',
+            marginBottom: '20px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                backgroundColor: '#f7f2ed',
+                color: '#806657',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <ActiveTabIcon size={18} />
+              </div>
+              <div>
+                <h1 style={{ fontSize: '1.3rem', color: '#2c221e', margin: 0, fontWeight: '600', fontFamily: 'var(--font-heading)' }}>
+                  {currentActiveTabObj.label}
+                </h1>
+                <span style={{ fontSize: '0.8rem', color: '#8c7b70' }}>Private Client Care Suite</span>
+              </div>
+            </div>
+          </div>
 
       {/* TAB 1: OVERVIEW */}
       {activeTab === 'overview' && (
@@ -1600,6 +1612,8 @@ const ClientDashboard = () => {
           </form>
         </div>
       )}
+        </main>
+      </div>
     </div>
   );
 };
