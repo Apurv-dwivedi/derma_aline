@@ -81,23 +81,23 @@ public class EmailService {
                 + "</div>"
                 + "</div>";
 
-        // 1. Primary: Google SMTP (smtp.gmail.com)
-        if (sendViaGoogleSmtp(to, subject, textBody, htmlBody)) {
-            return true;
-        }
-
-        // 2. Secondary fallback: Brevo HTTP API (if configured)
+        // 1. Primary: Brevo HTTPS API (Port 443 - Instant cloud delivery without SMTP port blocking)
         if (brevoApiKey != null && !brevoApiKey.trim().isEmpty()) {
             if (sendViaBrevoHttpApi(to, subject, textBody, htmlBody)) {
                 return true;
             }
         }
 
-        // 3. Tertiary fallback: Resend HTTP API (if configured)
+        // 2. Secondary: Resend HTTP API (Port 443)
         if (resendApiKey != null && !resendApiKey.trim().isEmpty()) {
             if (sendViaResendHttpApi(to, subject, textBody, htmlBody)) {
                 return true;
             }
+        }
+
+        // 3. Fallback: Google SMTP (smtp.gmail.com)
+        if (sendViaGoogleSmtp(to, subject, textBody, htmlBody)) {
+            return true;
         }
 
         return false;
@@ -120,23 +120,23 @@ public class EmailService {
                 + "</div>"
                 + "</div>";
 
-        // 1. Primary: Google SMTP (smtp.gmail.com)
-        if (sendViaGoogleSmtp(to, subject, body, htmlBody)) {
-            return true;
-        }
-
-        // 2. Secondary fallback: Brevo HTTP API
+        // 1. Primary: Brevo HTTPS API (Port 443 - Instant cloud delivery without SMTP port blocking)
         if (brevoApiKey != null && !brevoApiKey.trim().isEmpty()) {
             if (sendViaBrevoHttpApi(to, subject, body, htmlBody)) {
                 return true;
             }
         }
 
-        // 3. Tertiary fallback: Resend HTTP API
+        // 2. Secondary: Resend HTTP API (Port 443)
         if (resendApiKey != null && !resendApiKey.trim().isEmpty()) {
             if (sendViaResendHttpApi(to, subject, body, htmlBody)) {
                 return true;
             }
+        }
+
+        // 3. Fallback: Google SMTP (smtp.gmail.com)
+        if (sendViaGoogleSmtp(to, subject, body, htmlBody)) {
+            return true;
         }
 
         return false;
