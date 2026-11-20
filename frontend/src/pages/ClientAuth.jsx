@@ -624,7 +624,7 @@ const ClientAuth = () => {
               </div>
               <div style={{ textAlign: 'center', marginTop: '12px' }}>
                 <span style={{ fontSize: '0.75rem', color: '#8c7b70', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                  <ShieldCheck size={14} color="#806657" /> Secure 6-digit email verification via Brevo HTTPS delivery
+                  <ShieldCheck size={14} color="#806657" /> Secure 6-digit verification code sent directly to your Gmail inbox
                 </span>
               </div>
             </div>

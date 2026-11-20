@@ -1,11 +1,12 @@
 package com.dermaaline.backend.service;
 
+import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import java.io.OutputStream;
@@ -39,18 +40,23 @@ public class EmailService {
         return lastError;
     }
 
+    /**
+     * Dispatches 6-digit verification code with high-contrast luxury styling.
+     * Google Gmail SMTP is the primary dispatcher.
+     */
     public boolean sendOtpEmail(String to, String fullName, String codeStr, int expiryMinutes) {
         lastError = null;
         String recipientName = (fullName != null && !fullName.trim().isEmpty()) ? fullName.trim() : "Valued Client";
         String subject = "Your 6-Digit Verification Code | Derma Aline Aesthétics";
-        
+
         String textBody = "Dear " + recipientName + ",\n\n"
                 + "Welcome to Derma Aline Aesthétics Skin Clinic.\n\n"
                 + "Your 6-digit verification code is: " + codeStr + "\n\n"
                 + "This verification code will expire in " + expiryMinutes + " minutes. "
                 + "For your privacy and security, never share this code with anyone.\n\n"
                 + "Warm regards,\n"
-                + "Derma Aline Aesthétics Skin Clinic";
+                + "Derma Aline Aesthétics Skin Clinic\n"
+                + "+91 93195 44704";
 
         String htmlBody = "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 36px 28px; background-color: #FAFAF8; border-radius: 12px; border: 1px solid #E8E5E0;\">"
                 + "<div style=\"text-align: center; padding-bottom: 24px; border-bottom: 1px solid #E8E5E0;\">"
@@ -75,34 +81,22 @@ public class EmailService {
                 + "</div>"
                 + "</div>";
 
-        // 1. Try Brevo HTTP API (Port 443 - Primary Brevo Delivery)
+        // 1. Primary: Google SMTP (smtp.gmail.com)
+        if (sendViaGoogleSmtp(to, subject, textBody, htmlBody)) {
+            return true;
+        }
+
+        // 2. Secondary fallback: Brevo HTTP API (if configured)
         if (brevoApiKey != null && !brevoApiKey.trim().isEmpty()) {
             if (sendViaBrevoHttpApi(to, subject, textBody, htmlBody)) {
                 return true;
             }
         }
 
-        // 2. Try Resend HTTP API as secondary fallback
+        // 3. Tertiary fallback: Resend HTTP API (if configured)
         if (resendApiKey != null && !resendApiKey.trim().isEmpty()) {
             if (sendViaResendHttpApi(to, subject, textBody, htmlBody)) {
                 return true;
-            }
-        }
-
-        // 3. Try standard SMTP as fallback
-        if (mailSender != null) {
-            try {
-                SimpleMailMessage message = new SimpleMailMessage();
-                message.setTo(to);
-                message.setSubject(subject);
-                message.setText(textBody);
-                message.setFrom(fromEmail);
-                mailSender.send(message);
-                logger.info("OTP dispatched via SMTP fallback to {}", to);
-                return true;
-            } catch (Exception e) {
-                lastError = e.getMessage();
-                logger.warn("SMTP fallback failed: {}", e.getMessage());
             }
         }
 
@@ -112,7 +106,6 @@ public class EmailService {
     public boolean sendEmail(String to, String subject, String body) {
         lastError = null;
 
-        // Compose clinic-branded HTML template to maximize inbox delivery and avoid spam filters
         String htmlBody = "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 32px 24px; background-color: #FAFAF8; border-radius: 12px; border: 1px solid #E8E5E0;\">"
                 + "<div style=\"text-align: center; padding-bottom: 24px; border-bottom: 1px solid #E8E5E0;\">"
                 + "<h2 style=\"margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0.05em; color: #2C2623; text-transform: uppercase;\">Derma Aline Aesth\u00e9tics</h2>"
@@ -127,41 +120,49 @@ public class EmailService {
                 + "</div>"
                 + "</div>";
 
-        // 1. Try Brevo HTTP API (Port 443 - Never blocked by cloud hosting firewalls)
+        // 1. Primary: Google SMTP (smtp.gmail.com)
+        if (sendViaGoogleSmtp(to, subject, body, htmlBody)) {
+            return true;
+        }
+
+        // 2. Secondary fallback: Brevo HTTP API
         if (brevoApiKey != null && !brevoApiKey.trim().isEmpty()) {
             if (sendViaBrevoHttpApi(to, subject, body, htmlBody)) {
                 return true;
             }
         }
 
-        // 2. Try Resend HTTP API (Port 443 - Never blocked by cloud hosting firewalls)
+        // 3. Tertiary fallback: Resend HTTP API
         if (resendApiKey != null && !resendApiKey.trim().isEmpty()) {
             if (sendViaResendHttpApi(to, subject, body, htmlBody)) {
                 return true;
             }
         }
 
-        // 3. Try standard SMTP (Works on paid Render, VPS, or local development)
-        if (mailSender != null) {
-            try {
-                SimpleMailMessage message = new SimpleMailMessage();
-                message.setTo(to);
-                message.setSubject(subject);
-                message.setText(body);
-                message.setFrom(fromEmail);
-
-                mailSender.send(message);
-                logger.info("Email dispatched successfully via SMTP to {}", to);
-                return true;
-            } catch (Exception e) {
-                lastError = e.getMessage();
-                logger.warn("SMTP send failed (Render free tier blocks ports 25, 465, 587): {}", e.getMessage());
-            }
-        } else {
-            lastError = "JavaMailSender not initialized";
-        }
-
         return false;
+    }
+
+    private boolean sendViaGoogleSmtp(String to, String subject, String textBody, String htmlBody) {
+        if (mailSender == null) {
+            lastError = "Google SMTP JavaMailSender is not initialized";
+            return false;
+        }
+        try {
+            MimeMessage mimeMessage = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "UTF-8");
+            helper.setFrom(fromEmail, "Derma Aline Aesthétics");
+            helper.setTo(to);
+            helper.setSubject(subject);
+            helper.setText(textBody, htmlBody);
+
+            mailSender.send(mimeMessage);
+            logger.info("Email dispatched successfully via Google SMTP to {}", to);
+            return true;
+        } catch (Exception e) {
+            lastError = "Google SMTP error: " + e.getMessage();
+            logger.warn("Google SMTP dispatch notice: {}", e.getMessage());
+            return false;
+        }
     }
 
     private boolean sendViaResendHttpApi(String to, String subject, String textBody, String htmlBody) {
@@ -267,9 +268,9 @@ public class EmailService {
                 "To reset your password, please click the link below (or copy and paste it into your browser). This link is valid for 1 hour:\n\n" +
                 resetLink + "\n\n" +
                 "If you did not make this request, you can safely ignore this email and your password will remain unchanged.\n\n" +
-                "Warm regards,\n" +
-                "Derma Aline Aesthetics Team\n" +
-                "https://derma-aline.vercel.app";
+                "Warm regards,\n"
+                + "Derma Aline Aesthetics Team\n"
+                + "https://derma-aline.vercel.app";
 
         return sendEmail(to, subject, body);
     }
