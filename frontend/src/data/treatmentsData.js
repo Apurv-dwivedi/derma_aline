@@ -33,7 +33,7 @@ export const TREATMENTS_DATA = [
     subcategory: "PRP & GFC Therapies",
     pricingNote: "Per Session",
     description: "Synergistic autologous growth factor concentrate (GFC) combined with platelet-rich plasma therapy to support follicular rejuvenation and scalp vitality.",
-    image: "/clinic-interior.webp"
+    image: "/Hair_GFC_PRP_treatment.jpg"
   },
   {
     id: "hair-prp",
@@ -45,7 +45,7 @@ export const TREATMENTS_DATA = [
     subcategory: "PRP & GFC Therapies",
     pricingNote: "Per Session",
     description: "Concentrated platelet-rich plasma micro-infusion to nourish scalp microcirculation, revitalise miniaturised follicles, and support denser-looking hair.",
-    image: "/clinic-interior.webp"
+    image: "/Hair_PRP_treatment.jpg"
   },
   // Laser Hair Reduction: Facial & Neck
   {
@@ -59,7 +59,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Hair Reduction — Facial & Neck",
     pricingNote: "Per Session",
     description: "Clinical-grade diode laser hair reduction specifically calibrated for fine and coarse facial hair, ensuring smooth, hair-free facial contours.",
-    image: "/Laser hair.webp"
+    image: "/laser_hair_reduction_of_full_face.jpg"
   },
   {
     id: "lhr-upper-lips",
@@ -72,7 +72,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Hair Reduction — Facial & Neck",
     pricingNote: "Per Session",
     description: "Precision laser targeting designed for the delicate perioral upper lip area to reduce persistent hair growth comfortably.",
-    image: "/Laser hair.webp"
+    image: "/laser_hair_reduction_of_upper_lips.jpg"
   },
   {
     id: "lhr-chin",
@@ -85,7 +85,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Hair Reduction — Facial & Neck",
     pricingNote: "Per Session",
     description: "Focused diode laser pulses calibrated for coarse chin hair follicles often associated with hormonal sensitivity.",
-    image: "/Laser hair.webp"
+    image: "/laser_hair_reduction_of_chin.jpg"
   },
   {
     id: "lhr-sidelocks",
@@ -98,7 +98,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Hair Reduction — Facial & Neck",
     pricingNote: "Per Session",
     description: "Clean aesthetic hairline refinement along the temporal sidelocks for symmetrical facial framing.",
-    image: "/Laser hair.webp"
+    image: "/laser_hair_reduction_of_sidelocks.jpg"
   },
   {
     id: "lhr-forehead",
@@ -111,7 +111,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Hair Reduction — Facial & Neck",
     pricingNote: "Per Session",
     description: "Controlled hairline definition and hair reduction across the upper forehead zone for a neat, polished appearance.",
-    image: "/Laser hair.webp"
+    image: "/laser_hair_reduction_of_forhead.jpg"
   },
   {
     id: "lhr-neck",
@@ -124,7 +124,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Hair Reduction — Facial & Neck",
     pricingNote: "Per Session",
     description: "Comprehensive front and side neck hair reduction to prevent razor irritation, folliculitis, and unwanted stubble.",
-    image: "/Laser hair.webp"
+    image: "/laser_hair_reduction_of_neck.jpg"
   },
   {
     id: "lhr-backnape",
@@ -137,7 +137,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Hair Reduction — Facial & Neck",
     pricingNote: "Per Session",
     description: "Precision posterior neckline shaping and permanent hair reduction for a consistently sharp, groomed appearance.",
-    image: "/Laser hair.webp"
+    image: "/laser_hair_reduction_of_backneck.jpg"
   },
   // Laser Hair Reduction: Body & Targeted Areas
   {
@@ -151,7 +151,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Hair Reduction — Body & Targeted Areas",
     pricingNote: "Per Session",
     description: "Full abdominal coverage targeting central linea alba and wider stomach hair for silky, even skin texture.",
-    image: "/Laser hair.webp"
+    image: "/laser_hair_reduction_of_stomach.jpg"
   },
   {
     id: "lhr-shine-area",
@@ -164,7 +164,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Hair Reduction — Body & Targeted Areas",
     pricingNote: "Per Session",
     description: "Targeted clinical laser reduction for prominent aesthetic body areas, ensuring comprehensive hair clearance.",
-    image: "/Laser hair.webp"
+    image: "/laser_hair_reduction_of_shine_area.jpg"
   },
   {
     id: "lhr-full-legs",
@@ -177,7 +177,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Hair Reduction — Body & Targeted Areas",
     pricingNote: "Per Session",
     description: "Complete lower and upper legs diode laser treatment providing lasting smoothness without recurring waxing or razor burn.",
-    image: "/Laser hair.webp"
+    image: "/laser_hair_reduction_of_full_legs.jpg"
   },
   {
     id: "lhr-bikini-area",
@@ -190,7 +190,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Hair Reduction — Body & Targeted Areas",
     pricingNote: "Per Session",
     description: "Conducted in strict clinical privacy with integrated contact cooling to ensure optimal comfort and hygiene in sensitive zones.",
-    image: "/Laser hair.webp"
+    image: "/laser_hair_reduction_of_full_body_showcase.jpg"
   },
   {
     id: "lhr-full-body",
@@ -203,7 +203,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Hair Reduction — Body & Targeted Areas",
     pricingNote: "Per Session",
     description: "Our premier head-to-toe permanent hair reduction protocol covering arms, legs, back, chest, abdomen, underarms, and face.",
-    image: "/Laser hair.webp"
+    image: "/laser_hair_reduction_of_full_body_showcase.jpg"
   },
   {
     id: "lhr-under-arms",
@@ -216,7 +216,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Hair Reduction — Body & Targeted Areas",
     pricingNote: "Per Session",
     description: "Rapid, hygienic axillary hair removal that eliminates recurring ingrown hairs and darkening from regular shaving.",
-    image: "/Laser hair.webp"
+    image: "/laser_hair_reduction_of_under_arms.jpg"
   },
   {
     id: "lhr-chest",
@@ -229,7 +229,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Hair Reduction — Body & Targeted Areas",
     pricingNote: "Per Session",
     description: "Comprehensive pectoral area coverage with customizable hair thinning or complete clearance based on personal aesthetic goals.",
-    image: "/Laser hair.webp"
+    image: "/laser_hair_reduction_of_chest.jpg"
   },
 
   // ==========================================
@@ -246,7 +246,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Targeted & Medical Peels",
     pricingNote: "Per Session",
     description: "Deep dermatological resurfacing peel indicated for severe photodamage, deep dynamic rhytids, and advanced structural skin renewal.",
-    image: "/chemical peel .webp"
+    image: "/Phenol_Peel_treatment.jpg"
   },
   {
     id: "peel-cosmelan",
@@ -258,7 +258,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Targeted & Medical Peels",
     pricingNote: "Per Session",
     description: "Gold-standard professional depigmentation treatment formulated to inhibit tyrosinase activity and clear stubborn hormonal melasma.",
-    image: "/chemical peel .webp"
+    image: "/Cosmelan_Peel_treatment.jpg"
   },
   {
     id: "peel-azelan",
@@ -270,7 +270,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Targeted & Medical Peels",
     pricingNote: "Per Session",
     description: "Potent azelaic and salicylic acid synergy designed for acne-prone skin, controlling excess sebum, active blemishes, and post-inflammatory erythema.",
-    image: "/chemical peel .webp"
+    image: "/Azelan_Peel_treatment.jpg"
   },
   {
     id: "peel-yellow",
@@ -282,7 +282,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Targeted & Medical Peels",
     pricingNote: "Per Session",
     description: "Retinol and phytic acid medical formulation that stimulates cellular renewal, fades sunspots, and restores natural radiance.",
-    image: "/chemical peel .webp"
+    image: "/Yellow_Peel_treatment.jpg"
   },
   {
     id: "peel-glycolic",
@@ -294,7 +294,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Targeted & Medical Peels",
     pricingNote: "Per Session",
     description: "Alpha-hydroxy acid (AHA) peel that gently breaks down cellular bonds to improve micro-relief, fine lines, and dull skin tone.",
-    image: "/chemical peel .webp"
+    image: "/Glycolic_Peel_treatment.jpg"
   },
   {
     id: "peel-salicylic",
@@ -306,7 +306,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Targeted & Medical Peels",
     pricingNote: "Per Session",
     description: "Lipophilic beta-hydroxy acid (BHA) peel that penetrates deep into sebaceous pores to clear comedones, blackheads, and congestive breakouts.",
-    image: "/chemical peel .webp"
+    image: "/Salicylic_Peel_treatment.jpg"
   },
   // Brightening & Body Peels
   {
@@ -319,7 +319,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Brightening & Body Peels",
     pricingNote: "Per Session",
     description: "Instant skin-brightening peel featuring a tailored cocktail of mild exfoliating acids and antioxidants for an immediate red-carpet luminosity.",
-    image: "/chemical peel .webp"
+    image: "/Glow_Peel_treatment.jpg"
   },
   {
     id: "peel-whitening",
@@ -331,7 +331,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Brightening & Body Peels",
     pricingNote: "Per Session",
     description: "Targeted botanical and brightening acid peel designed to even out irregular skin tone, sun tan, and post-blemish pigmentation.",
-    image: "/chemical peel .webp"
+    image: "/Whitening_Peel_treatment.jpg"
   },
   {
     id: "peel-body",
@@ -343,7 +343,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Brightening & Body Peels",
     pricingNote: "Per Session",
     description: "Large-surface dermatological peel targeting extensive areas such as back acne scars, arms, legs, and overall body hyperpigmentation.",
-    image: "/chemical peel .webp"
+    image: "/Body_Peel_treatment.jpg"
   },
 
   // ==========================================
@@ -360,7 +360,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Neuromodulators & Dermal Fillers",
     pricingNote: "Per Unit",
     description: "Premium botulinum toxin type A injected with micro-precision to soften dynamic frown lines, crow's feet, and horizontal forehead creases.",
-    image: "/injectables.webp"
+    image: "/Face_Botox_Per_Unit_treatment.jpg"
   },
   {
     id: "fillers",
@@ -372,7 +372,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Neuromodulators & Dermal Fillers",
     pricingNote: "Per Syringe",
     description: "US-FDA approved cross-linked hyaluronic acid dermal fillers to sculpt cheekbones, define jawline contours, and augment lip volume naturally.",
-    image: "/injectables.webp"
+    image: "/Fillers_treatment.jpg"
   },
   {
     id: "skin-boosters",
@@ -384,7 +384,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Neuromodulators & Dermal Fillers",
     pricingNote: "Per Session",
     description: "Stabilized micro-injections of non-crosslinked hyaluronic acid and essential micronutrients to deeply hydrate dermal layers from within.",
-    image: "/skin booster.webp"
+    image: "/Skin_Boosters_treatment.jpg"
   },
   // Lifting & IV Wellness
   {
@@ -397,7 +397,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Lifting & IV Wellness",
     pricingNote: "Clinical Treatment",
     description: "Minimally invasive PDO/PLLA thread placement providing an immediate mechanical lift while stimulating long-term neocollagenesis.",
-    image: "/injectables.webp"
+    image: "/Face_Thread_Lift_treatment.jpg"
   },
   {
     id: "hifu",
@@ -409,7 +409,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Lifting & IV Wellness",
     pricingNote: "Per Session",
     description: "High-Intensity Focused Ultrasound delivering thermal energy to the deep SMAS layer for non-surgical skin tightening and jawline contouring.",
-    image: "/injectables.webp"
+    image: "/HIFU_treatment.jpg"
   },
   {
     id: "glutathione-iv-drip",
@@ -421,7 +421,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Lifting & IV Wellness",
     pricingNote: "Per Infusion",
     description: "Medical-grade intravenous infusion of pharmaceutical glutathione enriched with Vitamin C for cellular detoxification and systemic oxidative support.",
-    image: "/skin booster.webp"
+    image: "/Glutathione_IV_Drip_treatment_to_showcase_in_website.jpg"
   },
 
   // ==========================================
@@ -438,7 +438,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Microneedling",
     pricingNote: "Per Session",
     description: "Automated medical-grade collagen induction therapy creating controlled micro-channels to refine pores, improve texture, and minimize scars.",
-    image: "/clinic-interior.webp"
+    image: "/Microneedling_treatment.jpg"
   },
   {
     id: "microneedling-prp",
@@ -450,7 +450,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Microneedling",
     pricingNote: "Per Session",
     description: "Advanced vampire facial combining precision microneedling with autologous platelet-rich plasma to accelerate tissue repair and collagen remodeling.",
-    image: "/clinic-interior.webp"
+    image: "/Microneedling_PRP_treatment.jpg"
   },
   // MNRF
   {
@@ -463,7 +463,7 @@ export const TREATMENTS_DATA = [
     subcategory: "MNRF (Radiofrequency Microneedling)",
     pricingNote: "Per Session",
     description: "Fractional radiofrequency energy delivered via insulated micro-needles paired with autologous PRP for potent dermal remodeling and acne scar smoothing.",
-    image: "/clinic-interior.webp"
+    image: "/MNRF_PRP.jpg"
   },
   {
     id: "mnrf-exosome",
@@ -475,7 +475,7 @@ export const TREATMENTS_DATA = [
     subcategory: "MNRF (Radiofrequency Microneedling)",
     pricingNote: "Per Session",
     description: "Next-generation regenerative aesthetic protocol combining radiofrequency microneedling with purified bio-signaling exosome topical delivery.",
-    image: "/clinic-interior.webp"
+    image: "/MNRF(Exosome).jpg"
   },
   {
     id: "mnrf-gfc",
@@ -487,7 +487,7 @@ export const TREATMENTS_DATA = [
     subcategory: "MNRF (Radiofrequency Microneedling)",
     pricingNote: "Per Session",
     description: "High-concentration growth factor concentrate infused post-radiofrequency microneedling for maximal tissue rejuvenation and skin firming.",
-    image: "/clinic-interior.webp"
+    image: "/MNRF_GFC.jpg"
   },
 
   // ==========================================
@@ -504,7 +504,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Procedures",
     pricingNote: "Per Session",
     description: "Ablative fractional carbon dioxide laser therapy delivering micro-thermal treatment zones for deep scar revision, severe texture correction, and skin resurfacing.",
-    image: "/Laser hair.webp"
+    image: "/CO_Laser_treatment_of_salon.jpg"
   },
   {
     id: "lip-laser",
@@ -516,7 +516,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Laser Procedures",
     pricingNote: "Per Session",
     description: "Specialized low-fluence Q-switched laser pulses targeting melanin buildup and smoker's pigmentation to restore natural pink lip tone.",
-    image: "/Laser hair.webp"
+    image: "/Lip_Laser.jpg"
   },
   // Spot, Lesion & Tattoo Removal
   {
@@ -529,7 +529,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Spot, Lesion & Tattoo Removal",
     pricingNote: "According to Size",
     description: "Hygienic, precise electro-cautery or radiofrequency excision to eliminate viral warts with minimal risk of recurrence or scarring.",
-    image: "/clinic-interior.webp"
+    image: "/Wart_Removal_According_to_Size.jpg"
   },
   {
     id: "mole-removal",
@@ -541,7 +541,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Spot, Lesion & Tattoo Removal",
     pricingNote: "Per Lesion",
     description: "Dermatological radiofrequency ablation or laser excision of benign melanocytic nevi ensuring clean healing and minimal cosmetic mark.",
-    image: "/clinic-interior.webp"
+    image: "/Mole_Removal.jpg"
   },
   {
     id: "tattoo-removal",
@@ -553,7 +553,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Spot, Lesion & Tattoo Removal",
     pricingNote: "Starting From",
     description: "Advanced Q-switched Nd:YAG laser shattering exogenous ink pigment into micro-particles for natural lymphatic elimination.",
-    image: "/Laser hair.webp"
+    image: "/Tattoo_Removal.jpg"
   },
   {
     id: "scar-removal",
@@ -565,7 +565,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Spot, Lesion & Tattoo Removal",
     pricingNote: "Per Inch",
     description: "Combination surgical and fractional laser protocol designed to remodel hypertrophic, surgical, or post-traumatic scar tissue.",
-    image: "/Laser hair.webp"
+    image: "/Scar_Removal_Per_Inch.jpg"
   },
 
   // ==========================================
@@ -582,7 +582,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Pigmentation & Acne Care",
     pricingNote: "Clinical Treatment",
     description: "Targeted photo-acoustic pigment laser energy that selectively fragments ephelides without damaging surrounding normal epidermal tissue.",
-    image: "/glass Skin.webp"
+    image: "/Freckles_Removal_Treatment.jpg"
   },
   {
     id: "acne-removal",
@@ -594,7 +594,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Pigmentation & Acne Care",
     pricingNote: "Comprehensive Protocol",
     description: "Multi-modal clinical protocol addressing active acne vulgaris through comedone extraction, medical peels, and blue-light anti-microbial therapy.",
-    image: "/chemical peel .webp"
+    image: "/Acne_Removal_Treatment.jpg"
   },
   {
     id: "melasma-pigmentation",
@@ -606,7 +606,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Pigmentation & Acne Care",
     pricingNote: "Comprehensive Protocol",
     description: "Doctor-curated dermatological regimen targeting dermal and epidermal melasma patches using advanced depigmenting solutions and laser toning.",
-    image: "/glass Skin.webp"
+    image: "/Melasma_Pigmentation_Treatment.jpg"
   },
   // Glass Skin & Whitening Treatments
   {
@@ -619,7 +619,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Glass Skin & Whitening Treatments",
     pricingNote: "Signature Ritual",
     description: "Our signature multi-step Korean aesthetic ritual delivering profound deep hydration, pore tightening, and a crystal-clear, luminous complexion.",
-    image: "/glass Skin.webp"
+    image: "/Korean_Glass_Treatment_salon.jpg"
   },
   {
     id: "skin-whitening-treatment",
@@ -631,7 +631,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Glass Skin & Whitening Treatments",
     pricingNote: "Clinical Session",
     description: "Specialized clinical formulation that suppresses melanogenesis, brightens chronic tanning, and restores healthy, even skin radiance.",
-    image: "/glass Skin.webp"
+    image: "/Skin_Whitening_Treatment.jpg"
   },
   {
     id: "japanese-collagen-treatment",
@@ -643,7 +643,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Glass Skin & Whitening Treatments",
     pricingNote: "Luxury Treatment",
     description: "Bio-engineered marine collagen infusion combined with peptide serums to reinforce the skin's structural matrix and restore supple bounce.",
-    image: "/skin booster.webp"
+    image: "/Japanese_Collagen_Treatment.jpg"
   },
   {
     id: "full-body-whitening",
@@ -655,7 +655,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Glass Skin & Whitening Treatments",
     pricingNote: "Comprehensive Program",
     description: "Complete full-body brightening and tone-balancing program incorporating systemic infusions, total-body exfoliation, and advanced light therapies.",
-    image: "/glass Skin.webp"
+    image: "/Full_Body_Whitening.jpg"
   },
 
   // ==========================================
@@ -672,7 +672,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Semi-Permanent Makeup (3 Sittings)",
     pricingNote: "3 Sittings Included",
     description: "Cosmetic micro-pigmentation that deposits sheer, customized mineral tint into the lips, enhancing natural shape, symmetry, and color.",
-    image: "/clinic-interior.webp"
+    image: "/Lip_Blushing_3_Sittings_treatment.jpg"
   },
   {
     id: "bb-glow-3-sittings",
@@ -684,7 +684,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Semi-Permanent Makeup (3 Sittings)",
     pricingNote: "3 Sittings Included",
     description: "Micro-encapsulated organic tint and peptide serum infused using nano-needling to impart a semi-permanent foundation-like radiant finish.",
-    image: "/glass Skin.webp"
+    image: "/BB_Glow_3_Sittings_treatment.jpg"
   },
   {
     id: "cheek-blushing-3-sittings",
@@ -696,7 +696,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Semi-Permanent Makeup (3 Sittings)",
     pricingNote: "3 Sittings Included",
     description: "Subtle, natural-looking flush micro-pigmented onto the malar cheek area to accentuate facial high points without daily blush application.",
-    image: "/clinic-interior.webp"
+    image: "/Cheek_Blushing_3_Sittings_treatment.jpg"
   },
   {
     id: "microblading-3-sittings",
@@ -708,7 +708,7 @@ export const TREATMENTS_DATA = [
     subcategory: "Semi-Permanent Makeup (3 Sittings)",
     pricingNote: "3 Sittings Included",
     description: "Artistic manual feather-stroke technique creating realistic hair-like lines to reshape, define, and fill sparse eyebrows naturally.",
-    image: "/clinic-interior.webp"
+    image: "/Microblading_3_Sittings_treatment.jpg"
   },
   // HydraFacial
   {
@@ -721,7 +721,7 @@ export const TREATMENTS_DATA = [
     subcategory: "HydraFacial",
     pricingNote: "Essential Session",
     description: "Patented vortex-fusion technology combining deep cleansing, gentle chemical exfoliation, painless suction extractions, and antioxidant hydration.",
-    image: "/glass Skin.webp"
+    image: "/HydraFacial_Basic_treatment.jpg"
   },
   {
     id: "hydrafacial-advanced",
@@ -733,7 +733,7 @@ export const TREATMENTS_DATA = [
     subcategory: "HydraFacial",
     pricingNote: "Advanced Clinical Session",
     description: "Elevated HydraFacial experience including lymphatic drainage, customized booster serums (peptides/brighteners), and therapeutic LED phototherapy.",
-    image: "/glass Skin.webp"
+    image: "/HydraFacial_Advanced_treatment.jpg"
   }
 ];
 

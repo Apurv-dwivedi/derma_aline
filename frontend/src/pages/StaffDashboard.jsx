@@ -658,7 +658,7 @@ const StaffDashboard = () => {
                       backgroundColor: '#ffffff',
                       border: '1px solid #ebdcd0',
                       borderRadius: '12px',
-                      padding: '20px',
+                      padding: '18px',
                       display: 'flex',
                       flexDirection: 'column',
                       justifyContent: 'space-between',
@@ -666,6 +666,16 @@ const StaffDashboard = () => {
                     }}
                   >
                     <div>
+                      {item.image && (
+                        <div style={{ width: '100%', height: '130px', borderRadius: '8px', overflow: 'hidden', marginBottom: '12px', backgroundColor: '#faf7f2' }}>
+                          <img 
+                            src={item.image} 
+                            alt={item.name} 
+                            loading="lazy" 
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                          />
+                        </div>
+                      )}
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
                         <span style={{ fontSize: '0.72rem', fontWeight: '700', color: '#806657', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                           {item.subcategory || item.categoryName}
