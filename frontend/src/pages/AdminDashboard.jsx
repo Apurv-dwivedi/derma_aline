@@ -1,19 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Calendar, CheckCircle, Clock, Edit2, Trash2, X, Save, LogOut, 
   RefreshCw, MessageSquare, Mail, Phone, Search, Users, UserPlus, 
   Shield, Briefcase, Award, KeyRound, Lock, Eye, EyeOff, 
-  CheckCircle2, AlertCircle, Sparkles, HeartPulse, Settings, FileText
+  CheckCircle2, AlertCircle, Sparkles, HeartPulse, Settings, FileText,
+  Menu, Camera, Upload, User
 } from 'lucide-react';
 import API from '../services/api';
 import '../styles/pages.css';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const treatmentPhotoInputRef = useRef(null);
 
   // Active Tab: 'clients' | 'treatments' | 'staff' | 'messages' | 'reports' | 'audit' | 'settings' | 'security' | 'appointments'
   const [activeTab, setActiveTab] = useState('clients');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Core Data States
   const [appointments, setAppointments] = useState([]);
@@ -21,10 +24,11 @@ const AdminDashboard = () => {
   const [messages, setMessages] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
   const [treatmentsList, setTreatmentsList] = useState([]);
+  const [staffMembers, setStaffMembers] = useState([]);
 
   // Treatment Catalogue Management State
   const [showTreatmentModal, setShowTreatmentModal] = useState(false);
-  const [treatmentForm, setTreatmentForm] = useState({ name: '', category: 'Facial Aesthetics', description: '', price: '', durationMinutes: 60, active: true });
+  const [treatmentForm, setTreatmentForm] = useState({ name: '', category: 'Facial Aesthetics', description: '', price: '', durationMinutes: 60, active: true, imageUrl: '' });
   const [treatmentSaving, setTreatmentSaving] = useState(false);
   const [treatmentToast, setTreatmentToast] = useState('');
   const [reports, setReports] = useState({
@@ -100,7 +104,7 @@ const AdminDashboard = () => {
       }
       setError('');
 
-      const [apptRes, msgRes, reportRes, staffRes, clientsRes, settingsRes, auditRes, treatRes] = await Promise.allSettled([
+      const [apptRes, msgRes, reportRes, staffRes, clientsRes, settingsRes, auditRes, treatRes, staffMembersRes] = await Promise.allSettled([
         API.get('/appointments'),
         API.get('/contact'),
         API.get('/admin/reports/overview'),
@@ -108,7 +112,8 @@ const AdminDashboard = () => {
         API.get('/admin/clients'),
         API.get('/admin/settings'),
         API.get('/admin/audit-logs'),
-        API.get('/treatments')
+        API.get('/treatments'),
+        API.get('/admin/staff/members')
       ]);
 
       if (apptRes.status === 'fulfilled') {
@@ -122,6 +127,9 @@ const AdminDashboard = () => {
       }
       if (staffRes.status === 'fulfilled') {
         setStaffInvitations(staffRes.value.data || []);
+      }
+      if (staffMembersRes.status === 'fulfilled' && Array.isArray(staffMembersRes.value.data)) {
+        setStaffMembers(staffMembersRes.value.data);
       }
       if (clientsRes.status === 'fulfilled') {
         setClients(clientsRes.value.data || []);
@@ -251,10 +259,10 @@ const AdminDashboard = () => {
         setTreatmentToast('Treatment updated successfully.');
       } else {
         await API.post('/treatments', treatmentForm);
-        setTreatmentToast('Treatment created successfully.');
+        setTreatmentToast('Treatment created successfully and added to treatment catalogue.');
       }
       setShowTreatmentModal(false);
-      setTreatmentForm({ name: '', category: 'Facial Aesthetics', description: '', price: '', durationMinutes: 60, active: true });
+      setTreatmentForm({ name: '', category: 'Facial Aesthetics', description: '', price: '', durationMinutes: 60, active: true, imageUrl: '' });
       const res = await API.get('/treatments');
       setTreatmentsList(res.data || []);
       setTimeout(() => setTreatmentToast(''), 3000);
@@ -265,12 +273,88 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleTreatmentPhotoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload a valid image file (JPEG, PNG, WebP).');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image file size must be under 5MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setTreatmentForm((prev) => ({ ...prev, imageUrl: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleDeleteTreatment = async (id, name) => {
+    if (window.confirm(`Are you sure you want to permanently delete the treatment "${name}" from the clinic catalogue?`)) {
+      try {
+        await API.delete(`/treatments/${id}`);
+        setTreatmentToast(`Treatment "${name}" deleted successfully.`);
+        setTreatmentsList(prev => prev.filter(t => t.id !== id));
+        setTimeout(() => setTreatmentToast(''), 3000);
+      } catch (err) {
+        alert(err.response?.data?.message || 'Failed to delete treatment.');
+      }
+    }
+  };
+
   const handleToggleTreatmentActive = async (tr) => {
     try {
       await API.put(`/treatments/${tr.id}`, { ...tr, active: !tr.active });
       setTreatmentsList(prev => prev.map(item => item.id === tr.id ? { ...item, active: !item.active } : item));
     } catch (err) {
       alert('Failed to update treatment status.');
+    }
+  };
+
+  // Staff Management: Permanent Delete When Staff Leaves Salon
+  const handleDeleteStaffMember = async (id, name) => {
+    if (window.confirm(`Are you sure you want to permanently remove "${name || 'this staff member'}" from the salon? Their account and operational access will be completely deleted.`)) {
+      try {
+        await API.delete(`/admin/staff/members/${id}`);
+        setStaffSuccess(`Staff member "${name || ''}" removed from the salon successfully.`);
+        fetchData();
+        setTimeout(() => setStaffSuccess(''), 4000);
+      } catch (err) {
+        setStaffError(err.response?.data?.message || 'Failed to remove staff member.');
+        setTimeout(() => setStaffError(''), 4000);
+      }
+    }
+  };
+
+  // Staff Management: Delete / Revoke Invitation
+  const handleDeleteInvitation = async (id, email) => {
+    if (window.confirm(`Are you sure you want to revoke and delete the invitation for ${email}?`)) {
+      try {
+        await API.delete(`/admin/staff/invitations/${id}`);
+        setStaffSuccess(`Staff invitation for ${email} has been removed.`);
+        fetchData();
+        setTimeout(() => setStaffSuccess(''), 4000);
+      } catch (err) {
+        setStaffError(err.response?.data?.message || 'Failed to delete invitation.');
+        setTimeout(() => setStaffError(''), 4000);
+      }
+    }
+  };
+
+  // Audit Logs: Purge All
+  const handleClearAllAuditLogs = async () => {
+    if (window.confirm("Are you sure you want to permanently delete ALL audit logs from the portal? This action cannot be undone.")) {
+      try {
+        await API.delete('/admin/audit-logs');
+        setAuditLogs([]);
+        setRefreshToast('All audit logs have been purged from the portal.');
+        setTimeout(() => setRefreshToast(''), 3000);
+      } catch (err) {
+        alert(err.response?.data?.message || 'Failed to clear audit logs.');
+      }
     }
   };
 
@@ -310,14 +394,7 @@ const AdminDashboard = () => {
 
   // Staff Management: Revoke
   const handleRevokeStaff = async (id) => {
-    if (window.confirm("Are you sure you want to revoke this staff member's clearance?")) {
-      try {
-        await API.delete('/admin/staff/invitations/' + id);
-        fetchData();
-      } catch (err) {
-        alert("Failed to revoke staff access");
-      }
-    }
+    handleDeleteInvitation(id, 'this staff invitee');
   };
 
   // Client Details Modal
@@ -466,69 +543,23 @@ const AdminDashboard = () => {
     );
   });
 
+  const adminTabs = [
+    { id: 'clients', label: 'Client CRM', count: clients.length, icon: Users },
+    { id: 'treatments', label: 'Treatment Catalogue', count: treatmentsList.length, icon: Sparkles },
+    { id: 'staff', label: 'Staff Management', count: staffMembers.length + staffInvitations.length, icon: Briefcase },
+    { id: 'messages', label: 'Inquiries', count: activeMessages.length, icon: MessageSquare },
+    { id: 'reports', label: 'Operational Reports', icon: FileText },
+    { id: 'audit', label: 'Audit Trail', count: auditLogs.length, icon: Shield },
+    { id: 'settings', label: 'Clinic Settings', icon: Settings },
+    { id: 'security', label: 'Admin Password', icon: KeyRound },
+    { id: 'appointments', label: 'Archived Visits', count: appointments.length, icon: Calendar }
+  ];
+
+  const currentActiveTabObj = adminTabs.find((t) => t.id === activeTab) || adminTabs[0];
+  const ActiveTabIcon = currentActiveTabObj.icon;
+
   return (
-    <div style={{ maxWidth: '1240px', margin: '0 auto', padding: '10px 0 60px 0' }}>
-      
-      {/* Top Header Card */}
-      <div style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        gap: '20px',
-        backgroundColor: 'var(--bg-white)',
-        padding: '28px 32px',
-        borderRadius: 'var(--radius-lg)',
-        border: '1px solid var(--border-light)',
-        boxShadow: 'var(--shadow-soft)',
-        marginBottom: '25px'
-      }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-            <span style={{ 
-              backgroundColor: '#fef3c7', color: '#92400e', padding: '4px 10px', 
-              borderRadius: '20px', fontSize: '0.75rem', fontWeight: '800', letterSpacing: '0.08em', textTransform: 'uppercase'
-            }}>
-              SUPER_ADMIN
-            </span>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-light)' }}>Clinic Management Platform</span>
-          </div>
-          <h1 style={{ fontSize: '1.8rem', color: 'var(--color-primary)', margin: 0, fontFamily: 'var(--font-heading)', fontWeight: '600' }}>
-            Derma Aline Executive Suite
-          </h1>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button 
-            className="btn-secondary" 
-            onClick={() => fetchData(true)} 
-            disabled={refreshing || loading}
-            title="Refresh All Clinic Data"
-            style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              padding: '10px 14px', 
-              fontSize: '0.85rem', 
-              fontWeight: '600',
-              cursor: (refreshing || loading) ? 'wait' : 'pointer',
-              opacity: (refreshing || loading) ? 0.75 : 1
-            }}
-          >
-            <RefreshCw size={15} style={{ animation: (refreshing || loading) ? 'spin 0.8s linear infinite' : 'none' }} /> 
-            {refreshing ? 'Syncing...' : 'Refresh'}
-          </button>
-          
-          <button 
-            className="btn-primary" 
-            onClick={handleLogout} 
-            style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontSize: '0.85rem', fontWeight: '600', backgroundColor: '#dc3545', borderColor: '#dc3545' }}
-          >
-            <LogOut size={15} /> Sign Out
-          </button>
-        </div>
-      </div>
-
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '16px 20px 60px 20px' }}>
       {/* Floating Refresh Confirmation Toast */}
       {refreshToast && (
         <div style={{
@@ -551,167 +582,216 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {error && (
-        <div style={{ padding: '15px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '8px', marginBottom: '25px' }}>
-          {error}
-        </div>
-      )}
-
-      {/* Top Operational Summary Cards (Zero Financial/Revenue Metrics) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-        
-        {/* Total Registered Clients */}
-        <div style={{ backgroundColor: 'var(--bg-white)', padding: '22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registered Clients</span>
-            <Users size={22} color="var(--color-accent)" />
+      {/* Admin Suite Responsive Layout with Left Sidebar */}
+      <div className="admin-suite-layout">
+        {/* Left Navigation Sidebar (Desktop Pinned Left / Mobile Slide-Over Drawer) */}
+        <aside className={`admin-suite-sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+          {/* Mobile-Only Header with Close Button */}
+          <div className="client-sidebar-mobile-header">
+            <span className="client-sidebar-title">Admin Navigation</span>
+            <button 
+              type="button" 
+              className="client-sidebar-close-btn"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Close navigation menu"
+            >
+              <X size={18} />
+            </button>
           </div>
-          <p style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--color-primary)', margin: '6px 0 2px' }}>
-            {reports.totalCustomers || clients.length}
-          </p>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>Client profiles in clinic CRM</span>
-        </div>
 
-        {/* Clinical Treatments Recorded */}
-        <div style={{ backgroundColor: 'var(--bg-white)', padding: '22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Treatments Recorded</span>
-            <HeartPulse size={22} color="#155724" />
+          {/* Admin Identity Card in Sidebar */}
+          <div className="client-sidebar-profile-card">
+            <div className="client-sidebar-avatar-wrap" style={{ cursor: 'default' }}>
+              <Shield size={34} />
+            </div>
+
+            <div className="client-sidebar-verified-badge" style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '3px 8px', borderRadius: '12px' }}>
+              <Shield size={12} color="#b45309" /> SUPER_ADMIN SUITE
+            </div>
+
+            <h2 className="client-sidebar-user-name">
+              Clinic Administrator
+            </h2>
+
+            <div className="client-sidebar-user-meta">
+              dermaalineaesthetics@gmail.com
+            </div>
+
+            <div className="client-sidebar-actions">
+              <button
+                type="button"
+                onClick={() => fetchData(true)}
+                disabled={refreshing || loading}
+                title="Refresh clinic database"
+                className="client-sidebar-action-btn client-sidebar-refresh-btn"
+              >
+                <RefreshCw size={13} style={{ animation: (refreshing || loading) ? 'spin 0.8s linear infinite' : 'none' }} />
+                <span>{refreshing ? 'Syncing...' : 'Refresh'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="client-sidebar-action-btn client-sidebar-logout-btn"
+              >
+                <LogOut size={13} />
+                <span>Sign Out</span>
+              </button>
+            </div>
           </div>
-          <p style={{ fontSize: '2rem', fontWeight: '800', color: '#155724', margin: '6px 0 2px' }}>
-            {reports.totalTreatmentsRecorded || 0}
-          </p>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>Clinical sessions completed</span>
-        </div>
 
-        {/* Active Client Enquiries */}
-        <div style={{ backgroundColor: 'var(--bg-white)', padding: '22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Enquiries</span>
-            <MessageSquare size={22} color="#b45309" />
+          {/* Executive Navigation Tabs */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div className="client-sidebar-title">Executive Navigation</div>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {adminTabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setMobileMenuOpen(false);
+                      setError('');
+                    }}
+                    className={`client-nav-btn ${isActive ? 'active' : ''}`}
+                  >
+                    <span className="client-nav-btn-content">
+                      <Icon size={17} style={{ flexShrink: 0 }} />
+                      <span>{tab.label}</span>
+                    </span>
+                    {tab.count !== undefined && (
+                      <span className="client-nav-badge">
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
-          <p style={{ fontSize: '2rem', fontWeight: '800', color: '#b45309', margin: '6px 0 2px' }}>
-            {activeMessages.length}
-          </p>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>
-            {reports.unreadEnquiries || 0} unread • {messages.length} total received
-          </span>
-        </div>
+        </aside>
 
-        {/* Staff Team */}
-        <div style={{ backgroundColor: 'var(--bg-white)', padding: '22px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Clinic Staff Team</span>
-            <Briefcase size={22} color="var(--color-primary)" />
+        {/* Mobile Backdrop Overlay */}
+        {mobileMenuOpen && (
+          <div 
+            className="admin-suite-backdrop"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Main Content Area */}
+        <main className="admin-suite-content">
+          {/* Mobile-Only Bar with Hamburger: Strictly hidden on desktop, visible on phone */}
+          <div className="admin-mobile-bar">
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="client-mobile-hamburger-btn"
+              aria-label="Toggle navigation menu"
+            >
+              <Menu size={18} />
+              <span>Menu</span>
+            </button>
+            <div className="client-mobile-active-tab">
+              <ActiveTabIcon size={15} />
+              <span>{currentActiveTabObj.label}</span>
+            </div>
           </div>
-          <p style={{ fontSize: '2rem', fontWeight: '800', color: 'var(--color-primary)', margin: '6px 0 2px' }}>
-            {staffInvitations.length}
-          </p>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>Authorized operational staff</span>
-        </div>
-      </div>
 
-      {/* Navigation Tabs */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '25px', flexWrap: 'wrap' }}>
-        <button 
-          onClick={() => setActiveTab('clients')} 
-          style={{ 
-            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
-            backgroundColor: activeTab === 'clients' ? 'var(--color-accent)' : 'var(--bg-white)', 
-            color: activeTab === 'clients' ? '#fff' : 'var(--color-primary)', 
-            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
+          {/* Desktop Content Header */}
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '14px',
+            padding: '16px 24px',
+            border: '1px solid #ebdcd0',
+            boxShadow: '0 2px 10px rgba(44, 34, 30, 0.02)',
+            marginBottom: '20px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center'
           }}>
-          <Users size={16} /> Client CRM ({clients.length})
-        </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                backgroundColor: '#f7f2ed',
+                color: '#806657',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <ActiveTabIcon size={18} />
+              </div>
+              <div>
+                <h1 style={{ fontSize: '1.3rem', color: '#2c221e', margin: 0, fontWeight: '600', fontFamily: 'var(--font-heading)' }}>
+                  {currentActiveTabObj.label}
+                </h1>
+                <span style={{ fontSize: '0.8rem', color: '#8c7b70' }}>Derma Aline Executive Suite</span>
+              </div>
+            </div>
+          </div>
 
-        <button 
-          onClick={() => setActiveTab('treatments')} 
-          style={{ 
-            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
-            backgroundColor: activeTab === 'treatments' ? 'var(--color-accent)' : 'var(--bg-white)', 
-            color: activeTab === 'treatments' ? '#fff' : 'var(--color-primary)', 
-            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
-          }}>
-          <Sparkles size={16} /> Treatment Catalogue ({treatmentsList.length})
-        </button>
+          {/* Global Content Alerts */}
+          {error && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '14px 18px', backgroundColor: '#fef2f2', border: '1px solid #fecaca',
+              color: '#991b1b', borderRadius: '10px', marginBottom: '20px', fontSize: '0.9rem'
+            }}>
+              <AlertCircle size={18} /> <span>{error}</span>
+            </div>
+          )}
 
-        <button 
-          onClick={() => setActiveTab('staff')} 
-          style={{ 
-            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
-            backgroundColor: activeTab === 'staff' ? 'var(--color-accent)' : 'var(--bg-white)', 
-            color: activeTab === 'staff' ? '#fff' : 'var(--color-primary)', 
-            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
-          }}>
-          <Briefcase size={16} /> Staff Management ({staffInvitations.length})
-        </button>
+          {/* Top Operational Summary Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+            <div style={{ backgroundColor: 'var(--bg-white)', padding: '18px 20px', borderRadius: '12px', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Registered Clients</span>
+                <Users size={18} color="var(--color-accent)" />
+              </div>
+              <p style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--color-primary)', margin: '4px 0 2px' }}>
+                {reports.totalCustomers || clients.length}
+              </p>
+              <span style={{ fontSize: '0.76rem', color: 'var(--text-light)' }}>Client CRM profiles</span>
+            </div>
 
-        <button 
-          onClick={() => setActiveTab('messages')} 
-          style={{ 
-            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
-            backgroundColor: activeTab === 'messages' ? 'var(--color-accent)' : 'var(--bg-white)', 
-            color: activeTab === 'messages' ? '#fff' : 'var(--color-primary)', 
-            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
-          }}>
-          <MessageSquare size={16} /> Inquiries ({activeMessages.length})
-        </button>
+            <div style={{ backgroundColor: 'var(--bg-white)', padding: '18px 20px', borderRadius: '12px', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Treatments Catalogue</span>
+                <Sparkles size={18} color="#b45309" />
+              </div>
+              <p style={{ fontSize: '1.75rem', fontWeight: '800', color: '#b45309', margin: '4px 0 2px' }}>
+                {treatmentsList.length}
+              </p>
+              <span style={{ fontSize: '0.76rem', color: 'var(--text-light)' }}>Available procedures</span>
+            </div>
 
-        <button 
-          onClick={() => setActiveTab('reports')} 
-          style={{ 
-            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
-            backgroundColor: activeTab === 'reports' ? 'var(--color-accent)' : 'var(--bg-white)', 
-            color: activeTab === 'reports' ? '#fff' : 'var(--color-primary)', 
-            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
-          }}>
-          <FileText size={16} /> Operational Reports
-        </button>
+            <div style={{ backgroundColor: 'var(--bg-white)', padding: '18px 20px', borderRadius: '12px', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active Inquiries</span>
+                <MessageSquare size={18} color="#155724" />
+              </div>
+              <p style={{ fontSize: '1.75rem', fontWeight: '800', color: '#155724', margin: '4px 0 2px' }}>
+                {activeMessages.length}
+              </p>
+              <span style={{ fontSize: '0.76rem', color: 'var(--text-light)' }}>{reports.unreadEnquiries || 0} unread enquiries</span>
+            </div>
 
-        <button 
-          onClick={() => setActiveTab('audit')} 
-          style={{ 
-            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
-            backgroundColor: activeTab === 'audit' ? 'var(--color-accent)' : 'var(--bg-white)', 
-            color: activeTab === 'audit' ? '#fff' : 'var(--color-primary)', 
-            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
-          }}>
-          <Shield size={16} /> Audit Trail ({auditLogs.length})
-        </button>
-
-        <button 
-          onClick={() => setActiveTab('settings')} 
-          style={{ 
-            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
-            backgroundColor: activeTab === 'settings' ? 'var(--color-accent)' : 'var(--bg-white)', 
-            color: activeTab === 'settings' ? '#fff' : 'var(--color-primary)', 
-            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
-          }}>
-          <Settings size={16} /> Clinic Settings
-        </button>
-
-        <button 
-          onClick={() => setActiveTab('security')} 
-          style={{ 
-            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
-            backgroundColor: activeTab === 'security' ? 'var(--color-accent)' : 'var(--bg-white)', 
-            color: activeTab === 'security' ? '#fff' : 'var(--color-primary)', 
-            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
-          }}>
-          <KeyRound size={16} /> Admin Password
-        </button>
-
-        <button 
-          onClick={() => setActiveTab('appointments')} 
-          style={{ 
-            padding: '11px 18px', fontWeight: '700', borderRadius: '8px', cursor: 'pointer', border: 'none', 
-            backgroundColor: activeTab === 'appointments' ? 'var(--color-accent)' : 'var(--bg-white)', 
-            color: activeTab === 'appointments' ? '#fff' : 'var(--color-primary)', 
-            boxShadow: 'var(--shadow-soft)', display: 'flex', alignItems: 'center', gap: '8px'
-          }}>
-          <Calendar size={16} /> Archived Visits ({appointments.length})
-        </button>
-      </div>
+            <div style={{ backgroundColor: 'var(--bg-white)', padding: '18px 20px', borderRadius: '12px', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Staff Team</span>
+                <Briefcase size={18} color="var(--color-primary)" />
+              </div>
+              <p style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--color-primary)', margin: '4px 0 2px' }}>
+                {staffMembers.length || staffInvitations.length}
+              </p>
+              <span style={{ fontSize: '0.76rem', color: 'var(--text-light)' }}>Authorized team members</span>
+            </div>
+          </div>
 
       {/* TAB 1: APPOINTMENTS */}
       {activeTab === 'appointments' && (
@@ -1021,17 +1101,91 @@ const AdminDashboard = () => {
             </form>
           </div>
 
-          {/* Active Staff List Table */}
+          {/* Active Salon Staff Team Members */}
           <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
-            <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', marginBottom: '15px', fontFamily: 'var(--font-heading)' }}>
-              Clinic Staff Team & Invitations
-            </h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <div>
+                <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', margin: '0 0 4px', fontFamily: 'var(--font-heading)' }}>
+                  Active Salon Staff Members ({staffMembers.length})
+                </h3>
+                <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', margin: 0 }}>
+                  Active operational team members with staff workspace access. Delete any staff who have left the salon.
+                </p>
+              </div>
+            </div>
             
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--border-light)', color: 'var(--text-light)', fontSize: '0.9rem' }}>
                     <th style={{ padding: '12px' }}>Staff Worker</th>
+                    <th style={{ padding: '12px' }}>Email</th>
+                    <th style={{ padding: '12px' }}>Phone</th>
+                    <th style={{ padding: '12px' }}>Status</th>
+                    <th style={{ padding: '12px', textAlign: 'center' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {staffMembers.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-light)' }}>
+                        No active staff accounts enrolled yet. Use the invitation form above to invite team members.
+                      </td>
+                    </tr>
+                  ) : (
+                    staffMembers.map((staff) => (
+                      <tr key={staff.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                        <td style={{ padding: '14px 12px', fontWeight: '600', color: 'var(--color-primary)' }}>
+                          {staff.fullName || 'Clinic Staff'}
+                        </td>
+                        <td style={{ padding: '14px 12px', color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                          {staff.email}
+                        </td>
+                        <td style={{ padding: '14px 12px', color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                          {staff.phone || '—'}
+                        </td>
+                        <td style={{ padding: '14px 12px' }}>
+                          <span style={{ 
+                            padding: '4px 10px', borderRadius: '15px', fontSize: '0.75rem', fontWeight: '700', 
+                            backgroundColor: staff.status === 'ACTIVE' ? '#d4edda' : '#f8d7da', 
+                            color: staff.status === 'ACTIVE' ? '#155724' : '#721c24'
+                          }}>
+                            {staff.status || 'ACTIVE'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px 12px', textAlign: 'center' }}>
+                          <button 
+                            type="button"
+                            onClick={() => handleDeleteStaffMember(staff.id, staff.fullName)}
+                            title="Permanently remove staff member from salon"
+                            style={{ 
+                              backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', 
+                              padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600',
+                              display: 'inline-flex', alignItems: 'center', gap: '5px'
+                            }}
+                          >
+                            <Trash2 size={13} /> Delete Staff
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Pending Staff Invitations */}
+          <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
+            <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', marginBottom: '15px', fontFamily: 'var(--font-heading)' }}>
+              Pending Staff Invitations & Clearances ({staffInvitations.length})
+            </h3>
+            
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid var(--border-light)', color: 'var(--text-light)', fontSize: '0.9rem' }}>
+                    <th style={{ padding: '12px' }}>Invited Worker</th>
                     <th style={{ padding: '12px' }}>Email</th>
                     <th style={{ padding: '12px' }}>Designation</th>
                     <th style={{ padding: '12px' }}>Status</th>
@@ -1040,7 +1194,7 @@ const AdminDashboard = () => {
                 </thead>
                 <tbody>
                   {staffInvitations.length === 0 ? (
-                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-light)' }}>No staff members enrolled yet.</td></tr>
+                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-light)' }}>No pending staff invitations.</td></tr>
                   ) : (
                     staffInvitations.map((staff) => (
                       <tr key={staff.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
@@ -1067,10 +1221,14 @@ const AdminDashboard = () => {
                               </button>
                             )}
                             <button 
-                              onClick={() => handleRevokeStaff(staff.id)}
-                              style={{ backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem' }}
+                              onClick={() => handleDeleteInvitation(staff.id, staff.email)}
+                              style={{ 
+                                backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', 
+                                borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem',
+                                display: 'inline-flex', alignItems: 'center', gap: '4px'
+                              }}
                             >
-                              Revoke
+                              <Trash2 size={13} /> Revoke / Delete
                             </button>
                           </div>
                         </td>
@@ -1410,12 +1568,12 @@ const AdminDashboard = () => {
                 Clinical Treatment Catalogue
               </h2>
               <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', margin: 0 }}>
-                Manage treatment offerings. Treatment prices are catalogue information only and never generate invoices or payments.
+                Manage treatment offerings. Treatment prices are catalogue information only and automatically sync with the website.
               </p>
             </div>
             <button 
               onClick={() => {
-                setTreatmentForm({ name: '', category: 'Facial Aesthetics', description: '', price: '', durationMinutes: 60, active: true });
+                setTreatmentForm({ name: '', category: 'Facial Aesthetics', description: '', price: '', durationMinutes: 60, active: true, imageUrl: '' });
                 setShowTreatmentModal(true);
               }}
               className="btn-primary"
@@ -1440,6 +1598,7 @@ const AdminDashboard = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--border-light)', color: 'var(--text-light)', fontSize: '0.85rem' }}>
+                    <th style={{ padding: '12px 14px' }}>Photo</th>
                     <th style={{ padding: '12px 14px' }}>Treatment Name</th>
                     <th style={{ padding: '12px 14px' }}>Category</th>
                     <th style={{ padding: '12px 14px' }}>Catalogue Price</th>
@@ -1451,6 +1610,13 @@ const AdminDashboard = () => {
                 <tbody>
                   {treatmentsList.map((tr) => (
                     <tr key={tr.id} style={{ borderBottom: '1px solid var(--border-light)', fontSize: '0.9rem' }}>
+                      <td style={{ padding: '12px 14px' }}>
+                        <img 
+                          src={tr.imageUrl || '/clinic-interior.webp'} 
+                          alt={tr.name} 
+                          style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #ebdcd0', display: 'block' }} 
+                        />
+                      </td>
                       <td style={{ padding: '14px', fontWeight: '600', color: 'var(--color-primary)' }}>
                         {tr.name}
                       </td>
@@ -1473,27 +1639,46 @@ const AdminDashboard = () => {
                         </span>
                       </td>
                       <td style={{ padding: '14px', textAlign: 'right' }}>
-                        <button
-                          onClick={() => handleToggleTreatmentActive(tr)}
-                          style={{
-                            backgroundColor: '#faf8f5', border: '1px solid #ebdcd0', color: '#806657',
-                            padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600', marginRight: '8px'
-                          }}
-                        >
-                          {tr.active ? 'Deactivate' : 'Activate'}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setTreatmentForm(tr);
-                            setShowTreatmentModal(true);
-                          }}
-                          style={{
-                            backgroundColor: '#f7f2ed', border: '1px solid #d4c3b3', color: '#2c221e',
-                            padding: '6px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600'
-                          }}
-                        >
-                          Edit
-                        </button>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleTreatmentActive(tr)}
+                            style={{
+                              backgroundColor: '#faf8f5', border: '1px solid #ebdcd0', color: '#806657',
+                              padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600'
+                            }}
+                          >
+                            {tr.active ? 'Deactivate' : 'Activate'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTreatmentForm({
+                                ...tr,
+                                imageUrl: tr.imageUrl || ''
+                              });
+                              setShowTreatmentModal(true);
+                            }}
+                            style={{
+                              backgroundColor: '#f7f2ed', border: '1px solid #d4c3b3', color: '#2c221e',
+                              padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600'
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTreatment(tr.id, tr.name)}
+                            title="Delete treatment from catalogue"
+                            style={{
+                              backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b',
+                              padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600',
+                              display: 'inline-flex', alignItems: 'center', gap: '3px'
+                            }}
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1507,13 +1692,29 @@ const AdminDashboard = () => {
       {/* TAB: AUDIT LOGS */}
       {activeTab === 'audit' && (
         <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
-          <div style={{ marginBottom: '20px' }}>
-            <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', margin: '0 0 4px', fontFamily: 'var(--font-heading)' }}>
-              Operational & Security Audit Trail
-            </h2>
-            <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', margin: 0 }}>
-              Immutable record of administrative actions, staff invitations, account status alterations, and security operations.
-            </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
+            <div>
+              <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', margin: '0 0 4px', fontFamily: 'var(--font-heading)' }}>
+                Operational & Security Audit Trail
+              </h2>
+              <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', margin: 0 }}>
+                Immutable record of administrative actions, staff invitations, account status alterations, and security operations.
+              </p>
+            </div>
+            {auditLogs.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearAllAuditLogs}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b',
+                  padding: '9px 16px', borderRadius: '8px', cursor: 'pointer',
+                  fontSize: '0.85rem', fontWeight: '600'
+                }}
+              >
+                <Trash2 size={15} /> Clear All Audit Logs
+              </button>
+            )}
           </div>
 
           {auditLogs.length === 0 ? (
@@ -1564,6 +1765,8 @@ const AdminDashboard = () => {
           )}
         </div>
       )}
+        </main>
+      </div>
 
       {/* MODAL: ADD / EDIT TREATMENT */}
       {showTreatmentModal && (
@@ -1596,6 +1799,99 @@ const AdminDashboard = () => {
                 />
               </div>
 
+              {/* Treatment Photo Upload & Live Preview */}
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: '#4a3b32' }}>Treatment Photo</label>
+                <input 
+                  type="file" 
+                  ref={treatmentPhotoInputRef}
+                  onChange={handleTreatmentPhotoUpload}
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div 
+                    onClick={() => treatmentPhotoInputRef.current?.click()}
+                    style={{
+                      width: '80px',
+                      height: '80px',
+                      borderRadius: '10px',
+                      border: '2px dashed #d4c3b3',
+                      backgroundColor: '#faf8f5',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                      overflow: 'hidden',
+                      position: 'relative'
+                    }}
+                    title="Click to upload treatment photo"
+                  >
+                    {treatmentForm.imageUrl ? (
+                      <img 
+                        src={treatmentForm.imageUrl} 
+                        alt="Treatment Preview" 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      />
+                    ) : (
+                      <>
+                        <Camera size={22} color="#806657" />
+                        <span style={{ fontSize: '0.65rem', color: '#8c7b70', marginTop: '4px', fontWeight: '600' }}>Add Photo</span>
+                      </>
+                    )}
+                  </div>
+
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        onClick={() => treatmentPhotoInputRef.current?.click()}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          padding: '7px 12px',
+                          backgroundColor: '#f7f2ed',
+                          border: '1px solid #ebdcd0',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          fontWeight: '600',
+                          color: '#806657',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Upload size={13} /> {treatmentForm.imageUrl ? 'Change Photo' : 'Upload Image'}
+                      </button>
+
+                      {treatmentForm.imageUrl && (
+                        <button
+                          type="button"
+                          onClick={() => setTreatmentForm((prev) => ({ ...prev, imageUrl: '' }))}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            padding: '7px 10px',
+                            backgroundColor: '#fff',
+                            border: '1px solid #fecaca',
+                            color: '#dc2626',
+                            borderRadius: '6px',
+                            fontSize: '0.78rem',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Trash2 size={12} /> Remove
+                        </button>
+                      )}
+                    </div>
+                    <span style={{ display: 'block', fontSize: '0.75rem', color: '#8c7b70', marginTop: '6px' }}>
+                      JPEG, PNG, WebP up to 5MB. Displays directly on the public treatments page.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: '#4a3b32' }}>Category *</label>
                 <select
@@ -1603,6 +1899,13 @@ const AdminDashboard = () => {
                   onChange={(e) => setTreatmentForm({ ...treatmentForm, category: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', backgroundColor: '#fff' }}
                 >
+                  <option value="Hair & Scalp Treatments">Hair & Scalp Treatments</option>
+                  <option value="Chemical Peels">Chemical Peels</option>
+                  <option value="Injectables, Drips & Anti-Aging / Lifting">Injectables, Drips & Anti-Aging / Lifting</option>
+                  <option value="Microneedling & MNRF">Microneedling & MNRF</option>
+                  <option value="Laser & Lesion / Growth Removal">Laser & Lesion / Growth Removal</option>
+                  <option value="Pigmentation, Acne & Skin Brightening">Pigmentation, Acne & Skin Brightening</option>
+                  <option value="Semi-Permanent Makeup & HydraFacial">Semi-Permanent Makeup & HydraFacial</option>
                   <option value="Facial Aesthetics">Facial Aesthetics</option>
                   <option value="Laser Care">Laser Care</option>
                   <option value="Anti-Aging">Anti-Aging</option>

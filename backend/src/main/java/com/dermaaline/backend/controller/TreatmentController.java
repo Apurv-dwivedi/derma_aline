@@ -58,6 +58,9 @@ public class TreatmentController {
         t.setPrice(details.getPrice());
         t.setDurationMinutes(details.getDurationMinutes());
         t.setActive(details.isActive());
+        if (details.getImageUrl() != null) {
+            t.setImageUrl(details.getImageUrl());
+        }
         
         treatmentRepository.save(t);
         auditLogService.record("TREATMENT_UPDATED", "admin", "SUPER_ADMIN", "TREATMENT", id.toString(), "Updated treatment details for: " + t.getName());

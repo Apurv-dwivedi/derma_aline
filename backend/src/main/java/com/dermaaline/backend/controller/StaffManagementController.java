@@ -172,9 +172,9 @@ public class StaffManagementController {
     @DeleteMapping("/invitations/{id}")
     public ResponseEntity<?> deleteInvitation(@PathVariable Long id) {
         return staffInvitationRepository.findById(id).map(invitation -> {
-            invitation.setStatus(StaffInvitation.InvitationStatus.REVOKED);
-            staffInvitationRepository.save(invitation);
-            return ResponseEntity.ok(Map.of("success", true, "message", "Invitation revoked successfully."));
+            staffInvitationRepository.delete(invitation);
+            auditLogService.record("STAFF_INVITATION_DELETED", "admin", "SUPER_ADMIN", "STAFF_INVITATION", invitation.getEmail(), "Staff invitation revoked and removed");
+            return ResponseEntity.ok(Map.of("success", true, "message", "Staff invitation removed successfully."));
         }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Invitation not found.")));
     }
 
@@ -182,12 +182,11 @@ public class StaffManagementController {
     public ResponseEntity<?> revokeStaffAccount(@PathVariable Long id) {
         return userRepository.findById(id).map(user -> {
             if (user.getRole() == User.Role.SUPER_ADMIN || user.getRole() == User.Role.ADMIN) {
-                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Cannot revoke clinic administrator accounts."));
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Cannot delete clinic administrator accounts."));
             }
-            user.setStatus(User.AccountStatus.DISABLED);
-            userRepository.save(user);
-            auditLogService.record("STAFF_DEACTIVATED", "admin", "SUPER_ADMIN", "USER", user.getEmail(), "Staff account disabled");
-            return ResponseEntity.ok(Map.of("success", true, "message", "Staff access deactivated successfully."));
+            userRepository.delete(user);
+            auditLogService.record("STAFF_DELETED", "admin", "SUPER_ADMIN", "USER", user.getEmail(), "Staff account removed permanently from salon");
+            return ResponseEntity.ok(Map.of("success", true, "message", "Staff account removed from salon successfully."));
         }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Staff member not found.")));
     }
 }

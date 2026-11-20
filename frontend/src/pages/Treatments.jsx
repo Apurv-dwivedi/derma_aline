@@ -11,11 +11,24 @@ import {
   getGeneralWhatsAppUrl,
   CLINIC_PHONE_DISPLAY 
 } from '../data/treatmentsData';
+import API from '../services/api';
 import '../styles/treatments.css';
 
 const Treatments = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [dbTreatments, setDbTreatments] = useState([]);
+
+  // Fetch live treatments added via Admin Portal
+  useEffect(() => {
+    API.get('/treatments/active')
+      .then((res) => {
+        if (res.data && Array.isArray(res.data)) {
+          setDbTreatments(res.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Update SEO Document Title & Meta Description
   useEffect(() => {
@@ -30,9 +43,53 @@ const Treatments = () => {
     metaDescription.content = "Explore advanced skin, hair, laser, pigmentation and aesthetic treatments at Derma Aline Aesthetics Skin Clinic. Discover treatments and enquire about consultations.";
   }, []);
 
+  // Merge static catalogue with dynamic treatments from Admin database
+  const combinedTreatments = useMemo(() => {
+    if (!dbTreatments || dbTreatments.length === 0) {
+      return TREATMENTS_DATA;
+    }
+
+    const merged = [...TREATMENTS_DATA];
+    dbTreatments.forEach((db) => {
+      // Find matching category or fallback to first valid category
+      const catMatch = TREATMENT_CATEGORIES.find((c) => 
+        c.name.toLowerCase().includes((db.category || '').toLowerCase()) ||
+        c.shortName.toLowerCase().includes((db.category || '').toLowerCase()) ||
+        c.id === (db.category || '').toLowerCase()
+      ) || TREATMENT_CATEGORIES[1];
+
+      const formattedItem = {
+        id: `db-treatment-${db.id}`,
+        dbId: db.id,
+        name: db.name,
+        displayName: db.name,
+        price: db.price ? (typeof db.price === 'number' ? `₹${db.price.toLocaleString('en-IN')}` : `₹${db.price}`) : 'Consultation',
+        categoryId: catMatch.id,
+        categoryName: catMatch.name,
+        subcategory: db.category || 'Specialized Treatments',
+        pricingNote: 'Clinic Catalogue',
+        description: db.description || 'Clinical aesthetic treatment administered by certified Derma Aline specialists.',
+        image: db.imageUrl || '/clinic-interior.webp',
+        isFromDb: true
+      };
+
+      const existingIndex = merged.findIndex(
+        (m) => m.name.toLowerCase().trim() === db.name.toLowerCase().trim()
+      );
+
+      if (existingIndex !== -1) {
+        merged[existingIndex] = { ...merged[existingIndex], ...formattedItem };
+      } else {
+        merged.unshift(formattedItem);
+      }
+    });
+
+    return merged;
+  }, [dbTreatments]);
+
   // Filter treatments based on active category & search query
   const filteredTreatments = useMemo(() => {
-    return TREATMENTS_DATA.filter((item) => {
+    return combinedTreatments.filter((item) => {
       const matchesCategory = selectedCategory === 'all' || item.categoryId === selectedCategory;
       const matchesSearch = searchQuery.trim() === '' || 
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -41,7 +98,7 @@ const Treatments = () => {
         (item.displayName && item.displayName.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchesCategory && matchesSearch;
     });
-  }, [selectedCategory, searchQuery]);
+  }, [combinedTreatments, selectedCategory, searchQuery]);
 
   // Group filtered treatments by Category -> Subcategory for structured hierarchy
   const groupedTreatments = useMemo(() => {
@@ -162,7 +219,7 @@ const Treatments = () => {
 
           <div className="treatment-results-meta">
             <span className="treatment-count-pill">
-              {filteredTreatments.length} of {TREATMENTS_DATA.length} Treatments
+              {filteredTreatments.length} of {combinedTreatments.length} Treatments
             </span>
             {(selectedCategory !== 'all' || searchQuery.trim() !== '') && (
               <button 

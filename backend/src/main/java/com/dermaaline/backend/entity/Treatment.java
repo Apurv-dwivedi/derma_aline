@@ -23,6 +23,9 @@ public class Treatment {
     private Integer durationMinutes;
     private boolean active = true;
 
+    @Column(name = "image_url", columnDefinition = "TEXT")
+    private String imageUrl;
+
     private LocalDateTime createdAt = LocalDateTime.now();
 
     // Getters and Setters
@@ -46,6 +49,9 @@ public class Treatment {
 
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
 }
