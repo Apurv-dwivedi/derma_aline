@@ -87,16 +87,17 @@
   display: flex;
   gap: 28px;
   align-items: flex-start;
-  margin-top: 15px;
+  margin-top: 0;
 }
 
-/* Desktop Sidebar: Pinned Left Side, No Hamburger */
+/* Desktop Sidebar: Permanently Locked / Stationary on Screen */
 .client-suite-sidebar {
   width: 310px;
   flex-shrink: 0;
   position: sticky;
-  top: 24px;
-  max-height: calc(100vh - 48px);
+  top: 96px; /* Exactly aligns with 80px sticky navbar + 16px top spacing */
+  height: calc(100vh - 116px);
+  max-height: calc(100vh - 116px);
   overflow-y: auto;
   background-color: #ffffff;
   border-radius: 16px;

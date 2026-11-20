@@ -349,7 +349,7 @@ const ClientDashboard = () => {
   }
 
   return (
-    <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '10px 20px 60px 20px' }}>
+    <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '16px 20px 60px 20px' }}>
       {/* Hidden File Input for Avatar Photo Upload */}
       <input 
         type="file" 
@@ -378,27 +378,6 @@ const ClientDashboard = () => {
           fontWeight: '500'
         }}>
           <CheckCircle2 size={16} color="#4ade80" /> {refreshToast}
-        </div>
-      )}
-
-      {/* Global Alerts */}
-      {error && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          padding: '14px 18px', backgroundColor: '#fef2f2', border: '1px solid #fecaca',
-          color: '#991b1b', borderRadius: '10px', marginBottom: '20px', fontSize: '0.9rem'
-        }}>
-          <AlertCircle size={18} /> <span>{error}</span>
-        </div>
-      )}
-
-      {successMessage && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '10px',
-          padding: '14px 18px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0',
-          color: '#166534', borderRadius: '10px', marginBottom: '20px', fontSize: '0.9rem'
-        }}>
-          <CheckCircle2 size={18} /> <span>{successMessage}</span>
         </div>
       )}
 
@@ -573,6 +552,27 @@ const ClientDashboard = () => {
               </div>
             </div>
           </div>
+
+          {/* Global Content Alerts */}
+          {error && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '14px 18px', backgroundColor: '#fef2f2', border: '1px solid #fecaca',
+              color: '#991b1b', borderRadius: '10px', marginBottom: '20px', fontSize: '0.9rem'
+            }}>
+              <AlertCircle size={18} /> <span>{error}</span>
+            </div>
+          )}
+
+          {successMessage && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px',
+              padding: '14px 18px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0',
+              color: '#166534', borderRadius: '10px', marginBottom: '20px', fontSize: '0.9rem'
+            }}>
+              <CheckCircle2 size={18} /> <span>{successMessage}</span>
+            </div>
+          )}
 
       {/* TAB 1: OVERVIEW */}
       {activeTab === 'overview' && (
