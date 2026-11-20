@@ -508,12 +508,14 @@
   border: 1px solid #D9CBBE;
   cursor: pointer;
   transition: all 0.2s ease;
-  text-decoration: none;
+  text-decoration: none !important;
+  white-space: nowrap;
 }
 
 .btn-card-consult:hover {
   background-color: #FAF7F2;
   border-color: var(--color-primary, #806657);
+  text-decoration: none !important;
 }
 
 /* --------------------------------------------------------------------------
@@ -800,10 +802,12 @@
   }
   .btn-card-consult {
     padding: 6px 4px;
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     gap: 4px;
     border-radius: 6px;
     justify-content: center;
+    white-space: nowrap;
+    text-decoration: none !important;
   }
 
   /* Responsive Button Text Toggle */

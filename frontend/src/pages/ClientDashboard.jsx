@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   User, Sparkles, Calendar, Clock, FileText, MessageSquare, Bell, 
   ShieldCheck, LogOut, CheckCircle2, AlertCircle, Edit2, KeyRound, 
@@ -12,6 +12,7 @@ import '../styles/pages.css';
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const fileInputRef = useRef(null);
 
   // Active Tab: 'overview' | 'appointments' | 'catalogue' | 'treatments' | 'profile' | 'enquiries' | 'notifications' | 'security'
@@ -68,6 +69,14 @@ const ClientDashboard = () => {
 
     fetchClientData();
   }, [navigate]);
+
+  useEffect(() => {
+    const requestedTreatment = searchParams.get('bookTreatment');
+    if (requestedTreatment) {
+      setBookTreatment(requestedTreatment);
+      setActiveTab('appointments');
+    }
+  }, [searchParams]);
 
   const fetchClientData = async (isManual = false) => {
     if (isManual) {
@@ -1115,7 +1124,7 @@ const ClientDashboard = () => {
                           gap: '6px'
                         }}
                       >
-                        Book <ArrowRight size={13} />
+                        Book Appointment <ArrowRight size={13} />
                       </button>
                     </div>
                   </div>

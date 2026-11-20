@@ -213,10 +213,10 @@ const Home = () => {
               </p>
             </div>
             <button 
-              onClick={() => navigate('/contact')}
+              onClick={() => navigate('/contact?treatment=' + encodeURIComponent('HydraFacial Glow'))}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', backgroundColor: '#fcf9f5', border: '1px solid #ded4c9', color: '#5a4638', fontWeight: '600', fontSize: '0.88rem', cursor: 'pointer' }}
             >
-              <span>Enquire Service</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} /> Book Appointment</span>
               <ChevronRight size={16} />
             </button>
           </div>
@@ -232,10 +232,10 @@ const Home = () => {
               </p>
             </div>
             <button 
-              onClick={() => navigate('/contact')}
+              onClick={() => navigate('/contact?treatment=' + encodeURIComponent('Laser Hair Reduction'))}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', backgroundColor: '#fcf9f5', border: '1px solid #ded4c9', color: '#5a4638', fontWeight: '600', fontSize: '0.88rem', cursor: 'pointer' }}
             >
-              <span>Enquire Service</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} /> Book Appointment</span>
               <ChevronRight size={16} />
             </button>
           </div>
@@ -251,10 +251,10 @@ const Home = () => {
               </p>
             </div>
             <button 
-              onClick={() => navigate('/contact')}
+              onClick={() => navigate('/contact?treatment=' + encodeURIComponent('Carbon Laser Peel'))}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', backgroundColor: '#fcf9f5', border: '1px solid #ded4c9', color: '#5a4638', fontWeight: '600', fontSize: '0.88rem', cursor: 'pointer' }}
             >
-              <span>Enquire Service</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} /> Book Appointment</span>
               <ChevronRight size={16} />
             </button>
           </div>
@@ -270,10 +270,10 @@ const Home = () => {
               </p>
             </div>
             <button 
-              onClick={() => navigate('/contact')}
+              onClick={() => navigate('/contact?treatment=' + encodeURIComponent('Skin Rejuvenation'))}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: '8px', backgroundColor: '#fcf9f5', border: '1px solid #ded4c9', color: '#5a4638', fontWeight: '600', fontSize: '0.88rem', cursor: 'pointer' }}
             >
-              <span>Enquire Service</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Calendar size={14} /> Book Appointment</span>
               <ChevronRight size={16} />
             </button>
           </div>

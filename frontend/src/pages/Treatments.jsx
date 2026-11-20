@@ -299,11 +299,12 @@ const Treatments = () => {
                             <Link 
                               to={`/contact?treatment=${encodeURIComponent(treatment.name)}`}
                               className="btn-card-consult"
-                              title={`Request an in-clinic consultation for ${treatment.name}`}
+                              title={`Book appointment for ${treatment.name}`}
+                              style={{ textDecoration: 'none' }}
                             >
                               <Calendar size={14} />
-                              <span className="desktop-btn-label">Book In-Clinic Consultation</span>
-                              <span className="mobile-btn-label">Book Visit</span>
+                              <span className="desktop-btn-label">Book Appointment</span>
+                              <span className="mobile-btn-label">Book Appointment</span>
                             </Link>
                           </div>
                         </div>

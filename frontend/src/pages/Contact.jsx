@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { MapPin, Phone, Mail, Clock, Send, MessageSquare } from 'lucide-react';
+import { MapPin, Phone, Mail, Clock, Send, MessageSquare, Calendar } from 'lucide-react';
 import API from '../services/api';
 import '../styles/pages.css';
 
@@ -12,7 +12,7 @@ const Contact = () => {
     name: '', 
     email: '', 
     phone: '', 
-    message: treatmentParam ? `I would like to enquire and schedule an in-clinic consultation for ${treatmentParam}.` : '' 
+    message: treatmentParam ? `I would like to book an appointment for ${treatmentParam}.` : '' 
   });
   const [status, setStatus] = useState({ type: '', message: '' });
   const [loading, setLoading] = useState(false);
@@ -21,7 +21,7 @@ const Contact = () => {
     if (treatmentParam) {
       setFormData((prev) => ({
         ...prev,
-        message: `I would like to enquire and schedule an in-clinic consultation for ${treatmentParam}.`
+        message: `I would like to book an appointment for ${treatmentParam}.`
       }));
     }
   }, [treatmentParam]);
@@ -45,7 +45,12 @@ const Contact = () => {
 
     try {
       await API.post('/contact', formData);
-      setStatus({ type: 'success', message: 'Thank you! Your message has been sent securely. We will respond soon.' });
+      setStatus({ 
+        type: 'success', 
+        message: treatmentParam 
+          ? `Thank you! Your appointment request for ${treatmentParam} has been sent. Our clinical desk will contact you to confirm your slot.` 
+          : 'Thank you! Your message has been sent securely. We will respond soon.' 
+      });
       setFormData({ name: '', email: '', phone: '', message: '' });
     } catch (error) {
       console.error("Contact submission failed:", error);
@@ -58,18 +63,45 @@ const Contact = () => {
   return (
     <div className="internal-page">
       <div className="page-header" style={{ textAlign: 'center', maxWidth: '700px', margin: '0 auto 50px auto' }}>
-        <h1>Get in Touch</h1>
+        <h1>{treatmentParam ? 'Book an Appointment' : 'Get in Touch'}</h1>
         <p style={{ color: 'var(--text-light)', marginTop: '15px', fontSize: '1.1rem' }}>
-          Have questions about our treatments or want to schedule a specific consultation? Reach out to our experts in Rajouri Garden.
+          {treatmentParam 
+            ? `Schedule your in-clinic session for ${treatmentParam} with our medical aesthetics specialists.`
+            : 'Have questions about our treatments or want to schedule a specific consultation? Reach out to our experts in Rajouri Garden.'}
         </p>
       </div>
 
       <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap' }}>
         {/* Contact Form */}
         <div style={{ flex: '1', minWidth: '300px', backgroundColor: 'var(--bg-white)', padding: '40px', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-soft)', border: '1px solid var(--border-light)' }}>
-          <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', marginBottom: '25px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <MessageSquare size={24} color="var(--color-accent)" /> Send us a Message
+          <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Calendar size={22} color="var(--color-accent)" /> 
+            {treatmentParam ? 'Appointment Request Form' : 'Send us a Message'}
           </h2>
+
+          {treatmentParam && (
+            <div style={{
+              backgroundColor: '#FAF7F2',
+              border: '1px solid #ebdcd0',
+              borderLeft: '4px solid #806657',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '10px',
+              flexWrap: 'wrap'
+            }}>
+              <div>
+                <span style={{ fontSize: '0.74rem', color: '#8c7b70', textTransform: 'uppercase', fontWeight: '700', letterSpacing: '0.05em' }}>Selected Procedure</span>
+                <div style={{ fontSize: '1.05rem', fontWeight: '700', color: '#2c221e' }}>{treatmentParam}</div>
+              </div>
+              <span style={{ fontSize: '0.75rem', backgroundColor: '#eef2ff', color: '#3730a3', padding: '4px 10px', borderRadius: '12px', fontWeight: '600' }}>
+                Priority In-Clinic Visit
+              </span>
+            </div>
+          )}
 
           {status.message && (
             <div style={{ padding: '15px', marginBottom: '25px', borderRadius: '8px', backgroundColor: status.type === 'success' ? '#d4edda' : '#f8d7da', color: status.type === 'success' ? '#155724' : '#721c24', fontWeight: '600' }}>
@@ -95,12 +127,23 @@ const Contact = () => {
             </div>
 
             <div className="form-group" style={{ marginBottom: '25px' }}>
-              <label className="form-label" style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>Your Query</label>
-              <textarea name="message" value={formData.message} onChange={handleInputChange} className="form-input" required rows="5" placeholder="How can we help you today?" style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-light)' }}></textarea>
+              <label className="form-label" style={{ fontWeight: '600', marginBottom: '8px', display: 'block' }}>
+                {treatmentParam ? 'Appointment Notes / Preferred Date & Time' : 'Your Query'}
+              </label>
+              <textarea 
+                name="message" 
+                value={formData.message} 
+                onChange={handleInputChange} 
+                className="form-input" 
+                required 
+                rows="5" 
+                placeholder={treatmentParam ? "Let us know your preferred date/time slot or skin concerns..." : "How can we help you today?"} 
+                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+              ></textarea>
             </div>
 
             <button type="submit" className="btn-primary" disabled={loading} style={{ width: '100%', padding: '14px', fontSize: '1rem', fontWeight: '700', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-              {loading ? 'Sending securely...' : <><Send size={18} /> Send Message</>}
+              {loading ? 'Submitting securely...' : <><Calendar size={18} /> {treatmentParam ? 'Request Appointment' : 'Send Message'}</>}
             </button>
           </form>
         </div>
