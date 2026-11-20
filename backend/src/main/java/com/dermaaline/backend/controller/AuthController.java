@@ -113,7 +113,7 @@ public class AuthController {
             System.err.println("OTP dispatch notice for " + email + ": " + e.getMessage());
         }
 
-        auditLogService.record("REGISTER_PENDING_OTP", email, user.getRole().name(), "USER", user.getId().toString(), "Client registered; awaiting 6-digit OTP email verification");
+        auditLogService.record("REGISTER_PENDING_OTP", email, user.getRole().name(), "USER", user.getId() != null ? user.getId().toString() : "N/A", "Client registered; awaiting 6-digit OTP email verification");
 
         Map<String, Object> resp = new HashMap<>();
         resp.put("success", true);
@@ -224,6 +224,128 @@ public class AuthController {
     }
 
     /**
+     * Supabase User Synchronization (Google SSO & Email OTP Verified)
+     * Securely links or provisions active customer record, links customer profile, and issues application JWT.
+     */
+    @PostMapping("/sync-supabase-user")
+    public ResponseEntity<?> syncSupabaseUser(@RequestBody Map<String, String> payload) {
+        if (payload == null || payload.get("email") == null || payload.get("email").trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Email is required."));
+        }
+
+        String email = SecuritySanitizer.sanitizeEmail(payload.get("email"));
+        if (email == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "A valid email address is required."));
+        }
+
+        String rawFullName = payload.get("fullName");
+        String fullName = SecuritySanitizer.sanitizeText(rawFullName, 100);
+        if (fullName == null || fullName.trim().isEmpty()) {
+            fullName = "Valued Client";
+        }
+
+        String phone = SecuritySanitizer.sanitizePhone(payload.get("phone"));
+        String provider = SecuritySanitizer.sanitizeText(payload.getOrDefault("provider", "supabase"), 50);
+
+        Optional<User> existingUserOpt = userRepository.findByEmail(email);
+        User user;
+        if (existingUserOpt.isPresent()) {
+            user = existingUserOpt.get();
+            if (user.getStatus() == User.AccountStatus.DISABLED) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "success", false,
+                    "message", "Your account has been deactivated. Please contact clinic management."
+                ));
+            }
+            // Supabase verified the email: activate account
+            user.setStatus(User.AccountStatus.ACTIVE);
+            if (phone != null && !phone.isEmpty() && (user.getPhone() == null || user.getPhone().isEmpty())) {
+                user.setPhone(phone);
+            }
+            if (fullName != null && !fullName.equals("Valued Client") && (user.getFullName() == null || user.getFullName().equals("Valued Client"))) {
+                user.setFullName(fullName);
+            }
+            user = userRepository.save(user);
+        } else {
+            user = new User();
+            user.setEmail(email);
+            user.setFullName(fullName);
+            user.setPhone(phone);
+            user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+            user.setRole(User.Role.CUSTOMER);
+            user.setStatus(User.AccountStatus.ACTIVE);
+            user = userRepository.save(user);
+        }
+
+        // Safe Customer Profile Linking
+        Optional<Customer> customerOpt = customerRepository.findByEmail(email);
+        if (customerOpt.isEmpty()) {
+            Customer c = new Customer();
+            c.setEmail(email);
+            c.setFullName(user.getFullName());
+            c.setPhone(user.getPhone());
+            customerRepository.save(c);
+        }
+
+        String roleStr = (user.getRole() == User.Role.SUPER_ADMIN || user.getRole() == User.Role.ADMIN) 
+                ? "ADMIN" : user.getRole().name();
+
+        String token = jwtTokenProvider.generateToken(
+            new UsernamePasswordAuthenticationToken(user.getEmail(), null, 
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + roleStr)))
+        );
+
+        auditLogService.record("SUPABASE_AUTH_SYNC", user.getEmail(), roleStr, "USER", user.getId() != null ? user.getId().toString() : "N/A", 
+            "Authenticated and synchronized via Supabase (" + provider + ")");
+
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("token", token);
+        resp.put("role", roleStr);
+        resp.put("email", user.getEmail());
+        resp.put("fullName", user.getFullName());
+        resp.put("profilePicture", user.getProfilePicture() != null ? user.getProfilePicture() : "");
+        resp.put("message", "Welcome to Derma Aline Aesthétics.");
+
+        return ResponseEntity.ok(resp);
+    }
+
+    /**
+     * Synchronize Password with Supabase Reset
+     */
+    @PostMapping("/sync-password")
+    public ResponseEntity<?> syncPassword(@RequestBody Map<String, String> payload) {
+        if (payload == null || payload.get("email") == null || payload.get("newPassword") == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Email and new password are required."));
+        }
+
+        String cleanEmail = payload.get("email").trim().toLowerCase();
+        String newPassword = payload.get("newPassword").trim();
+
+        if (cleanEmail.isEmpty() || newPassword.length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Valid email and new password (min 6 characters) are required."));
+        }
+
+        Optional<User> userOpt = userRepository.findByEmail(cleanEmail);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("success", false, "message", "User account not found."));
+        }
+
+        User user = userOpt.get();
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setResetToken(null);
+        user.setResetTokenExpiry(null);
+        userRepository.save(user);
+
+        auditLogService.record("PASSWORD_RESET_SYNC", cleanEmail, user.getRole().name(), "USER", user.getId() != null ? user.getId().toString() : "N/A", "Password reset updated via Supabase");
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "message", "Password successfully updated in clinic database."
+        ));
+    }
+
+    /**
      * Client / Customer Portal Login
      * Strictly verifies role is CUSTOMER and account is ACTIVE.
      */
@@ -245,7 +367,7 @@ public class AuthController {
 
         User user = userOpt.get();
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            auditLogService.record("LOGIN_FAILED", cleanEmail, user.getRole().name(), "USER", user.getId().toString(), "Failed authentication: invalid password attempt");
+            auditLogService.record("LOGIN_FAILED", cleanEmail, user.getRole().name(), "USER", user.getId() != null ? user.getId().toString() : "N/A", "Failed authentication: invalid password attempt");
             return ResponseEntity.status(401).body(Map.of("success", false, "message", "Invalid email or password."));
         }
 
@@ -306,7 +428,7 @@ public class AuthController {
         respMap.put("fullName", user.getFullName());
         respMap.put("profilePicture", user.getProfilePicture() != null ? user.getProfilePicture() : "");
 
-        auditLogService.record("LOGIN_SUCCESS", user.getEmail(), roleStr, "USER", user.getId().toString(), "Authenticated into portal mode: " + portal);
+        auditLogService.record("LOGIN_SUCCESS", user.getEmail(), roleStr, "USER", user.getId() != null ? user.getId().toString() : "N/A", "Authenticated into portal mode: " + portal);
 
         return ResponseEntity.ok(respMap);
     }

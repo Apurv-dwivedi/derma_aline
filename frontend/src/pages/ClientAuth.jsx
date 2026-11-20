@@ -2,13 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mail, User, Phone, CheckCircle2, AlertCircle, ArrowLeft, RefreshCw, Sparkles, ShieldCheck } from 'lucide-react';
 import API from '../services/api';
+import {
+  supabase,
+  isSupabaseConfigured,
+  signInWithGoogleSSO,
+  signUpWithSupabase,
+  verifySupabaseOtp,
+  requestSupabasePasswordReset,
+  updateSupabasePassword
+} from '../services/supabaseClient';
 import '../styles/pages.css';
 
 /**
  * Derma Aline Aesthétics Client Portal Authentication
  * Supports:
- * - Option A: Self-Registration with Email OTP Verification
- * - Email OTP Verification with countdown timer & resend cooldown
+ * - Google SSO via Supabase Auth
+ * - Self-Registration with Supabase / Email OTP Verification
  * - Client Login
  * - Password Reset
  */
@@ -55,6 +64,76 @@ const ClientAuth = () => {
       setMode('reset');
     }
   }, [searchParams]);
+
+  // Detect Supabase OAuth Redirect or Active Session on Load
+  useEffect(() => {
+    const checkSupabaseSession = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) {
+          console.warn('Supabase session inspection notice:', sessionError.message);
+          return;
+        }
+
+        if (session?.user) {
+          const user = session.user;
+          const userMeta = user.user_metadata || {};
+          const detectedFullName = userMeta.full_name || userMeta.name || 'Valued Client';
+          const detectedPhone = userMeta.phone || user.phone || '';
+          const provider = user.app_metadata?.provider || 'google';
+
+          setLoading(true);
+          const res = await API.post('/auth/sync-supabase-user', {
+            email: user.email,
+            fullName: detectedFullName,
+            phone: detectedPhone,
+            provider
+          });
+
+          if (res.data?.token) {
+            localStorage.setItem('token', res.data.token);
+            localStorage.setItem('role', res.data.role || 'CUSTOMER');
+            localStorage.setItem('fullName', res.data.fullName || detectedFullName);
+            localStorage.setItem('email', user.email);
+            if (res.data.profilePicture) {
+              localStorage.setItem('profilePicture', res.data.profilePicture);
+            }
+
+            // Remove URL hash tokens to clean address bar
+            if (window.location.hash) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+
+            navigate('/client/dashboard');
+          }
+        }
+      } catch (err) {
+        console.warn('OAuth session sync notice:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkSupabaseSession();
+  }, [navigate]);
+
+  // Google SSO Handler
+  const handleGoogleSSO = async () => {
+    setLoading(true);
+    setError('');
+    setSuccessMessage('');
+    try {
+      if (!isSupabaseConfigured()) {
+        setError('Google SSO is awaiting configuration in your clinic environment. Please sign in with email.');
+        setLoading(false);
+        return;
+      }
+      await signInWithGoogleSSO('/client/login');
+    } catch (err) {
+      setError(err?.message || 'Google SSO could not be initiated.');
+      setLoading(false);
+    }
+  };
 
   // 1. Client Login
   const handleLogin = async (e) => {
@@ -116,6 +195,26 @@ const ClientAuth = () => {
 
     setLoading(true);
 
+    // If Supabase is configured, use Supabase Auth for high-deliverability email OTP
+    if (isSupabaseConfigured()) {
+      try {
+        await signUpWithSupabase(email, password, fullName, phone);
+        setSuccessMessage(`A 6-digit verification code has been dispatched to ${email.trim()}. Please enter it below.`);
+        setMode('verify');
+        setCooldown(60);
+        setLoading(false);
+        return;
+      } catch (sbErr) {
+        if (sbErr.message && sbErr.message.toLowerCase().includes('already registered')) {
+          setError('This email address is already registered. Please sign in or reset your password.');
+          setLoading(false);
+          return;
+        }
+        console.warn('Supabase sign-up error, falling back to direct backend registration:', sbErr.message);
+      }
+    }
+
+    // Direct backend registration
     try {
       const res = await API.post('/auth/register', {
         fullName: fullName.trim(),
@@ -160,6 +259,39 @@ const ClientAuth = () => {
     setSuccessMessage('');
     setLoading(true);
 
+    // If Supabase is configured, verify through Supabase Auth
+    if (isSupabaseConfigured()) {
+      try {
+        const data = await verifySupabaseOtp(email, otp);
+        if (data?.session || data?.user) {
+          const res = await API.post('/auth/sync-supabase-user', {
+            email: email.trim().toLowerCase(),
+            fullName: fullName.trim() || 'Valued Client',
+            phone: phone.trim(),
+            provider: 'supabase_email_otp'
+          });
+
+          const { token, role, fullName: userFullName, profilePicture } = res.data;
+          localStorage.setItem('token', token);
+          localStorage.setItem('role', role || 'CUSTOMER');
+          localStorage.setItem('fullName', userFullName || 'Client');
+          localStorage.setItem('email', email.trim().toLowerCase());
+          if (profilePicture) {
+            localStorage.setItem('profilePicture', profilePicture);
+          } else {
+            localStorage.removeItem('profilePicture');
+          }
+
+          setSuccessMessage('Account verified successfully! Entering your private suite...');
+          setTimeout(() => navigate('/client/dashboard'), 600);
+          return;
+        }
+      } catch (sbErr) {
+        console.warn('Supabase OTP verification notice, attempting backend verification:', sbErr.message);
+      }
+    }
+
+    // Direct backend OTP verification
     try {
       const res = await API.post('/auth/verify-otp', {
         email: email.trim().toLowerCase(),
@@ -178,7 +310,7 @@ const ClientAuth = () => {
       }
 
       setSuccessMessage('Account verified successfully! Redirecting to your private suite...');
-      setTimeout(() => navigate('/client/dashboard'), 1200);
+      setTimeout(() => navigate('/client/dashboard'), 800);
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid or expired verification code.');
     } finally {
@@ -192,6 +324,18 @@ const ClientAuth = () => {
     setError('');
     setSuccessMessage('');
     setLoading(true);
+
+    if (isSupabaseConfigured()) {
+      try {
+        await signUpWithSupabase(email, password || 'DermaAlineTemp@2026', fullName, phone);
+        setSuccessMessage(`A fresh verification code has been dispatched to ${email.trim()}.`);
+        setCooldown(60);
+        setLoading(false);
+        return;
+      } catch (sbErr) {
+        console.warn('Supabase resend notice:', sbErr.message);
+      }
+    }
 
     try {
       const res = await API.post('/auth/resend-otp', {
@@ -213,13 +357,27 @@ const ClientAuth = () => {
     setSuccessMessage('');
     setLoading(true);
 
+    let supabaseSent = false;
+    if (isSupabaseConfigured()) {
+      try {
+        await requestSupabasePasswordReset(email);
+        supabaseSent = true;
+      } catch (sbErr) {
+        console.warn('Supabase password reset notice:', sbErr.message);
+      }
+    }
+
     try {
       const res = await API.post('/auth/forgot-password', {
         email: email.trim().toLowerCase()
       });
-      setSuccessMessage(res.data.message);
+      setSuccessMessage(res.data.message || 'If an account exists with that email, password reset instructions have been sent.');
     } catch (err) {
-      setError(err.response?.data?.message || 'Request failed. Please try again.');
+      if (supabaseSent) {
+        setSuccessMessage('Password reset instructions have been dispatched to your email address.');
+      } else {
+        setError(err.response?.data?.message || 'Request failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -242,15 +400,38 @@ const ClientAuth = () => {
 
     setLoading(true);
 
+    if (isSupabaseConfigured()) {
+      try {
+        await updateSupabasePassword(password);
+      } catch (sbErr) {
+        console.warn('Supabase password update notice:', sbErr.message);
+      }
+    }
+
     try {
-      const res = await API.post('/auth/reset-password', {
-        token: resetToken.trim(),
+      // Sync password with backend
+      await API.post('/auth/sync-password', {
+        email: email.trim().toLowerCase(),
         newPassword: password
       });
-      setSuccessMessage(res.data.message);
-      setTimeout(() => setMode('login'), 2000);
+      setSuccessMessage('Your password has been updated successfully! Redirecting to sign in...');
+      setTimeout(() => setMode('login'), 1500);
     } catch (err) {
-      setError(err.response?.data?.message || 'Password reset link has expired.');
+      if (resetToken) {
+        try {
+          const res = await API.post('/auth/reset-password', {
+            token: resetToken.trim(),
+            newPassword: password
+          });
+          setSuccessMessage(res.data.message);
+          setTimeout(() => setMode('login'), 1500);
+          return;
+        } catch (innerErr) {
+          setError(innerErr.response?.data?.message || 'Password reset link has expired.');
+          return;
+        }
+      }
+      setError(err.response?.data?.message || 'Failed to update password. Please request a new reset link.');
     } finally {
       setLoading(false);
     }
@@ -348,6 +529,48 @@ const ClientAuth = () => {
           }}>
             <CheckCircle2 size={18} style={{ flexShrink: 0 }} />
             <span>{successMessage}</span>
+          </div>
+        )}
+
+        {/* Google SSO Button (Login & Register modes) */}
+        {(mode === 'login' || mode === 'register') && (
+          <div style={{ marginBottom: '20px' }}>
+            <button
+              type="button"
+              onClick={handleGoogleSSO}
+              disabled={loading}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px',
+                padding: '11px 16px',
+                backgroundColor: '#ffffff',
+                border: '1px solid #d4c4b7',
+                borderRadius: '8px',
+                color: '#2c221e',
+                fontSize: '0.9rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.03)'
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.03h3.88c2.27-2.09 3.665-5.17 3.665-9.12z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.03c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.13C3.25 21.37 7.34 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.58H1.26C.46 8.18 0 9.99 0 12s.46 3.82 1.26 5.42l4.02-3.13z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.25 2.63 1.26 6.58l4.02 3.13c.95-2.83 3.6-4.96 6.72-4.96z"/>
+              </svg>
+              Continue with Google
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', margin: '18px 0', gap: '12px' }}>
+              <div style={{ flex: 1, height: '1px', backgroundColor: '#ebdcd0' }}></div>
+              <span style={{ fontSize: '0.75rem', color: '#a8988d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>OR CONTINUE WITH EMAIL</span>
+              <div style={{ flex: 1, height: '1px', backgroundColor: '#ebdcd0' }}></div>
+            </div>
           </div>
         )}
 
@@ -624,7 +847,7 @@ const ClientAuth = () => {
               </div>
               <div style={{ textAlign: 'center', marginTop: '12px' }}>
                 <span style={{ fontSize: '0.75rem', color: '#8c7b70', display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                  <ShieldCheck size={14} color="#806657" /> Secure 6-digit verification code sent directly to your Gmail inbox
+                  <ShieldCheck size={14} color="#806657" /> Secure 6-digit verification code sent directly to your email inbox
                 </span>
               </div>
             </div>

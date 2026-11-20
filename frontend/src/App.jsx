@@ -153,7 +153,7 @@ function App() {
               <Route path="/client/dashboard" element={<ProtectedRoute requireCustomer={true}><ClientDashboard /></ProtectedRoute>} />
               <Route path="/client/profile" element={<ProtectedRoute requireCustomer={true}><ClientDashboard /></ProtectedRoute>} />
               <Route path="/profile" element={<Navigate to="/client/dashboard" replace />} />
-              <Route path="/auth" element={<Navigate to="/client/login" replace />} />
+              <Route path="/auth" element={<ClientAuth />} />
 
               {/* Portal 2: Staff Portal Routes */}
               <Route path="/staff/login" element={<Login />} />

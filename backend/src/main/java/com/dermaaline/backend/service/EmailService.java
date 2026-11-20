@@ -70,7 +70,8 @@ public class EmailService {
                 + "<span style=\"display: inline-block; font-size: 34px; font-weight: 700; letter-spacing: 10px; color: #806657; background: #FAF7F2; padding: 14px 28px; border-radius: 8px; border: 2px solid #806657;\">"
                 + codeStr
                 + "</span>"
-                + "<p style=\"margin: 10px 0 0 0; font-size: 13px; color: #8F857D;\">Code expires in " + expiryMinutes + " minutes</p>"
+                + "<p style=\"margin: 10px 0 0 0; font-size: 13px; color: #8F857D;\">Code expires in " + expiryMinutes
+                + " minutes</p>"
                 + "</div>"
                 + "<p style=\"font-size: 13px; color: #736B63; background: #F3EFEA; padding: 12px 16px; border-radius: 6px;\">Security Note: Our clinical team will never ask for your verification code. Never share this code with anyone.</p>"
                 + "</div>"
@@ -81,7 +82,8 @@ public class EmailService {
                 + "</div>"
                 + "</div>";
 
-        // 1. Primary: Brevo HTTPS API (Port 443 - Instant cloud delivery without SMTP port blocking)
+        // 1. Primary: Brevo HTTPS API (Port 443 - Instant cloud delivery without SMTP
+        // port blocking)
         if (brevoApiKey != null && !brevoApiKey.trim().isEmpty()) {
             if (sendViaBrevoHttpApi(to, subject, textBody, htmlBody)) {
                 return true;
@@ -120,7 +122,8 @@ public class EmailService {
                 + "</div>"
                 + "</div>";
 
-        // 1. Primary: Brevo HTTPS API (Port 443 - Instant cloud delivery without SMTP port blocking)
+        // 1. Primary: Brevo HTTPS API (Port 443 - Instant cloud delivery without SMTP
+        // port blocking)
         if (brevoApiKey != null && !brevoApiKey.trim().isEmpty()) {
             if (sendViaBrevoHttpApi(to, subject, body, htmlBody)) {
                 return true;
@@ -167,7 +170,7 @@ public class EmailService {
 
     private boolean sendViaResendHttpApi(String to, String subject, String textBody, String htmlBody) {
         try {
-            URL url = new URL("https://api.resend.com/emails");
+            URL url = java.net.URI.create("https://api.resend.com/emails").toURL();
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("Authorization", "Bearer " + resendApiKey.trim());
@@ -177,12 +180,12 @@ public class EmailService {
             conn.setDoOutput(true);
 
             String jsonPayload = String.format(
-                "{\"from\":\"Derma Aline <onboarding@resend.dev>\",\"to\":[\"%s\"],\"subject\":\"%s\",\"text\":\"%s\",\"html\":\"%s\"}",
-                to, escapeJson(subject), escapeJson(textBody), escapeJson(htmlBody)
-            );
+                    "{\"from\":\"Derma Aline <onboarding@resend.dev>\",\"to\":[\"%s\"],\"subject\":\"%s\",\"text\":\"%s\",\"html\":\"%s\"}",
+                    to, escapeJson(subject), escapeJson(textBody), escapeJson(htmlBody));
 
             try (OutputStream os = conn.getOutputStream()) {
                 os.write(jsonPayload.getBytes(StandardCharsets.UTF_8));
+                os.flush();
             }
 
             int code = conn.getResponseCode();
@@ -205,7 +208,7 @@ public class EmailService {
 
     private boolean sendViaBrevoHttpApi(String to, String subject, String textBody, String htmlBody) {
         try {
-            URL url = new URL("https://api.brevo.com/v3/smtp/email");
+            URL url = java.net.URI.create("https://api.brevo.com/v3/smtp/email").toURL();
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
             conn.setRequestMethod("POST");
             conn.setRequestProperty("api-key", brevoApiKey.trim());
@@ -219,12 +222,12 @@ public class EmailService {
                     : fromEmail;
 
             String jsonPayload = String.format(
-                "{\"sender\":{\"name\":\"Derma Aline Aesthétics\",\"email\":\"%s\"},\"to\":[{\"email\":\"%s\"}],\"subject\":\"%s\",\"textContent\":\"%s\",\"htmlContent\":\"%s\"}",
-                senderEmailToUse, to, escapeJson(subject), escapeJson(textBody), escapeJson(htmlBody)
-            );
+                    "{\"sender\":{\"name\":\"Derma Aline Aesthétics\",\"email\":\"%s\"},\"to\":[{\"email\":\"%s\"}],\"subject\":\"%s\",\"textContent\":\"%s\",\"htmlContent\":\"%s\"}",
+                    senderEmailToUse, to, escapeJson(subject), escapeJson(textBody), escapeJson(htmlBody));
 
             try (OutputStream os = conn.getOutputStream()) {
                 os.write(jsonPayload.getBytes(StandardCharsets.UTF_8));
+                os.flush();
             }
 
             int code = conn.getResponseCode();
@@ -249,12 +252,13 @@ public class EmailService {
     }
 
     private String escapeJson(String raw) {
-        if (raw == null) return "";
+        if (raw == null)
+            return "";
         return raw.replace("\\", "\\\\")
-                  .replace("\"", "\\\"")
-                  .replace("\n", "\\n")
-                  .replace("\r", "\\r")
-                  .replace("\t", "\\t");
+                .replace("\"", "\\\"")
+                .replace("\n", "\\n")
+                .replace("\r", "\\r")
+                .replace("\t", "\\t");
     }
 
     public boolean sendPasswordResetEmail(String to, String recipientName, String resetLink) {
@@ -268,7 +272,7 @@ public class EmailService {
                 "To reset your password, please click the link below (or copy and paste it into your browser). This link is valid for 1 hour:\n\n" +
                 resetLink + "\n\n" +
                 "If you did not make this request, you can safely ignore this email and your password will remain unchanged.\n\n" +
-                "Warm regards,\n"
+                "Warm regards, \n"
                 + "Derma Aline Aesthetics Team\n"
                 + "https://derma-aline.vercel.app";
 
