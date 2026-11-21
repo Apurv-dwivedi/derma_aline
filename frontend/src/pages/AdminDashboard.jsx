@@ -68,6 +68,10 @@ const AdminDashboard = () => {
 
   // Security & Password State
   const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
+  const [adminOtp, setAdminOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordSuccess, setPasswordSuccess] = useState('');
   const [passwordError, setPasswordError] = useState('');
@@ -160,6 +164,13 @@ const AdminDashboard = () => {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (otpCooldown > 0) {
+      const timer = setTimeout(() => setOtpCooldown(prev => prev - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpCooldown]);
 
   const handleEditClick = (appt) => {
     setEditingId(appt.id);
@@ -259,7 +270,7 @@ const AdminDashboard = () => {
         setTreatmentToast('Treatment updated successfully.');
       } else {
         await API.post('/treatments', treatmentForm);
-        setTreatmentToast('Treatment created successfully and added to treatment catalogue.');
+        setTreatmentToast('Treatment created successfully and added to treatment section.');
       }
       setShowTreatmentModal(false);
       setTreatmentForm({ name: '', category: 'Facial Aesthetics', description: '', price: '', durationMinutes: 60, active: true, imageUrl: '' });
@@ -293,7 +304,7 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteTreatment = async (id, name) => {
-    if (window.confirm(`Are you sure you want to permanently delete the treatment "${name}" from the clinic catalogue?`)) {
+    if (window.confirm(`Are you sure you want to permanently delete the treatment "${name}" from the clinic treatment section?`)) {
       try {
         await API.delete(`/treatments/${id}`);
         setTreatmentToast(`Treatment "${name}" deleted successfully.`);
@@ -315,15 +326,19 @@ const AdminDashboard = () => {
   };
 
   // Staff Management: Permanent Delete When Staff Leaves Salon
-  const handleDeleteStaffMember = async (id, name) => {
-    if (window.confirm(`Are you sure you want to permanently remove "${name || 'this staff member'}" from the salon? Their account and operational access will be completely deleted.`)) {
+  const handleDeleteStaffMember = async (id, name, email) => {
+    if (window.confirm(`Are you sure you want to permanently remove "${name || email || 'this staff member'}" from the salon? Their account and operational access will be completely deleted.`)) {
       try {
+        setStaffMembers(prev => prev.filter(s => s.id !== id && (!email || s.email !== email)));
+        setStaffInvitations(prev => prev.filter(inv => inv.id !== id && (!email || inv.email !== email)));
         await API.delete(`/admin/staff/members/${id}`);
-        setStaffSuccess(`Staff member "${name || ''}" removed from the salon successfully.`);
+        setStaffSuccess(`Staff member "${name || email || ''}" removed from the salon successfully.`);
         fetchData();
         setTimeout(() => setStaffSuccess(''), 4000);
       } catch (err) {
+        console.error("Failed to remove staff member:", err);
         setStaffError(err.response?.data?.message || 'Failed to remove staff member.');
+        fetchData();
         setTimeout(() => setStaffError(''), 4000);
       }
     }
@@ -333,12 +348,16 @@ const AdminDashboard = () => {
   const handleDeleteInvitation = async (id, email) => {
     if (window.confirm(`Are you sure you want to revoke and delete the invitation for ${email}?`)) {
       try {
+        setStaffInvitations(prev => prev.filter(inv => inv.id !== id && (!email || inv.email !== email)));
+        setStaffMembers(prev => prev.filter(s => s.id !== id && (!email || s.email !== email)));
         await API.delete(`/admin/staff/invitations/${id}`);
         setStaffSuccess(`Staff invitation for ${email} has been removed.`);
         fetchData();
         setTimeout(() => setStaffSuccess(''), 4000);
       } catch (err) {
+        console.error("Failed to delete invitation:", err);
         setStaffError(err.response?.data?.message || 'Failed to delete invitation.');
+        fetchData();
         setTimeout(() => setStaffError(''), 4000);
       }
     }
@@ -410,6 +429,41 @@ const AdminDashboard = () => {
     }
   };
 
+  // Client CRM: Delete Individual Client Profile
+  const handleDeleteClient = async (id, fullName, email) => {
+    const displayName = fullName || email || 'this client';
+    if (window.confirm(`Are you sure you want to permanently delete the CRM profile for "${displayName}"? All associated clinical notes will be removed.`)) {
+      try {
+        setClients(prev => prev.filter(c => c.id !== id));
+        await API.delete(`/admin/clients/${id}`);
+        setRefreshToast(`Client profile for "${displayName}" deleted.`);
+        fetchData();
+        setTimeout(() => setRefreshToast(''), 3500);
+      } catch (err) {
+        console.error("Failed to delete client profile:", err);
+        alert(err.response?.data?.message || 'Failed to delete client profile.');
+        fetchData();
+      }
+    }
+  };
+
+  // Client CRM: Delete All Client Data
+  const handleDeleteAllClients = async () => {
+    if (window.confirm("Are you sure you want to permanently delete ALL client CRM profiles? This action cannot be undone.")) {
+      try {
+        setClients([]);
+        await API.delete('/admin/clients');
+        setRefreshToast('All client CRM records have been deleted.');
+        fetchData();
+        setTimeout(() => setRefreshToast(''), 3500);
+      } catch (err) {
+        console.error("Failed to delete all clients:", err);
+        alert(err.response?.data?.message || 'Failed to delete client records.');
+        fetchData();
+      }
+    }
+  };
+
   // Clinic Settings Save
   const handleSaveSettings = async (e) => {
     e.preventDefault();
@@ -427,12 +481,50 @@ const AdminDashboard = () => {
     }
   };
 
-  // Change Admin Password
+  // Send 6-digit OTP for Admin Password Change
+  const handleSendAdminPasswordOtp = async () => {
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (!passwordForm.oldPassword) {
+      setPasswordError('Please enter your current admin password first.');
+      return;
+    }
+    if (!passwordForm.newPassword || passwordForm.newPassword.length < 6) {
+      setPasswordError('New password must be at least 6 characters long.');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('New passwords do not match.');
+      return;
+    }
+
+    const currentEmail = localStorage.getItem('email') || 'dermaalineaesthetics@gmail.com';
+    setOtpLoading(true);
+
+    try {
+      const res = await API.post('/auth/admin-password/request-otp', { email: currentEmail });
+      setOtpSent(true);
+      setOtpCooldown(60);
+      setPasswordSuccess(res.data.message || `Verification OTP sent to ${currentEmail}.`);
+    } catch (err) {
+      console.error("Failed to send OTP:", err);
+      setPasswordError(err.response?.data?.message || 'Failed to dispatch verification OTP.');
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  // Change Admin Password (Strictly requires 6-digit OTP)
   const handleChangePassword = async (e) => {
     e.preventDefault();
     setPasswordError('');
     setPasswordSuccess('');
 
+    if (!passwordForm.oldPassword) {
+      setPasswordError('Please enter your current admin password.');
+      return;
+    }
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setPasswordError('New passwords do not match.');
       return;
@@ -441,23 +533,30 @@ const AdminDashboard = () => {
       setPasswordError('Password must be at least 6 characters long.');
       return;
     }
+    if (!adminOtp || adminOtp.trim().length !== 6) {
+      setPasswordError('A 6-digit email OTP verification code is required to change admin password.');
+      return;
+    }
 
-    const currentEmail = localStorage.getItem('email') || 'apurvdwivedi2205@gmail.com';
+    const currentEmail = localStorage.getItem('email') || 'dermaalineaesthetics@gmail.com';
     setPasswordLoading(true);
 
     try {
       const response = await API.post('/auth/change-password', {
         email: currentEmail,
         oldPassword: passwordForm.oldPassword,
-        newPassword: passwordForm.newPassword
+        newPassword: passwordForm.newPassword,
+        otp: adminOtp.trim()
       });
 
-      setPasswordSuccess(response.data.message || 'Password changed successfully!');
+      setPasswordSuccess(response.data.message || 'Admin password changed successfully!');
       setPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '' });
-      setTimeout(() => setPasswordSuccess(''), 4000);
+      setAdminOtp('');
+      setOtpSent(false);
+      setTimeout(() => setPasswordSuccess(''), 5000);
     } catch (err) {
       console.error("Failed to change password:", err);
-      setPasswordError(err.response?.data?.message || 'Incorrect old password or session error.');
+      setPasswordError(err.response?.data?.message || 'Incorrect old password or invalid OTP code.');
     } finally {
       setPasswordLoading(false);
     }
@@ -545,12 +644,10 @@ const AdminDashboard = () => {
 
   const adminTabs = [
     { id: 'clients', label: 'Client CRM', count: clients.length, icon: Users },
-    { id: 'treatments', label: 'Treatment Catalogue', count: treatmentsList.length, icon: Sparkles },
+    { id: 'treatments', label: 'Treatment Section', count: treatmentsList.length, icon: Sparkles },
     { id: 'staff', label: 'Staff Management', count: staffMembers.length + staffInvitations.length, icon: Briefcase },
     { id: 'messages', label: 'Inquiries', count: activeMessages.length, icon: MessageSquare },
     { id: 'reports', label: 'Operational Reports', icon: FileText },
-    { id: 'audit', label: 'Audit Trail', count: auditLogs.length, icon: Shield },
-    { id: 'settings', label: 'Clinic Settings', icon: Settings },
     { id: 'security', label: 'Admin Password', icon: KeyRound },
     { id: 'appointments', label: 'Archived Visits', count: appointments.length, icon: Calendar }
   ];
@@ -761,7 +858,7 @@ const AdminDashboard = () => {
 
             <div style={{ backgroundColor: 'var(--bg-white)', padding: '18px 20px', borderRadius: '12px', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Treatments Catalogue</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--text-light)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Treatment Section</span>
                 <Sparkles size={18} color="#b45309" />
               </div>
               <p style={{ fontSize: '1.75rem', fontWeight: '800', color: '#b45309', margin: '4px 0 2px' }}>
@@ -922,15 +1019,33 @@ const AdminDashboard = () => {
               <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', margin: '4px 0 0 0' }}>Centralized directory of clinic patients and their clinical treatments.</p>
             </div>
             
-            <div style={{ position: 'relative' }}>
-              <Search size={18} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-light)' }} />
-              <input 
-                type="text" 
-                placeholder="Search clients..." 
-                value={clientSearchTerm}
-                onChange={(e) => setClientSearchTerm(e.target.value)}
-                style={{ padding: '8px 12px 8px 35px', borderRadius: '8px', border: '1px solid var(--border-light)', outline: 'none' }}
-              />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={18} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-light)' }} />
+                <input 
+                  type="text" 
+                  placeholder="Search clients..." 
+                  value={clientSearchTerm}
+                  onChange={(e) => setClientSearchTerm(e.target.value)}
+                  style={{ padding: '8px 12px 8px 35px', borderRadius: '8px', border: '1px solid var(--border-light)', outline: 'none' }}
+                />
+              </div>
+
+              {clients.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleDeleteAllClients}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '6px',
+                    backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b',
+                    padding: '8px 14px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                  title="Purge all client profiles from CRM database"
+                >
+                  <Trash2 size={14} /> Clear CRM Data
+                </button>
+              )}
             </div>
           </div>
 
@@ -942,7 +1057,7 @@ const AdminDashboard = () => {
                   <th style={{ padding: '12px' }}>Email</th>
                   <th style={{ padding: '12px' }}>Phone</th>
                   <th style={{ padding: '12px', textAlign: 'center' }}>Sessions on File</th>
-                  <th style={{ padding: '12px', textAlign: 'center' }}>Clinical Profile</th>
+                  <th style={{ padding: '12px', textAlign: 'center' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -960,12 +1075,27 @@ const AdminDashboard = () => {
                         </span>
                       </td>
                       <td style={{ padding: '14px 12px', textAlign: 'center' }}>
-                        <button
-                          onClick={() => handleViewClientDetails(c.id)}
-                          style={{ backgroundColor: '#fbf9f6', border: '1px solid #ebdcd0', color: '#806657', padding: '6px 14px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer' }}
-                        >
-                          View File
-                        </button>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                          <button
+                            type="button"
+                            onClick={() => handleViewClientDetails(c.id)}
+                            style={{ backgroundColor: '#fbf9f6', border: '1px solid #ebdcd0', color: '#806657', padding: '6px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer' }}
+                          >
+                            View File
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteClient(c.id, c.fullName, c.email)}
+                            title="Delete client profile"
+                            style={{
+                              backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b',
+                              padding: '6px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '600',
+                              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px'
+                            }}
+                          >
+                            <Trash2 size={13} /> Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -1156,7 +1286,7 @@ const AdminDashboard = () => {
                         <td style={{ padding: '14px 12px', textAlign: 'center' }}>
                           <button 
                             type="button"
-                            onClick={() => handleDeleteStaffMember(staff.id, staff.fullName)}
+                            onClick={() => handleDeleteStaffMember(staff.id, staff.fullName, staff.email)}
                             title="Permanently remove staff member from salon"
                             style={{ 
                               backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', 
@@ -1221,6 +1351,7 @@ const AdminDashboard = () => {
                               </button>
                             )}
                             <button 
+                              type="button"
                               onClick={() => handleDeleteInvitation(staff.id, staff.email)}
                               style={{ 
                                 backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', 
@@ -1383,92 +1514,6 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* TAB 6: CLINIC SETTINGS */}
-      {activeTab === 'settings' && (
-        <div style={{ backgroundColor: 'var(--bg-white)', padding: '36px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)', maxWidth: '750px', margin: '0 auto' }}>
-          <div style={{ marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', fontFamily: 'var(--font-heading)', fontWeight: '600', margin: '0 0 6px 0' }}>Clinic Settings & Information</h2>
-            <p style={{ color: 'var(--text-light)', fontSize: '0.88rem', margin: 0 }}>Configure official public clinic contact and operational parameters.</p>
-          </div>
-
-          {settingsSuccess && (
-            <div style={{ padding: '12px 16px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '8px', marginBottom: '20px' }}>
-              {settingsSuccess}
-            </div>
-          )}
-
-          <form onSubmit={handleSaveSettings} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Official Clinic Name</label>
-              <input
-                type="text"
-                required
-                value={settings.clinicName}
-                onChange={(e) => setSettings({ ...settings, clinicName: e.target.value })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
-              />
-            </div>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Public Contact Email</label>
-                <input
-                  type="email"
-                  required
-                  value={settings.contactEmail}
-                  onChange={(e) => setSettings({ ...settings, contactEmail: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Contact Phone Number</label>
-                <input
-                  type="text"
-                  required
-                  value={settings.contactPhone}
-                  onChange={(e) => setSettings({ ...settings, contactPhone: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Clinic Location Address</label>
-              <input
-                type="text"
-                value={settings.address}
-                onChange={(e) => setSettings({ ...settings, address: e.target.value })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Consultation & Opening Hours</label>
-              <input
-                type="text"
-                value={settings.openingHours}
-                onChange={(e) => setSettings({ ...settings, openingHours: e.target.value })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Clinic Description</label>
-              <textarea
-                rows={3}
-                value={settings.generalInformation}
-                onChange={(e) => setSettings({ ...settings, generalInformation: e.target.value })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
-              />
-            </div>
-
-            <button type="submit" disabled={settingsLoading} className="btn-primary" style={{ padding: '12px', fontWeight: '600', marginTop: '6px' }}>
-              {settingsLoading ? 'Saving...' : 'Save Settings'}
-            </button>
-          </form>
-        </div>
-      )}
-
       {/* TAB 7: SECURITY & ADMIN PASSWORD */}
       {activeTab === 'security' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '25px', maxWidth: '650px', margin: '0 auto' }}>
@@ -1480,7 +1525,7 @@ const AdminDashboard = () => {
               </h3>
             </div>
             <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '25px', lineHeight: '1.5' }}>
-              Update your master administrator credentials directly. Changes apply immediately with BCrypt encryption.
+              Update your master administrator credentials directly. For strict security, password updates require verified 6-digit email OTP authorization.
             </p>
 
             {passwordSuccess && (
@@ -1546,29 +1591,86 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
+              {/* Mandatory Admin OTP Verification Step */}
+              <div style={{ 
+                backgroundColor: '#fbf9f6', padding: '18px', borderRadius: '10px', 
+                border: '1px solid #ebdcd0', display: 'flex', flexDirection: 'column', gap: '12px' 
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <span style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Shield size={16} color="var(--color-accent)" /> Admin Security OTP Verification *
+                    </span>
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>
+                      OTP is dispatched to admin email ({localStorage.getItem('email') || 'dermaalineaesthetics@gmail.com'})
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleSendAdminPasswordOtp}
+                    disabled={otpLoading || otpCooldown > 0}
+                    style={{
+                      backgroundColor: otpCooldown > 0 ? '#e2e8f0' : 'var(--color-primary)',
+                      color: otpCooldown > 0 ? '#64748b' : '#ffffff',
+                      border: 'none', padding: '8px 14px', borderRadius: '6px',
+                      fontSize: '0.8rem', fontWeight: '600', cursor: otpCooldown > 0 ? 'not-allowed' : 'pointer'
+                    }}
+                  >
+                    {otpLoading ? 'Sending OTP...' : otpCooldown > 0 ? `Resend in ${otpCooldown}s` : otpSent ? 'Resend OTP' : 'Request OTP Code'}
+                  </button>
+                </div>
+
+                {otpSent && (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>
+                      Enter 6-Digit Email Verification Code *
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={6}
+                      placeholder="• • • • • •"
+                      value={adminOtp}
+                      onChange={(e) => setAdminOtp(e.target.value.replace(/\D/g, ''))}
+                      style={{
+                        width: '100%', padding: '12px 14px', borderRadius: '8px',
+                        border: '2px solid var(--color-accent)', outline: 'none',
+                        letterSpacing: '8px', textAlign: 'center', fontSize: '1.25rem', fontWeight: '700',
+                        color: 'var(--color-primary)', backgroundColor: '#ffffff'
+                      }}
+                      required
+                    />
+                  </div>
+                )}
+              </div>
+
               <button 
                 type="submit" 
-                disabled={passwordLoading}
+                disabled={passwordLoading || !adminOtp || adminOtp.length !== 6}
                 className="btn-primary" 
-                style={{ padding: '12px 20px', fontWeight: '700', marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+                style={{ 
+                  padding: '12px 20px', fontWeight: '700', marginTop: '6px', 
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                  opacity: (!adminOtp || adminOtp.length !== 6) ? 0.6 : 1,
+                  cursor: (!adminOtp || adminOtp.length !== 6) ? 'not-allowed' : 'pointer'
+                }}
               >
-                <Lock size={16} /> {passwordLoading ? 'Updating Password...' : 'Save New Admin Password'}
+                <Lock size={16} /> {passwordLoading ? 'Verifying & Updating Password...' : 'Verify OTP & Save New Admin Password'}
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* TAB: TREATMENT CATALOGUE */}
+      {/* TAB: TREATMENT SECTION */}
       {activeTab === 'treatments' && (
         <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
             <div>
               <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', margin: '0 0 4px', fontFamily: 'var(--font-heading)' }}>
-                Clinical Treatment Catalogue
+                Clinical Treatment Section
               </h2>
               <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', margin: 0 }}>
-                Manage treatment offerings. Treatment prices are catalogue information only and automatically sync with the website.
+                Manage treatment offerings. Treatment details and photos automatically synchronize with the clinic website.
               </p>
             </div>
             <button 
@@ -1579,7 +1681,7 @@ const AdminDashboard = () => {
               className="btn-primary"
               style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 18px', fontWeight: '700', fontSize: '0.85rem' }}
             >
-              <Sparkles size={16} /> Add Treatment Entry
+              <Sparkles size={16} /> Add Treatment
             </button>
           </div>
 
@@ -1591,7 +1693,7 @@ const AdminDashboard = () => {
 
           {treatmentsList.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-light)', border: '1px dashed var(--border-light)', borderRadius: '12px' }}>
-              No treatments configured in catalogue yet. Click "Add Treatment Entry" above to add clinic offerings.
+              No treatments configured yet. Click "Add Treatment" above to add clinic offerings.
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
@@ -1601,7 +1703,7 @@ const AdminDashboard = () => {
                     <th style={{ padding: '12px 14px' }}>Photo</th>
                     <th style={{ padding: '12px 14px' }}>Treatment Name</th>
                     <th style={{ padding: '12px 14px' }}>Category</th>
-                    <th style={{ padding: '12px 14px' }}>Catalogue Price</th>
+                    <th style={{ padding: '12px 14px' }}>Price</th>
                     <th style={{ padding: '12px 14px' }}>Est. Duration</th>
                     <th style={{ padding: '12px 14px' }}>Public Status</th>
                     <th style={{ padding: '12px 14px', textAlign: 'right' }}>Actions</th>
@@ -1669,7 +1771,7 @@ const AdminDashboard = () => {
                           <button
                             type="button"
                             onClick={() => handleDeleteTreatment(tr.id, tr.name)}
-                            title="Delete treatment from catalogue"
+                            title="Delete treatment from treatment section"
                             style={{
                               backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b',
                               padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600',
@@ -1679,83 +1781,6 @@ const AdminDashboard = () => {
                             <Trash2 size={13} /> Delete
                           </button>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB: AUDIT LOGS */}
-      {activeTab === 'audit' && (
-        <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
-            <div>
-              <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', margin: '0 0 4px', fontFamily: 'var(--font-heading)' }}>
-                Operational & Security Audit Trail
-              </h2>
-              <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', margin: 0 }}>
-                Immutable record of administrative actions, staff invitations, account status alterations, and security operations.
-              </p>
-            </div>
-            {auditLogs.length > 0 && (
-              <button
-                type="button"
-                onClick={handleClearAllAuditLogs}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b',
-                  padding: '9px 16px', borderRadius: '8px', cursor: 'pointer',
-                  fontSize: '0.85rem', fontWeight: '600'
-                }}
-              >
-                <Trash2 size={15} /> Clear All Audit Logs
-              </button>
-            )}
-          </div>
-
-          {auditLogs.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-light)', border: '1px dashed var(--border-light)', borderRadius: '12px' }}>
-              No audit logs recorded yet. Security events and operational tasks will automatically appear here.
-            </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid var(--border-light)', color: 'var(--text-light)', fontSize: '0.85rem' }}>
-                    <th style={{ padding: '12px 14px' }}>Timestamp</th>
-                    <th style={{ padding: '12px 14px' }}>Action</th>
-                    <th style={{ padding: '12px 14px' }}>Actor</th>
-                    <th style={{ padding: '12px 14px' }}>Target Entity</th>
-                    <th style={{ padding: '12px 14px' }}>Operational Details</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {auditLogs.map((log) => (
-                    <tr key={log.id} style={{ borderBottom: '1px solid var(--border-light)', fontSize: '0.88rem' }}>
-                      <td style={{ padding: '12px 14px', color: 'var(--text-light)', whiteSpace: 'nowrap' }}>
-                        {log.timestamp ? new Date(log.timestamp).toLocaleString() : 'Recent'}
-                      </td>
-                      <td style={{ padding: '12px 14px' }}>
-                        <span style={{
-                          padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '700',
-                          backgroundColor: log.action?.includes('SUCCESS') ? '#d4edda' : log.action?.includes('FAILED') ? '#f8d7da' : '#e0f2fe',
-                          color: log.action?.includes('SUCCESS') ? '#155724' : log.action?.includes('FAILED') ? '#721c24' : '#0369a1'
-                        }}>
-                          {log.action}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 14px', fontWeight: '600', color: 'var(--color-primary)' }}>
-                        {log.performedBy || 'System'} <span style={{ fontSize: '0.75rem', color: 'var(--text-light)', fontWeight: 'normal' }}>({log.role})</span>
-                      </td>
-                      <td style={{ padding: '12px 14px', color: '#5c4d44' }}>
-                        {log.targetEntity} {log.targetId ? `#${log.targetId}` : ''}
-                      </td>
-                      <td style={{ padding: '12px 14px', color: '#2c221e' }}>
-                        {log.details}
                       </td>
                     </tr>
                   ))}
@@ -1781,7 +1806,7 @@ const AdminDashboard = () => {
           }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
               <h2 style={{ fontSize: '1.3rem', color: '#2c221e', margin: 0, fontWeight: '600' }}>
-                {treatmentForm.id ? 'Edit Treatment Catalogue Entry' : 'Create Treatment Catalogue Entry'}
+                {treatmentForm.id ? 'Edit Treatment Details' : 'Add Treatment Entry'}
               </h2>
               <button onClick={() => setShowTreatmentModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
             </div>
@@ -1917,7 +1942,7 @@ const AdminDashboard = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: '#4a3b32' }}>Catalogue Price (INR)</label>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: '#4a3b32' }}>Price (INR)</label>
                   <input 
                     type="number"
                     placeholder="e.g. 4500"
@@ -1957,7 +1982,7 @@ const AdminDashboard = () => {
                   onChange={(e) => setTreatmentForm({ ...treatmentForm, active: e.target.checked })}
                 />
                 <label htmlFor="activeCheck" style={{ fontSize: '0.85rem', color: '#4a3b32', cursor: 'pointer', fontWeight: '600' }}>
-                  Show in public treatment catalogue on clinic website
+                  Show in public treatment section on clinic website
                 </label>
               </div>
 
@@ -1968,7 +1993,7 @@ const AdminDashboard = () => {
                   className="btn-primary"
                   style={{ flex: 1, padding: '11px', fontWeight: '700' }}
                 >
-                  {treatmentSaving ? 'Saving...' : 'Save Catalogue Entry'}
+                  {treatmentSaving ? 'Saving...' : 'Save Treatment'}
                 </button>
                 <button
                   type="button"

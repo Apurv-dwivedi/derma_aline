@@ -171,22 +171,74 @@ public class StaffManagementController {
 
     @DeleteMapping("/invitations/{id}")
     public ResponseEntity<?> deleteInvitation(@PathVariable Long id) {
-        return staffInvitationRepository.findById(id).map(invitation -> {
+        Optional<StaffInvitation> invitationOpt = staffInvitationRepository.findById(id);
+        if (invitationOpt.isPresent()) {
+            StaffInvitation invitation = invitationOpt.get();
+            String email = invitation.getEmail();
             staffInvitationRepository.delete(invitation);
-            auditLogService.record("STAFF_INVITATION_DELETED", "admin", "SUPER_ADMIN", "STAFF_INVITATION", invitation.getEmail(), "Staff invitation revoked and removed");
+            if (email != null && !email.trim().isEmpty()) {
+                userRepository.findByEmail(email.trim().toLowerCase()).ifPresent(user -> {
+                    if (user.getRole() == User.Role.STAFF) {
+                        userRepository.delete(user);
+                    }
+                });
+            }
+            auditLogService.record("STAFF_INVITATION_DELETED", "admin", "SUPER_ADMIN", "STAFF_INVITATION", email != null ? email : id.toString(), "Staff invitation revoked and removed");
             return ResponseEntity.ok(Map.of("success", true, "message", "Staff invitation removed successfully."));
-        }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Invitation not found.")));
+        }
+
+        // Fallback: If passed ID is actually a user ID for a staff member
+        Optional<User> userOpt = userRepository.findById(id);
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            if (user.getRole() == User.Role.STAFF) {
+                String email = user.getEmail();
+                userRepository.delete(user);
+                if (email != null && !email.trim().isEmpty()) {
+                    staffInvitationRepository.findByEmail(email.trim().toLowerCase()).ifPresent(staffInvitationRepository::delete);
+                }
+                auditLogService.record("STAFF_DELETED", "admin", "SUPER_ADMIN", "USER", email != null ? email : id.toString(), "Staff account removed permanently from salon");
+                return ResponseEntity.ok(Map.of("success", true, "message", "Staff account removed from salon successfully."));
+            }
+        }
+
+        return ResponseEntity.status(404).body(Map.of("success", false, "message", "Staff invitation or account not found."));
     }
 
     @DeleteMapping("/members/{id}")
     public ResponseEntity<?> revokeStaffAccount(@PathVariable Long id) {
-        return userRepository.findById(id).map(user -> {
+        Optional<User> userOpt = userRepository.findById(id);
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
             if (user.getRole() == User.Role.SUPER_ADMIN || user.getRole() == User.Role.ADMIN) {
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Cannot delete clinic administrator accounts."));
             }
+            String email = user.getEmail();
             userRepository.delete(user);
-            auditLogService.record("STAFF_DELETED", "admin", "SUPER_ADMIN", "USER", user.getEmail(), "Staff account removed permanently from salon");
+            if (email != null && !email.trim().isEmpty()) {
+                staffInvitationRepository.findByEmail(email.trim().toLowerCase()).ifPresent(staffInvitationRepository::delete);
+            }
+            auditLogService.record("STAFF_DELETED", "admin", "SUPER_ADMIN", "USER", email != null ? email : id.toString(), "Staff account removed permanently from salon");
             return ResponseEntity.ok(Map.of("success", true, "message", "Staff account removed from salon successfully."));
-        }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Staff member not found.")));
+        }
+
+        // Fallback: If passed ID is actually an invitation ID
+        Optional<StaffInvitation> invitationOpt = staffInvitationRepository.findById(id);
+        if (invitationOpt.isPresent()) {
+            StaffInvitation invitation = invitationOpt.get();
+            String email = invitation.getEmail();
+            staffInvitationRepository.delete(invitation);
+            if (email != null && !email.trim().isEmpty()) {
+                userRepository.findByEmail(email.trim().toLowerCase()).ifPresent(user -> {
+                    if (user.getRole() == User.Role.STAFF) {
+                        userRepository.delete(user);
+                    }
+                });
+            }
+            auditLogService.record("STAFF_INVITATION_DELETED", "admin", "SUPER_ADMIN", "STAFF_INVITATION", email != null ? email : id.toString(), "Staff invitation revoked and removed");
+            return ResponseEntity.ok(Map.of("success", true, "message", "Staff invitation removed successfully."));
+        }
+
+        return ResponseEntity.status(404).body(Map.of("success", false, "message", "Staff member not found."));
     }
 }

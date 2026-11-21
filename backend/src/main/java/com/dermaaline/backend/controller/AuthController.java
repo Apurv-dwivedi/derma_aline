@@ -590,24 +590,84 @@ public class AuthController {
     }
 
     /**
+     * Dispatch OTP for Admin Password Change
+     */
+    @PostMapping("/admin-password/request-otp")
+    public ResponseEntity<?> requestAdminPasswordOtp(@RequestBody Map<String, String> payload) {
+        String email = payload.get("email");
+        if (email == null || email.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Admin email is required."));
+        }
+
+        String cleanEmail = email.trim().toLowerCase();
+        Optional<User> userOpt = userRepository.findByEmail(cleanEmail);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("success", false, "message", "Admin account not found."));
+        }
+
+        User user = userOpt.get();
+        if (user.getRole() != User.Role.SUPER_ADMIN && user.getRole() != User.Role.ADMIN) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("success", false, "message", "Password OTP request is restricted to clinic administrators."));
+        }
+
+        try {
+            boolean sent = otpService.generateAndSendOtp(cleanEmail, user.getFullName() != null ? user.getFullName() : "Clinic Administrator");
+            auditLogService.record("ADMIN_PASSWORD_OTP_REQUESTED", cleanEmail, user.getRole().name(), "USER", user.getId().toString(), "Admin requested password change OTP");
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "A 6-digit security verification OTP has been sent to " + cleanEmail + ". Enter the OTP to authorize your password update."
+            ));
+        } catch (IllegalStateException ise) {
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(Map.of("success", false, "message", ise.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Failed to dispatch OTP: " + e.getMessage()));
+        }
+    }
+
+    /**
      * Authenticated Password Change
+     * Requires valid 6-digit email OTP for ADMIN and SUPER_ADMIN roles.
      */
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(@RequestBody Map<String, String> payload) {
         String email = payload.get("email");
         String oldPassword = payload.get("oldPassword");
         String newPassword = payload.get("newPassword");
+        String otp = payload.get("otp");
 
         if (email == null || oldPassword == null || newPassword == null) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "All fields are required."));
         }
 
-        Optional<User> userOpt = userRepository.findByEmail(email.trim().toLowerCase());
+        String cleanEmail = email.trim().toLowerCase();
+        Optional<User> userOpt = userRepository.findByEmail(cleanEmail);
         if (userOpt.isEmpty()) {
             return ResponseEntity.status(404).body(Map.of("success", false, "message", "User not found."));
         }
 
         User user = userOpt.get();
+
+        // For ADMIN and SUPER_ADMIN accounts: OTP verification is strictly mandatory
+        boolean isAdmin = (user.getRole() == User.Role.SUPER_ADMIN || user.getRole() == User.Role.ADMIN);
+        if (isAdmin) {
+            if (otp == null || otp.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "requiresOtp", true,
+                    "message", "Admin password change requires 6-digit email OTP verification. Please request an OTP first."
+                ));
+            }
+
+            boolean isOtpValid = otpService.verifyOtp(cleanEmail, otp.trim());
+            if (!isOtpValid) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "requiresOtp", true,
+                    "message", "Invalid or expired OTP verification code. Please check your email and try again."
+                ));
+            }
+        }
+
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
             return ResponseEntity.status(400).body(Map.of("success", false, "message", "Incorrect current password."));
         }
@@ -618,6 +678,8 @@ public class AuthController {
 
         user.setPassword(passwordEncoder.encode(newPassword.trim()));
         userRepository.save(user);
+
+        auditLogService.record("PASSWORD_CHANGED", cleanEmail, user.getRole().name(), "USER", user.getId().toString(), "Password changed successfully" + (isAdmin ? " with 6-digit OTP verification" : ""));
 
         return ResponseEntity.ok(Map.of("success", true, "message", "Password changed successfully."));
     }

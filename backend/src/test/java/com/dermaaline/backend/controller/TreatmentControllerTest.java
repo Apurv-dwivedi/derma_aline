@@ -30,10 +30,13 @@ public class TreatmentControllerTest {
     @Mock
     private TreatmentRepository treatmentRepository;
 
+    @Mock
+    private com.dermaaline.backend.service.AuditLogService auditLogService;
+
     @InjectMocks
     private TreatmentController treatmentController;
 
-    private ObjectMapper objectMapper = new ObjectMapper();
+    private ObjectMapper objectMapper = new ObjectMapper().registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
 
     @BeforeEach
     void setUp() {

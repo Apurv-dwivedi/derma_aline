@@ -157,6 +157,7 @@ public class DatabaseFixRunner {
                 "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS target_id VARCHAR(255);",
                 "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS details TEXT;",
                 "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
+                "DELETE FROM audit_logs;",
 
                 // 9. Notifications table verification
                 "CREATE TABLE IF NOT EXISTS notifications (" +

@@ -81,4 +81,28 @@ public class CustomerController {
         customerRepository.save(c);
         return ResponseEntity.ok(Map.of("success", true, "message", "Customer profile updated successfully"));
     }
+
+    /**
+     * Delete Individual Client from CRM: DELETE /api/admin/clients/{id}
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteCustomer(@PathVariable Long id) {
+        Optional<Customer> opt = customerRepository.findById(id);
+        if (opt.isEmpty()) {
+            return ResponseEntity.status(404).body(Map.of("success", false, "message", "Client profile not found."));
+        }
+        Customer c = opt.get();
+        String email = c.getEmail();
+        customerRepository.delete(c);
+        return ResponseEntity.ok(Map.of("success", true, "message", "Client profile deleted from CRM successfully.", "email", email != null ? email : ""));
+    }
+
+    /**
+     * Delete All Client CRM Data: DELETE /api/admin/clients
+     */
+    @DeleteMapping
+    public ResponseEntity<?> deleteAllCustomers() {
+        customerRepository.deleteAll();
+        return ResponseEntity.ok(Map.of("success", true, "message", "All client CRM profiles have been deleted successfully."));
+    }
 }
