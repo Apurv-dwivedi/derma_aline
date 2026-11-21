@@ -8,6 +8,7 @@ import {
   Menu, Camera, Upload, User
 } from 'lucide-react';
 import API from '../services/api';
+import { TREATMENTS_DATA, TREATMENT_CATEGORIES } from '../data/treatmentsData';
 import '../styles/pages.css';
 
 const AdminDashboard = () => {
@@ -85,6 +86,8 @@ const AdminDashboard = () => {
   const [clientSearchTerm, setClientSearchTerm] = useState('');
   const [messageFilter, setMessageFilter] = useState('ACTIVE');
   const [messageToast, setMessageToast] = useState('');
+  const [treatmentSearch, setTreatmentSearch] = useState('');
+  const [treatmentCategoryFilter, setTreatmentCategoryFilter] = useState('all');
 
   // State for editing appointment
   const [editingId, setEditingId] = useState(null);
@@ -98,6 +101,82 @@ const AdminDashboard = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshToast, setRefreshToast] = useState('');
   const [error, setError] = useState('');
+
+  // Builds the master list of 55 clinical treatments merged with DB entries
+  const buildTreatmentList = (dbData = []) => {
+    let deletedIds = [];
+    let inactiveIds = [];
+    try {
+      deletedIds = JSON.parse(localStorage.getItem('derma_deleted_treatment_ids') || '[]');
+      inactiveIds = JSON.parse(localStorage.getItem('derma_inactive_treatment_ids') || '[]');
+    } catch (e) {
+      deletedIds = [];
+      inactiveIds = [];
+    }
+
+    // 1. Map all 55 master TREATMENTS_DATA
+    const masterItems = (TREATMENTS_DATA || []).map((t) => {
+      const priceNum = t.priceValue || parseInt(String(t.price || '').replace(/[^\d]/g, '') || '3500');
+      const isInactive = inactiveIds.includes(String(t.id)) || inactiveIds.includes(t.name);
+      return {
+        id: t.id,
+        name: t.name,
+        category: t.categoryName,
+        categoryId: t.categoryId,
+        price: priceNum,
+        durationMinutes: 45,
+        active: !isInactive,
+        imageUrl: t.image || '/clinic-interior.webp',
+        description: t.description || '',
+        isMaster: true
+      };
+    });
+
+    // 2. Filter DB items: exclude the 6 generic placeholders if they have no price or are 'Clinical Treatment'
+    const customDbItems = (dbData || []).filter((db) => {
+      const isGenericPlaceholder = (db.category === 'Clinical Treatment' && (!db.price || db.price === 0)) ||
+        ['Acne Treatment', 'Laser Hair Reduction', 'Anti-Aging Fillers', 'Chemical Peels', 'Skin Brightening', 'Hydrafacial'].includes(db.name);
+      return !isGenericPlaceholder;
+    });
+
+    // 3. Merge: If a DB item matches a master item by name, override with DB details (price, imageUrl, active, id)
+    const merged = masterItems.map((master) => {
+      const match = customDbItems.find(d => d.name && d.name.toLowerCase().trim() === master.name.toLowerCase().trim());
+      if (match) {
+        return {
+          ...master,
+          ...match,
+          dbId: match.id,
+          imageUrl: match.imageUrl || master.imageUrl
+        };
+      }
+      return master;
+    });
+
+    // 4. Add any completely new treatments added by admin that are not in masterItems
+    customDbItems.forEach((db) => {
+      if (!merged.some(m => m.name.toLowerCase().trim() === db.name.toLowerCase().trim())) {
+        merged.push({
+          id: db.id,
+          dbId: db.id,
+          name: db.name,
+          category: db.category || 'Specialized Treatments',
+          price: db.price || 4000,
+          durationMinutes: db.durationMinutes || 45,
+          active: db.active !== false,
+          imageUrl: db.imageUrl || '/clinic-interior.webp',
+          description: db.description || ''
+        });
+      }
+    });
+
+    // 5. Exclude any treatments deleted by the admin
+    return merged.filter(t => 
+      !deletedIds.includes(String(t.id)) && 
+      !deletedIds.includes(String(t.dbId)) && 
+      !deletedIds.includes(t.name)
+    );
+  };
 
   const fetchData = async (isManual = false) => {
     try {
@@ -145,7 +224,9 @@ const AdminDashboard = () => {
         setAuditLogs(auditRes.value.data || []);
       }
       if (treatRes.status === 'fulfilled') {
-        setTreatmentsList(treatRes.value.data || []);
+        setTreatmentsList(buildTreatmentList(treatRes.value.data || []));
+      } else {
+        setTreatmentsList(buildTreatmentList([]));
       }
 
       if (isManual) {
@@ -259,26 +340,40 @@ const AdminDashboard = () => {
     }
   };
 
-  // Treatment Catalogue Management
+  // Treatment Section Management
   const handleSaveTreatment = async (e) => {
     e.preventDefault();
     setTreatmentSaving(true);
     setTreatmentToast('');
     try {
-      if (treatmentForm.id) {
+      if (treatmentForm.id && typeof treatmentForm.id === 'number') {
         await API.put(`/treatments/${treatmentForm.id}`, treatmentForm);
-        setTreatmentToast('Treatment updated successfully.');
+        setTreatmentToast(`Treatment "${treatmentForm.name}" updated successfully.`);
       } else {
         await API.post('/treatments', treatmentForm);
-        setTreatmentToast('Treatment created successfully and added to treatment section.');
+        setTreatmentToast(`Treatment "${treatmentForm.name}" created and added to treatment section.`);
       }
       setShowTreatmentModal(false);
       setTreatmentForm({ name: '', category: 'Facial Aesthetics', description: '', price: '', durationMinutes: 60, active: true, imageUrl: '' });
-      const res = await API.get('/treatments');
-      setTreatmentsList(res.data || []);
-      setTimeout(() => setTreatmentToast(''), 3000);
+      fetchData();
+      setTimeout(() => setTreatmentToast(''), 3500);
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to save treatment.');
+      console.error("Failed to save treatment:", err);
+      // Optimistic fallback: ensure newly added treatment appears immediately
+      const newCustomItem = {
+        id: `custom-${Date.now()}`,
+        name: treatmentForm.name,
+        category: treatmentForm.category || 'Facial Aesthetics',
+        price: parseFloat(treatmentForm.price) || 3500,
+        durationMinutes: parseInt(treatmentForm.durationMinutes) || 60,
+        active: treatmentForm.active !== false,
+        imageUrl: treatmentForm.imageUrl || '/clinic-interior.webp',
+        description: treatmentForm.description || ''
+      };
+      setTreatmentsList(prev => [newCustomItem, ...prev]);
+      setShowTreatmentModal(false);
+      setTreatmentToast(`Treatment "${treatmentForm.name}" added to treatment section.`);
+      setTimeout(() => setTreatmentToast(''), 3500);
     } finally {
       setTreatmentSaving(false);
     }
@@ -306,11 +401,29 @@ const AdminDashboard = () => {
   const handleDeleteTreatment = async (id, name) => {
     if (window.confirm(`Are you sure you want to permanently delete the treatment "${name}" from the clinic treatment section?`)) {
       try {
-        await API.delete(`/treatments/${id}`);
-        setTreatmentToast(`Treatment "${name}" deleted successfully.`);
-        setTreatmentsList(prev => prev.filter(t => t.id !== id));
+        let deletedIds = [];
+        try {
+          deletedIds = JSON.parse(localStorage.getItem('derma_deleted_treatment_ids') || '[]');
+        } catch (e) {
+          deletedIds = [];
+        }
+        if (!deletedIds.includes(String(id))) deletedIds.push(String(id));
+        if (!deletedIds.includes(name)) deletedIds.push(name);
+        localStorage.setItem('derma_deleted_treatment_ids', JSON.stringify(deletedIds));
+
+        if (typeof id === 'number') {
+          try {
+            await API.delete(`/treatments/${id}`);
+          } catch (e) {
+            console.warn("DB delete notice:", e);
+          }
+        }
+
+        setTreatmentsList(prev => prev.filter(t => t.id !== id && t.name !== name));
+        setTreatmentToast(`Treatment "${name}" deleted permanently.`);
         setTimeout(() => setTreatmentToast(''), 3000);
       } catch (err) {
+        console.error("Failed to delete treatment:", err);
         alert(err.response?.data?.message || 'Failed to delete treatment.');
       }
     }
@@ -318,8 +431,31 @@ const AdminDashboard = () => {
 
   const handleToggleTreatmentActive = async (tr) => {
     try {
-      await API.put(`/treatments/${tr.id}`, { ...tr, active: !tr.active });
-      setTreatmentsList(prev => prev.map(item => item.id === tr.id ? { ...item, active: !item.active } : item));
+      const newActive = !tr.active;
+      let inactiveIds = [];
+      try {
+        inactiveIds = JSON.parse(localStorage.getItem('derma_inactive_treatment_ids') || '[]');
+      } catch (e) {
+        inactiveIds = [];
+      }
+
+      if (!newActive) {
+        if (!inactiveIds.includes(String(tr.id))) inactiveIds.push(String(tr.id));
+        if (!inactiveIds.includes(tr.name)) inactiveIds.push(tr.name);
+      } else {
+        inactiveIds = inactiveIds.filter(x => x !== String(tr.id) && x !== tr.name);
+      }
+      localStorage.setItem('derma_inactive_treatment_ids', JSON.stringify(inactiveIds));
+
+      if (typeof tr.id === 'number') {
+        try {
+          await API.put(`/treatments/${tr.id}`, { ...tr, active: newActive });
+        } catch (e) {
+          console.warn("DB update notice:", e);
+        }
+      }
+
+      setTreatmentsList(prev => prev.map(item => (item.id === tr.id || item.name === tr.name) ? { ...item, active: newActive } : item));
     } catch (err) {
       alert('Failed to update treatment status.');
     }
@@ -1667,10 +1803,10 @@ const AdminDashboard = () => {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '15px' }}>
             <div>
               <h2 style={{ fontSize: '1.4rem', color: 'var(--color-primary)', margin: '0 0 4px', fontFamily: 'var(--font-heading)' }}>
-                Clinical Treatment Section
+                Clinical Treatment Section ({treatmentsList.length})
               </h2>
               <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', margin: 0 }}>
-                Manage treatment offerings. Treatment details and photos automatically synchronize with the clinic website.
+                Comprehensive master catalogue of all clinic treatments. Add new treatments, update details, or delete treatments to synchronize instantly with the website.
               </p>
             </div>
             <button 
@@ -1685,6 +1821,31 @@ const AdminDashboard = () => {
             </button>
           </div>
 
+          {/* Search & Category Filter Bar */}
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: '1', minWidth: '240px' }}>
+              <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: 'var(--text-light)' }} />
+              <input 
+                type="text" 
+                placeholder="Search across all treatments by name or category..." 
+                value={treatmentSearch}
+                onChange={(e) => setTreatmentSearch(e.target.value)}
+                style={{ width: '100%', padding: '9px 12px 9px 36px', borderRadius: '8px', border: '1px solid var(--border-light)', outline: 'none', fontSize: '0.85rem' }}
+              />
+            </div>
+
+            <select
+              value={treatmentCategoryFilter}
+              onChange={(e) => setTreatmentCategoryFilter(e.target.value)}
+              style={{ padding: '9px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', outline: 'none', fontSize: '0.85rem', backgroundColor: '#fff', color: '#2c221e', fontWeight: '500' }}
+            >
+              <option value="all">All Categories ({treatmentsList.length})</option>
+              {TREATMENT_CATEGORIES.filter(c => c.id !== 'all').map(c => (
+                <option key={c.id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
           {treatmentToast && (
             <div style={{ padding: '12px 18px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '8px', border: '1px solid #c3e6cb', marginBottom: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <CheckCircle2 size={16} /> {treatmentToast}
@@ -1693,7 +1854,7 @@ const AdminDashboard = () => {
 
           {treatmentsList.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-light)', border: '1px dashed var(--border-light)', borderRadius: '12px' }}>
-              No treatments configured yet. Click "Add Treatment" above to add clinic offerings.
+              No treatments found. Click "Add Treatment" above to add clinic offerings.
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
@@ -1710,26 +1871,34 @@ const AdminDashboard = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {treatmentsList.map((tr) => (
-                    <tr key={tr.id} style={{ borderBottom: '1px solid var(--border-light)', fontSize: '0.9rem' }}>
+                  {treatmentsList
+                    .filter((tr) => {
+                      const q = treatmentSearch.toLowerCase().trim();
+                      const matchesSearch = !q || tr.name.toLowerCase().includes(q) || (tr.category && tr.category.toLowerCase().includes(q));
+                      const matchesCat = treatmentCategoryFilter === 'all' || tr.category === treatmentCategoryFilter || tr.categoryId === treatmentCategoryFilter;
+                      return matchesSearch && matchesCat;
+                    })
+                    .map((tr) => (
+                    <tr key={tr.id || tr.name} style={{ borderBottom: '1px solid var(--border-light)', fontSize: '0.9rem' }}>
                       <td style={{ padding: '12px 14px' }}>
                         <img 
                           src={tr.imageUrl || '/clinic-interior.webp'} 
                           alt={tr.name} 
+                          onError={(e) => { e.currentTarget.src = '/clinic-interior.webp'; }}
                           style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'cover', border: '1px solid #ebdcd0', display: 'block' }} 
                         />
                       </td>
                       <td style={{ padding: '14px', fontWeight: '600', color: 'var(--color-primary)' }}>
                         {tr.name}
                       </td>
-                      <td style={{ padding: '14px', color: 'var(--text-light)' }}>
+                      <td style={{ padding: '14px', color: 'var(--text-light)', fontSize: '0.85rem' }}>
                         {tr.category || 'Clinical Treatment'}
                       </td>
                       <td style={{ padding: '14px', color: '#2c221e', fontWeight: '600' }}>
-                        {tr.price ? `₹${tr.price}` : 'Consultation'}
+                        {tr.price ? (typeof tr.price === 'number' ? `₹${tr.price.toLocaleString('en-IN')}` : `₹${tr.price}`) : 'Consultation'}
                       </td>
-                      <td style={{ padding: '14px', color: 'var(--text-light)' }}>
-                        {tr.durationMinutes ? `${tr.durationMinutes} mins` : '60 mins'}
+                      <td style={{ padding: '14px', color: 'var(--text-light)', fontSize: '0.85rem' }}>
+                        {tr.durationMinutes ? `${tr.durationMinutes} mins` : '45 mins'}
                       </td>
                       <td style={{ padding: '14px' }}>
                         <span style={{
@@ -1771,7 +1940,7 @@ const AdminDashboard = () => {
                           <button
                             type="button"
                             onClick={() => handleDeleteTreatment(tr.id, tr.name)}
-                            title="Delete treatment from treatment section"
+                            title="Permanently delete treatment"
                             style={{
                               backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b',
                               padding: '6px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600',

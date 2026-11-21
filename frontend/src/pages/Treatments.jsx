@@ -45,12 +45,22 @@ const Treatments = () => {
 
   // Merge static catalogue with dynamic treatments from Admin database
   const combinedTreatments = useMemo(() => {
+    let deletedIds = [];
+    try {
+      deletedIds = JSON.parse(localStorage.getItem('derma_deleted_treatment_ids') || '[]');
+    } catch (e) {
+      deletedIds = [];
+    }
+
     if (!dbTreatments || dbTreatments.length === 0) {
-      return TREATMENTS_DATA;
+      return TREATMENTS_DATA.filter(t => !deletedIds.includes(String(t.id)) && !deletedIds.includes(t.name));
     }
 
     const merged = [...TREATMENTS_DATA];
     dbTreatments.forEach((db) => {
+      // Skip dummy placeholders with no price
+      if (db.category === 'Clinical Treatment' && (!db.price || db.price === 0)) return;
+
       // Find matching category or fallback to first valid category
       const catMatch = TREATMENT_CATEGORIES.find((c) => 
         c.name.toLowerCase().includes((db.category || '').toLowerCase()) ||
@@ -84,7 +94,11 @@ const Treatments = () => {
       }
     });
 
-    return merged;
+    return merged.filter(t => 
+      !deletedIds.includes(String(t.id)) && 
+      !deletedIds.includes(String(t.dbId)) && 
+      !deletedIds.includes(t.name)
+    );
   }, [dbTreatments]);
 
   // Filter treatments based on active category & search query

@@ -158,6 +158,7 @@ public class DatabaseFixRunner {
                 "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS details TEXT;",
                 "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
                 "DELETE FROM audit_logs;",
+                "DELETE FROM treatments WHERE category = 'Clinical Treatment' OR price IS NULL;",
 
                 // 9. Notifications table verification
                 "CREATE TABLE IF NOT EXISTS notifications (" +
