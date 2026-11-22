@@ -618,6 +618,20 @@ const AdminDashboard = () => {
     }
   };
 
+  // System: Purge All Portal Data (Client, Staff, and Admin portals)
+  const handlePurgeAllPortalData = async () => {
+    if (window.confirm("WARNING: Are you sure you want to permanently delete ALL data across Client Portal, Staff Portal, and Admin Portal (appointments, treatment records, clients, enquiries, staff accounts, OTPs)?\n\nOnly your admin account (dermaalineaesthetics@gmail.com) and core treatments will be kept.")) {
+      try {
+        await API.delete('/admin/system/purge-all-data');
+        setRefreshToast('All portal data has been completely wiped. Admin credentials preserved.');
+        fetchData();
+        setTimeout(() => setRefreshToast(''), 4000);
+      } catch (err) {
+        alert(err.response?.data?.message || 'Failed to purge portal data.');
+      }
+    }
+  };
+
   // Clinic Settings Save
   const handleSaveSettings = async (e) => {
     e.preventDefault();
@@ -1200,6 +1214,20 @@ const AdminDashboard = () => {
                   <Trash2 size={14} /> Clear CRM Data
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={handlePurgeAllPortalData}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  backgroundColor: '#fff1f2', border: '1px solid #fecdd3', color: '#be123c',
+                  padding: '8px 14px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+                title="Permanently wipe all records across client, staff, and admin portals (keeps admin account)"
+              >
+                <Trash2 size={14} /> Purge All Portal Data
+              </button>
             </div>
           </div>
 

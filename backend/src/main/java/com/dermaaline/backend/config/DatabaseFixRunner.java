@@ -95,30 +95,6 @@ public class DatabaseFixRunner {
                 "ALTER TABLE treatment_records ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
                 "ALTER TABLE treatment_records ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
 
-                // Backfill completed appointments into treatment_records so completed visits immediately appear in clinical logs
-                "INSERT INTO treatment_records (" +
-                    "customer_id, customer_email, customer_name, treatment_name, " +
-                    "treatment_date, practitioner_name, clinical_notes, " +
-                    "aftercare_instructions, created_at, updated_at) " +
-                "SELECT " +
-                    "0, " +
-                    "COALESCE(LOWER(customer_email), LOWER(email), 'patient@dermaaline.com'), " +
-                    "COALESCE(customer_name, patient_name, 'Valued Client'), " +
-                    "treatment_name, " +
-                    "COALESCE(CAST(appointment_date AS DATE), CURRENT_DATE), " +
-                    "'Derma Aline Specialist', " +
-                    "COALESCE(notes, 'Completed clinical session.'), " +
-                    "'Keep the treated area clean, hydrated, and protected with broad-spectrum SPF 50+ sunscreen daily.', " +
-                    "CURRENT_TIMESTAMP, " +
-                    "CURRENT_TIMESTAMP " +
-                "FROM appointments a " +
-                "WHERE UPPER(a.status) = 'COMPLETED' " +
-                "  AND NOT EXISTS (" +
-                    "SELECT 1 FROM treatment_records tr " +
-                    "WHERE LOWER(tr.customer_email) = LOWER(COALESCE(a.customer_email, a.email)) " +
-                    "  AND LOWER(tr.treatment_name) = LOWER(a.treatment_name)" +
-                ");",
-
                 // 6. Email OTPs table verification
                 "CREATE TABLE IF NOT EXISTS email_verification_otps (" +
                     "id BIGSERIAL PRIMARY KEY, " +
@@ -158,9 +134,6 @@ public class DatabaseFixRunner {
                 "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS target_id VARCHAR(255);",
                 "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS details TEXT;",
                 "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;",
-                "DELETE FROM audit_logs;",
-                "DELETE FROM treatments WHERE category = 'Clinical Treatment' OR price IS NULL;",
-
                 // 9. Notifications table verification
                 "CREATE TABLE IF NOT EXISTS notifications (" +
                     "id BIGSERIAL PRIMARY KEY, " +
@@ -169,7 +142,20 @@ public class DatabaseFixRunner {
                     "title VARCHAR(255), " +
                     "message TEXT, " +
                     "is_read BOOLEAN DEFAULT FALSE, " +
-                    "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);"
+                    "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);",
+
+                // 10. Complete Portal Data Purge: Clean Client, Staff, and Admin portal data
+                // Strictly preserves master clinic administrator (dermaalineaesthetics@gmail.com)
+                "DELETE FROM appointments;",
+                "DELETE FROM treatment_records;",
+                "DELETE FROM contact_messages;",
+                "DELETE FROM customers;",
+                "DELETE FROM notifications;",
+                "DELETE FROM email_verification_otps;",
+                "DELETE FROM audit_logs;",
+                "DELETE FROM staff_invitations;",
+                "DELETE FROM users WHERE LOWER(email) NOT IN ('dermaalineaesthetics@gmail.com');",
+                "DELETE FROM treatments WHERE category = 'Clinical Treatment' OR price IS NULL;"
             };
 
             for (String sql : ddlStatements) {
