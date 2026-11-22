@@ -18,7 +18,7 @@ public class AdminBootstrap {
     @Value("${app.admin.email:dermaalineaesthetics@gmail.com}")
     private String adminEmail;
 
-    @Value("${app.admin.password:DermaAline@2026!}")
+    @Value("${app.admin.password:DermaAline#Master2026!}")
     private String adminPassword;
 
     @Value("${app.staff.email:staff@dermaaline.com}")
