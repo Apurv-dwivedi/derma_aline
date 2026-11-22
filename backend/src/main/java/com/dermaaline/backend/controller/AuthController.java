@@ -596,29 +596,34 @@ public class AuthController {
     }
 
     /**
-     * Dispatch OTP for Admin Password Change
+     * Dispatch OTP for Admin and Staff Password Change
      */
-    @PostMapping("/admin-password/request-otp")
-    public ResponseEntity<?> requestAdminPasswordOtp(@RequestBody Map<String, String> payload) {
+    @PostMapping({"/password/request-otp", "/admin-password/request-otp"})
+    public ResponseEntity<?> requestPasswordChangeOtp(@RequestBody Map<String, String> payload) {
         String email = payload.get("email");
         if (email == null || email.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Admin email is required."));
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Email address is required."));
         }
 
         String cleanEmail = email.trim().toLowerCase();
         Optional<User> userOpt = userRepository.findByEmail(cleanEmail);
         if (userOpt.isEmpty()) {
-            return ResponseEntity.status(404).body(Map.of("success", false, "message", "Admin account not found."));
+            return ResponseEntity.status(404).body(Map.of("success", false, "message", "Account not found."));
         }
 
         User user = userOpt.get();
-        if (user.getRole() != User.Role.SUPER_ADMIN && user.getRole() != User.Role.ADMIN) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("success", false, "message", "Password OTP request is restricted to clinic administrators."));
+        boolean isInternal = (user.getRole() == User.Role.SUPER_ADMIN || 
+                              user.getRole() == User.Role.ADMIN || 
+                              user.getRole() == User.Role.STAFF);
+
+        if (!isInternal) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("success", false, "message", "Password OTP request is restricted to clinical personnel."));
         }
 
         try {
-            boolean sent = otpService.generateAndSendOtp(cleanEmail, user.getFullName() != null ? user.getFullName() : "Clinic Administrator");
-            auditLogService.record("ADMIN_PASSWORD_OTP_REQUESTED", cleanEmail, user.getRole().name(), "USER", user.getId().toString(), "Admin requested password change OTP");
+            String roleName = user.getRole() == User.Role.STAFF ? "Clinical Staff" : "Clinic Administrator";
+            boolean sent = otpService.generateAndSendOtp(cleanEmail, user.getFullName() != null ? user.getFullName() : roleName);
+            auditLogService.record("PASSWORD_OTP_REQUESTED", cleanEmail, user.getRole().name(), "USER", user.getId().toString(), roleName + " requested password change OTP");
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "A 6-digit security verification OTP has been sent to " + cleanEmail + ". Enter the OTP to authorize your password update."
@@ -632,7 +637,7 @@ public class AuthController {
 
     /**
      * Authenticated Password Change
-     * Requires valid 6-digit email OTP for ADMIN and SUPER_ADMIN roles.
+     * Requires valid 6-digit email OTP for ADMIN, SUPER_ADMIN, and STAFF roles.
      */
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(@RequestBody Map<String, String> payload) {
@@ -653,14 +658,18 @@ public class AuthController {
 
         User user = userOpt.get();
 
-        // For ADMIN and SUPER_ADMIN accounts: OTP verification is strictly mandatory
-        boolean isAdmin = (user.getRole() == User.Role.SUPER_ADMIN || user.getRole() == User.Role.ADMIN);
-        if (isAdmin) {
+        // For ADMIN, SUPER_ADMIN, and STAFF accounts: OTP verification is strictly mandatory
+        boolean requiresOtp = (user.getRole() == User.Role.SUPER_ADMIN || 
+                               user.getRole() == User.Role.ADMIN || 
+                               user.getRole() == User.Role.STAFF);
+
+        if (requiresOtp) {
+            String roleTitle = (user.getRole() == User.Role.STAFF) ? "Staff" : "Admin";
             if (otp == null || otp.trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
                     "requiresOtp", true,
-                    "message", "Admin password change requires 6-digit email OTP verification. Please request an OTP first."
+                    "message", roleTitle + " password change requires 6-digit email OTP verification. Please request an OTP first."
                 ));
             }
 

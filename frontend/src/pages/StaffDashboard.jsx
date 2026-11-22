@@ -50,6 +50,20 @@ const StaffDashboard = () => {
   const [customerForm, setCustomerForm] = useState({ fullName: '', email: '', phone: '', notes: '' });
   const [customerSaving, setCustomerSaving] = useState(false);
 
+  // Staff Password Change with 6-Digit OTP State
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [staffPasswordForm, setStaffPasswordForm] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+    otp: ''
+  });
+  const [staffPasswordLoading, setStaffPasswordLoading] = useState(false);
+  const [staffOtpRequesting, setStaffOtpRequesting] = useState(false);
+  const [staffOtpSent, setStaffOtpSent] = useState(false);
+  const [staffPasswordError, setStaffPasswordError] = useState('');
+  const [staffPasswordSuccess, setStaffPasswordSuccess] = useState('');
+
   const [refreshing, setRefreshing] = useState(false);
   const [refreshToast, setRefreshToast] = useState('');
 
@@ -169,25 +183,76 @@ const StaffDashboard = () => {
     }
   };
 
-  const handleChangePassword = async () => {
-    const currentPass = window.prompt("Enter your current staff password:");
-    if (!currentPass || !currentPass.trim()) return;
-    const newPass = window.prompt("Enter your new confidential password (minimum 6 characters):");
-    if (!newPass || !newPass.trim()) return;
-    if (newPass.trim().length < 6) {
-      alert("New password must be at least 6 characters long.");
+  const handleOpenPasswordModal = () => {
+    setStaffPasswordForm({ oldPassword: '', newPassword: '', confirmPassword: '', otp: '' });
+    setStaffPasswordError('');
+    setStaffPasswordSuccess('');
+    setStaffOtpSent(false);
+    setShowPasswordModal(true);
+  };
+
+  const handleRequestStaffOtp = async () => {
+    const email = localStorage.getItem('email') || '';
+    if (!email) {
+      setStaffPasswordError('Staff email not found. Please log in again.');
       return;
     }
+    setStaffOtpRequesting(true);
+    setStaffPasswordError('');
     try {
-      const email = localStorage.getItem('email') || '';
+      const res = await API.post('/auth/password/request-otp', { email });
+      setStaffOtpSent(true);
+      setStaffPasswordSuccess(res.data?.message || `A 6-digit verification code has been dispatched to ${email}.`);
+      setTimeout(() => setStaffPasswordSuccess(''), 6000);
+    } catch (err) {
+      setStaffPasswordError(err.response?.data?.message || 'Failed to dispatch verification code. Please try again.');
+    } finally {
+      setStaffOtpRequesting(false);
+    }
+  };
+
+  const handleUpdateStaffPassword = async (e) => {
+    e.preventDefault();
+    const email = localStorage.getItem('email') || '';
+    if (!email) {
+      setStaffPasswordError('Staff email not found. Please log in again.');
+      return;
+    }
+    if (!staffPasswordForm.oldPassword) {
+      setStaffPasswordError('Current password is required.');
+      return;
+    }
+    if (staffPasswordForm.newPassword !== staffPasswordForm.confirmPassword) {
+      setStaffPasswordError('New passwords do not match.');
+      return;
+    }
+    if (staffPasswordForm.newPassword.length < 6) {
+      setStaffPasswordError('New password must be at least 6 characters long.');
+      return;
+    }
+    if (!staffPasswordForm.otp || staffPasswordForm.otp.trim().length !== 6) {
+      setStaffPasswordError('Please enter the 6-digit OTP received in your mailbox.');
+      return;
+    }
+
+    setStaffPasswordLoading(true);
+    setStaffPasswordError('');
+    try {
       const res = await API.post('/auth/change-password', {
         email,
-        oldPassword: currentPass.trim(),
-        newPassword: newPass.trim()
+        oldPassword: staffPasswordForm.oldPassword.trim(),
+        newPassword: staffPasswordForm.newPassword.trim(),
+        otp: staffPasswordForm.otp.trim()
       });
-      alert(res.data?.message || 'Password changed successfully!');
+      setStaffPasswordSuccess(res.data?.message || 'Password updated successfully!');
+      setTimeout(() => {
+        setShowPasswordModal(false);
+        setStaffPasswordSuccess('');
+      }, 2000);
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update password. Please verify your current password.');
+      setStaffPasswordError(err.response?.data?.message || 'Failed to update password. Please check your credentials and OTP.');
+    } finally {
+      setStaffPasswordLoading(false);
     }
   };
 
@@ -336,8 +401,8 @@ const StaffDashboard = () => {
             {refreshing ? 'Syncing...' : 'Refresh'}
           </button>
           <button
-            onClick={handleChangePassword}
-            title="Change your staff workspace password"
+            onClick={handleOpenPasswordModal}
+            title="Change your staff workspace password with 6-digit email OTP"
             style={{ backgroundColor: '#ffffff', border: '1px solid #ebdcd0', color: '#6e5d53', padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
           >
             <KeyRound size={15} color="#806657" /> Change Password
@@ -1172,6 +1237,159 @@ const StaffDashboard = () => {
                   {customerSaving ? 'Creating Profile...' : 'Save Client Profile'}
                 </button>
                 <button type="button" onClick={() => setShowCustomerModal(false)} style={{ padding: '12px 18px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: CHANGE STAFF PASSWORD WITH 6-DIGIT EMAIL OTP */}
+      {showPasswordModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 1000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: '#ffffff', borderRadius: '16px', padding: '30px',
+            maxWidth: '440px', width: '100%', boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+            maxHeight: '90vh', overflowY: 'auto'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <KeyRound size={20} color="#806657" />
+                <h3 style={{ margin: 0, fontSize: '1.25rem', color: '#2c221e', fontFamily: 'var(--font-heading)' }}>
+                  Change Workspace Password
+                </h3>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowPasswordModal(false)} 
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8c7b70' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p style={{ color: '#8c7b70', fontSize: '0.85rem', margin: '0 0 16px 0', lineHeight: '1.4' }}>
+              To update your staff password, a 6-digit security OTP code must be dispatched to your email address: <strong>{localStorage.getItem('email') || 'your registered staff mailbox'}</strong>.
+            </p>
+
+            {staffPasswordError && (
+              <div style={{ padding: '10px 14px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertCircle size={16} /> <span>{staffPasswordError}</span>
+              </div>
+            )}
+
+            {staffPasswordSuccess && (
+              <div style={{ padding: '10px 14px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CheckCircle2 size={16} /> <span>{staffPasswordSuccess}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateStaffPassword} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '4px' }}>Current Password *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••••••"
+                  value={staffPasswordForm.oldPassword}
+                  onChange={(e) => setStaffPasswordForm({ ...staffPasswordForm, oldPassword: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '4px' }}>New Password (min 6 chars) *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••••••"
+                  value={staffPasswordForm.newPassword}
+                  onChange={(e) => setStaffPasswordForm({ ...staffPasswordForm, newPassword: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '4px' }}>Confirm New Password *</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••••••••"
+                  value={staffPasswordForm.confirmPassword}
+                  onChange={(e) => setStaffPasswordForm({ ...staffPasswordForm, confirmPassword: e.target.value })}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              {/* OTP Dispatch and Input Section */}
+              <div style={{ backgroundColor: '#fdfbf9', padding: '14px', borderRadius: '10px', border: '1px dashed #d4c5b9', marginTop: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#4a3b32', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <ShieldCheck size={15} color="#16a34a" /> 6-Digit Email OTP *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleRequestStaffOtp}
+                    disabled={staffOtpRequesting}
+                    style={{
+                      padding: '5px 10px',
+                      backgroundColor: staffOtpSent ? '#f1f5f9' : '#806657',
+                      color: staffOtpSent ? '#475569' : '#ffffff',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: '600',
+                      cursor: staffOtpRequesting ? 'wait' : 'pointer'
+                    }}
+                  >
+                    {staffOtpRequesting ? 'Sending OTP...' : staffOtpSent ? 'Resend OTP' : 'Request OTP'}
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  required
+                  maxLength={6}
+                  placeholder="e.g. 849201"
+                  value={staffPasswordForm.otp}
+                  onChange={(e) => setStaffPasswordForm({ ...staffPasswordForm, otp: e.target.value.replace(/\D/g, '') })}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #ebdcd0',
+                    outline: 'none',
+                    fontSize: '1.1rem',
+                    letterSpacing: '3px',
+                    textAlign: 'center',
+                    fontWeight: '700',
+                    color: '#2c221e',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                <span style={{ fontSize: '0.72rem', color: '#8c7b70', marginTop: '4px', display: 'block' }}>
+                  Check your email inbox for the 6-digit verification code.
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                <button
+                  type="submit"
+                  disabled={staffPasswordLoading}
+                  className="btn-primary"
+                  style={{ flex: 1, padding: '12px', fontWeight: '700', cursor: staffPasswordLoading ? 'not-allowed' : 'pointer' }}
+                >
+                  {staffPasswordLoading ? 'Verifying OTP...' : 'Verify OTP & Change Password'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordModal(false)}
+                  style={{ padding: '12px 18px', backgroundColor: '#f1f5f9', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600' }}
+                >
                   Cancel
                 </button>
               </div>
