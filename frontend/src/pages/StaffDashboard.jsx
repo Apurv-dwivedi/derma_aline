@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   HeartPulse, Users, MessageSquare, Calendar, RefreshCw, LogOut, 
   Search, CheckCircle2, AlertCircle, Plus, FileText, Phone, Mail, 
-  ShieldCheck, Info, X, Clock, CheckCircle, Sparkles, ArrowRight, KeyRound
+  ShieldCheck, Info, X, Clock, CheckCircle, Sparkles, ArrowRight, KeyRound, Menu
 } from 'lucide-react';
 import API from '../services/api';
 import { TREATMENTS_DATA, TREATMENT_CATEGORIES } from '../data/treatmentsData';
@@ -27,6 +27,7 @@ const StaffDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Search States
   const [searchTerm, setSearchTerm] = useState('');
@@ -305,117 +306,19 @@ const StaffDashboard = () => {
     return true;
   });
 
+  const staffTabs = [
+    { id: 'treatments', label: 'Clinical Treatment Records', count: treatmentRecords.length, icon: HeartPulse },
+    { id: 'catalogue', label: 'Treatment Catalogue & Prices', count: 55, icon: Sparkles },
+    { id: 'queue', label: 'Client Appointments', count: appointments.length, icon: Calendar },
+    { id: 'customers', label: 'Client Directory', count: customers.length, icon: Users },
+    { id: 'enquiries', label: 'Client Enquiries', count: activeEnquiries.length, icon: MessageSquare }
+  ];
+
+  const currentActiveTabObj = staffTabs.find((t) => t.id === activeTab) || staffTabs[0];
+  const ActiveTabIcon = currentActiveTabObj.icon;
+
   return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '10px 0 60px 0' }}>
-      {/* Top Header Card */}
-      <div style={{
-        backgroundColor: '#ffffff',
-        borderRadius: '16px',
-        padding: '28px 32px',
-        border: '1px solid #ebdcd0',
-        boxShadow: '0 4px 20px rgba(44, 34, 30, 0.03)',
-        marginBottom: '25px',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        gap: '20px'
-      }}>
-        <div>
-          <div style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: '#f7f2ed',
-            padding: '4px 12px',
-            borderRadius: '15px',
-            fontSize: '0.75rem',
-            fontWeight: '700',
-            letterSpacing: '0.08em',
-            color: '#806657',
-            marginBottom: '6px',
-            textTransform: 'uppercase'
-          }}>
-            <ShieldCheck size={14} color="#16a34a" /> Generalist Clinical Operations
-          </div>
-          <h1 style={{
-            fontSize: '1.75rem',
-            color: '#2c221e',
-            fontFamily: 'var(--font-heading)',
-            fontWeight: '600',
-            margin: '0 0 4px 0'
-          }}>
-            Staff Clinical Workspace
-          </h1>
-          <p style={{ margin: 0, color: '#8c7b70', fontSize: '0.88rem' }}>
-            Operating Practitioner: <b>{staffName}</b> ({staffRole})
-          </p>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-          <button
-            onClick={() => setShowRecordModal(true)}
-            className="btn-primary"
-            style={{ padding: '10px 18px', fontSize: '0.85rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <Plus size={16} /> Record Treatment
-          </button>
-          <button
-            onClick={() => setShowCustomerModal(true)}
-            style={{
-              backgroundColor: '#fbf9f6',
-              border: '1px solid #ebdcd0',
-              color: '#806657',
-              padding: '10px 16px',
-              borderRadius: '8px',
-              fontSize: '0.85rem',
-              fontWeight: '600',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-          >
-            <Plus size={16} /> Add Client Profile
-          </button>
-          <button
-            onClick={() => fetchDashboardData(true)}
-            disabled={refreshing || loading}
-            title="Refresh clinical records"
-            style={{ 
-              backgroundColor: '#ffffff', 
-              border: '1px solid #ebdcd0', 
-              padding: '10px 14px', 
-              borderRadius: '8px', 
-              cursor: (refreshing || loading) ? 'wait' : 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '0.85rem',
-              fontWeight: '600',
-              color: '#6e5d53',
-              opacity: (refreshing || loading) ? 0.75 : 1
-            }}
-          >
-            <RefreshCw size={15} color="#6e5d53" style={{ animation: (refreshing || loading) ? 'spin 0.8s linear infinite' : 'none' }} />
-            {refreshing ? 'Syncing...' : 'Refresh'}
-          </button>
-          <button
-            onClick={handleOpenPasswordModal}
-            title="Change your staff workspace password with 6-digit email OTP"
-            style={{ backgroundColor: '#ffffff', border: '1px solid #ebdcd0', color: '#6e5d53', padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <KeyRound size={15} color="#806657" /> Change Password
-          </button>
-          <button
-            onClick={handleLogout}
-            style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <LogOut size={15} /> Sign Out
-          </button>
-        </div>
-      </div>
-
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '16px 20px 60px 20px' }}>
       {/* Floating Refresh Confirmation Toast */}
       {refreshToast && (
         <div style={{
@@ -438,130 +341,295 @@ const StaffDashboard = () => {
         </div>
       )}
 
-      {/* Global Alerts */}
-      {error && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 18px',
-          backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b',
-          borderRadius: '10px', marginBottom: '20px', fontSize: '0.9rem'
-        }}>
-          <AlertCircle size={18} /> <span>{error}</span>
-        </div>
-      )}
+      {/* Staff Suite Responsive Layout with Left Sidebar */}
+      <div className="admin-suite-layout">
+        {/* Left Navigation Sidebar (Desktop Pinned Left / Mobile Slide-Over Drawer) */}
+        <aside className={`admin-suite-sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+          {/* Mobile-Only Header with Close Button */}
+          <div className="client-sidebar-mobile-header">
+            <span className="client-sidebar-title">Staff Navigation</span>
+            <button 
+              type="button" 
+              className="client-sidebar-close-btn"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Close navigation menu"
+            >
+              <X size={18} />
+            </button>
+          </div>
 
-      {successMessage && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 18px',
-          backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534',
-          borderRadius: '10px', marginBottom: '20px', fontSize: '0.9rem'
-        }}>
-          <CheckCircle2 size={18} /> <span>{successMessage}</span>
-        </div>
-      )}
+          {/* Staff Identity Card in Sidebar */}
+          <div className="client-sidebar-profile-card">
+            <div className="client-sidebar-avatar-wrap" style={{ cursor: 'default' }}>
+              <HeartPulse size={34} />
+            </div>
 
-      {/* Operational Metrics Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '25px' }}>
-        <div style={{ backgroundColor: '#ffffff', padding: '22px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
-          <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Client Profiles
-          </div>
-          <div style={{ fontSize: '2rem', fontWeight: '700', color: '#2c221e', margin: '6px 0 2px' }}>
-            {customers.length}
-          </div>
-          <span style={{ fontSize: '0.82rem', color: '#6e5d53' }}>Registered in clinic CRM</span>
-        </div>
+            <div className="client-sidebar-verified-badge" style={{ backgroundColor: '#f0fdf4', color: '#166534', padding: '3px 8px', borderRadius: '12px' }}>
+              <ShieldCheck size={12} color="#16a34a" /> CLINICAL STAFF SUITE
+            </div>
 
-        <div style={{ backgroundColor: '#ffffff', padding: '22px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
-          <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Treatments Recorded
-          </div>
-          <div style={{ fontSize: '2rem', fontWeight: '700', color: '#2c221e', margin: '6px 0 2px' }}>
-            {treatmentRecords.length}
-          </div>
-          <span style={{ fontSize: '0.82rem', color: '#6e5d53' }}>Completed clinical sessions</span>
-        </div>
+            <h2 className="client-sidebar-user-name">
+              {staffName || 'Operating Staff'}
+            </h2>
 
-        <div style={{ backgroundColor: '#ffffff', padding: '22px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
-          <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Unread Client Enquiries
-          </div>
-          <div style={{ fontSize: '2rem', fontWeight: '700', color: '#ca8a04', margin: '6px 0 2px' }}>
-            {enquiries.filter((e) => e.status === 'UNREAD').length}
-          </div>
-          <span style={{ fontSize: '0.82rem', color: '#6e5d53' }}>Awaiting staff response</span>
-        </div>
+            <div className="client-sidebar-user-meta">
+              {staffRole || 'Skin Specialist'}
+            </div>
+            <div style={{ fontSize: '0.78rem', color: '#8c7b70', wordBreak: 'break-all', marginTop: '2px' }}>
+              {localStorage.getItem('email') || ''}
+            </div>
 
-        <div style={{ backgroundColor: '#ffffff', padding: '22px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
-          <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            Catalogue Services
-          </div>
-          <div style={{ fontSize: '2rem', fontWeight: '700', color: '#2c221e', margin: '6px 0 2px' }}>
-            {treatmentsList.length}
-          </div>
-          <span style={{ fontSize: '0.82rem', color: '#6e5d53' }}>Active clinic offerings</span>
-        </div>
-      </div>
+            <div className="client-sidebar-actions" style={{ flexDirection: 'column', gap: '6px', width: '100%', marginTop: '14px' }}>
+              <button
+                type="button"
+                onClick={() => fetchDashboardData(true)}
+                disabled={refreshing || loading}
+                title="Refresh clinical records"
+                className="client-sidebar-action-btn client-sidebar-refresh-btn"
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                <RefreshCw size={13} style={{ animation: (refreshing || loading) ? 'spin 0.8s linear infinite' : 'none' }} />
+                <span>{refreshing ? 'Syncing...' : 'Refresh'}</span>
+              </button>
 
-      {/* Navigation Tabs */}
-      <div style={{
-        display: 'flex',
-        gap: '10px',
-        borderBottom: '1px solid #ebdcd0',
-        paddingBottom: '6px',
-        marginBottom: '25px',
-        overflowX: 'auto'
-      }}>
-        {[
-          { id: 'treatments', label: `Clinical Treatment Records (${treatmentRecords.length})`, icon: HeartPulse },
-          { id: 'catalogue', label: 'Treatment Catalogue & Prices (55)', icon: Sparkles },
-          { id: 'queue', label: `Client Appointments (${appointments.length})`, icon: Calendar },
-          { id: 'customers', label: `Client Directory (${customers.length})`, icon: Users },
-          { id: 'enquiries', label: `Client Enquiries (${activeEnquiries.length})`, icon: MessageSquare }
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.id;
-          return (
+              <button
+                type="button"
+                onClick={handleOpenPasswordModal}
+                title="Change your staff workspace password with 6-digit email OTP"
+                className="client-sidebar-action-btn"
+                style={{ width: '100%', justifyContent: 'center', backgroundColor: '#fdfbf9', border: '1px solid #ebdcd0', color: '#806657' }}
+              >
+                <KeyRound size={13} />
+                <span>Change Password</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="client-sidebar-action-btn client-sidebar-logout-btn"
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                <LogOut size={13} />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Navigation Tabs */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div className="client-sidebar-title">Clinical Navigation</div>
+            <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {staffTabs.map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setMobileMenuOpen(false);
+                      setSearchTerm('');
+                    }}
+                    className={`client-nav-btn ${isActive ? 'active' : ''}`}
+                  >
+                    <span className="client-nav-btn-content">
+                      <Icon size={17} style={{ flexShrink: 0 }} />
+                      <span>{tab.label}</span>
+                    </span>
+                    {tab.count !== undefined && (
+                      <span className="client-nav-badge">
+                        {tab.count}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </aside>
+
+        {/* Mobile Backdrop Overlay */}
+        {mobileMenuOpen && (
+          <div 
+            className="admin-suite-backdrop"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Main Content Area */}
+        <main className="admin-suite-content">
+          {/* Mobile-Only Bar with Hamburger: Strictly hidden on desktop, visible on phone */}
+          <div className="admin-mobile-bar">
             <button
-              key={tab.id}
-              onClick={() => { setActiveTab(tab.id); setSearchTerm(''); }}
-              style={{
-                backgroundColor: isActive ? '#806657' : '#ffffff',
-                color: isActive ? '#ffffff' : '#5c4d44',
-                border: '1px solid',
-                borderColor: isActive ? '#806657' : '#ebdcd0',
-                padding: '10px 18px',
-                borderRadius: '8px',
-                fontSize: '0.88rem',
-                fontWeight: '600',
-                cursor: 'pointer',
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="client-mobile-hamburger-btn"
+              aria-label="Toggle navigation menu"
+            >
+              <Menu size={18} />
+              <span>Menu</span>
+            </button>
+            <div className="client-mobile-active-tab">
+              <ActiveTabIcon size={15} />
+              <span>{currentActiveTabObj?.label || 'Staff Portal'}</span>
+            </div>
+          </div>
+
+          {/* Staff Content Header Card */}
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: '16px',
+            padding: '24px 28px',
+            border: '1px solid #ebdcd0',
+            boxShadow: '0 4px 20px rgba(44, 34, 30, 0.03)',
+            marginBottom: '22px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: '16px'
+          }}>
+            <div>
+              <div style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '8px',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              <Icon size={16} />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+                backgroundColor: '#f7f2ed',
+                padding: '4px 12px',
+                borderRadius: '15px',
+                fontSize: '0.75rem',
+                fontWeight: '700',
+                letterSpacing: '0.08em',
+                color: '#806657',
+                marginBottom: '6px',
+                textTransform: 'uppercase'
+              }}>
+                <ShieldCheck size={14} color="#16a34a" /> Generalist Clinical Operations
+              </div>
+              <h1 style={{
+                fontSize: '1.65rem',
+                color: '#2c221e',
+                fontFamily: 'var(--font-heading)',
+                fontWeight: '600',
+                margin: '0 0 4px 0'
+              }}>
+                Staff Clinical Workspace
+              </h1>
+              <p style={{ margin: 0, color: '#8c7b70', fontSize: '0.88rem' }}>
+                Operating Practitioner: <b>{staffName}</b> ({staffRole})
+              </p>
+            </div>
 
-      {/* Search Bar for Records / Directory */}
-      {activeTab !== 'catalogue' && (
-        <div style={{ marginBottom: '20px' }}>
-          <div style={{ position: 'relative', maxWidth: '400px' }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#a8988d' }} />
-            <input
-              type="text"
-              placeholder="Search by client name, email, or treatment..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ width: '100%', padding: '10px 14px 10px 36px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.88rem' }}
-            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setShowRecordModal(true)}
+                className="btn-primary"
+                style={{ padding: '10px 18px', fontSize: '0.85rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Plus size={16} /> Record Treatment
+              </button>
+              <button
+                onClick={() => setShowCustomerModal(true)}
+                style={{
+                  backgroundColor: '#fbf9f6',
+                  border: '1px solid #ebdcd0',
+                  color: '#806657',
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  fontSize: '0.85rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <Plus size={16} /> Add Client Profile
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+
+          {/* Global Alerts */}
+          {error && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 18px',
+              backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b',
+              borderRadius: '10px', marginBottom: '20px', fontSize: '0.9rem'
+            }}>
+              <AlertCircle size={18} /> <span>{error}</span>
+            </div>
+          )}
+
+          {successMessage && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 18px',
+              backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534',
+              borderRadius: '10px', marginBottom: '20px', fontSize: '0.9rem'
+            }}>
+              <CheckCircle2 size={18} /> <span>{successMessage}</span>
+            </div>
+          )}
+
+          {/* Operational Metrics Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px', marginBottom: '22px' }}>
+            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
+              <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Client Profiles
+              </div>
+              <div style={{ fontSize: '1.8rem', fontWeight: '700', color: '#2c221e', margin: '4px 0 2px' }}>
+                {customers.length}
+              </div>
+              <span style={{ fontSize: '0.8rem', color: '#6e5d53' }}>Registered in clinic CRM</span>
+            </div>
+
+            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
+              <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Treatments Recorded
+              </div>
+              <div style={{ fontSize: '1.8rem', fontWeight: '700', color: '#2c221e', margin: '4px 0 2px' }}>
+                {treatmentRecords.length}
+              </div>
+              <span style={{ fontSize: '0.8rem', color: '#6e5d53' }}>Completed clinical sessions</span>
+            </div>
+
+            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
+              <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Unread Client Enquiries
+              </div>
+              <div style={{ fontSize: '1.8rem', fontWeight: '700', color: '#ca8a04', margin: '4px 0 2px' }}>
+                {enquiries.filter((e) => e.status === 'UNREAD').length}
+              </div>
+              <span style={{ fontSize: '0.8rem', color: '#6e5d53' }}>Awaiting staff response</span>
+            </div>
+
+            <div style={{ backgroundColor: '#ffffff', padding: '20px', borderRadius: '12px', border: '1px solid #ebdcd0' }}>
+              <div style={{ fontSize: '0.8rem', color: '#8c7b70', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Catalogue Services
+              </div>
+              <div style={{ fontSize: '1.8rem', fontWeight: '700', color: '#2c221e', margin: '4px 0 2px' }}>
+                {treatmentsList.length}
+              </div>
+              <span style={{ fontSize: '0.8rem', color: '#6e5d53' }}>Active clinic offerings</span>
+            </div>
+          </div>
+
+          {/* Search Bar for Records / Directory */}
+          {activeTab !== 'catalogue' && (
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ position: 'relative', maxWidth: '400px' }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#a8988d' }} />
+                <input
+                  type="text"
+                  placeholder="Search by client name, email, or treatment..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px 10px 36px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.88rem' }}
+                />
+              </div>
+            </div>
+          )}
 
       {/* TAB 1: CLINICAL TREATMENT RECORDS */}
       {activeTab === 'treatments' && (
@@ -1072,6 +1140,9 @@ const StaffDashboard = () => {
           )}
         </div>
       )}
+
+        </main>
+      </div>
 
       {/* MODAL 1: RECORD TREATMENT */}
       {showRecordModal && (
