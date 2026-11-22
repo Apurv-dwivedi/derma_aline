@@ -69,57 +69,98 @@ public class StaffManagementController {
             String fullName = payload.get("fullName");
             String designation = payload.get("designation");
             String phone = payload.get("phone");
+            String customPassword = payload.get("password");
 
             if (email == null || email.trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Staff email is required."));
             }
 
             String cleanEmail = email.trim().toLowerCase();
+            String dummyPassword = (customPassword != null && !customPassword.trim().isEmpty()) 
+                    ? customPassword.trim() 
+                    : "Staff@12345";
 
-            // Check if active user already exists
-            Optional<User> existingUser = userRepository.findByEmail(cleanEmail);
-            if (existingUser.isPresent() && existingUser.get().getStatus() == User.AccountStatus.ACTIVE) {
-                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "An active staff account with this email already exists."));
-            }
+            // Immediately create or activate staff account in users table
+            User staffUser = userRepository.findByEmail(cleanEmail).orElseGet(User::new);
+            staffUser.setEmail(cleanEmail);
+            staffUser.setFullName(fullName != null && !fullName.trim().isEmpty() ? fullName.trim() : "Clinic Staff");
+            staffUser.setPhone(phone != null && !phone.trim().isEmpty() ? phone.trim() : staffUser.getPhone());
+            staffUser.setRole(User.Role.STAFF);
+            staffUser.setStatus(User.AccountStatus.ACTIVE);
+            staffUser.setPassword(passwordEncoder.encode(dummyPassword));
+            userRepository.save(staffUser);
 
-            String token = UUID.randomUUID().toString();
+            // Record in staff invitations as ACTIVE (no token/activation required)
             StaffInvitation invitation = staffInvitationRepository.findByEmail(cleanEmail)
                     .orElseGet(StaffInvitation::new);
             invitation.setEmail(cleanEmail);
-            invitation.setFullName(fullName != null && !fullName.trim().isEmpty() ? fullName.trim() : "Clinic Staff");
+            invitation.setFullName(staffUser.getFullName());
             invitation.setDesignation(designation != null && !designation.trim().isEmpty() ? designation.trim() : "Skin Therapist");
-            invitation.setPhone(phone != null ? phone.trim() : null);
-            invitation.setToken(token);
-            invitation.setStatus(StaffInvitation.InvitationStatus.INVITED);
-            invitation.setExpiresAt(LocalDateTime.now().plusHours(24));
+            invitation.setPhone(staffUser.getPhone());
+            invitation.setStatus(StaffInvitation.InvitationStatus.ACTIVE);
+            invitation.setExpiresAt(LocalDateTime.now().plusYears(10));
             invitation.setCreatedAt(LocalDateTime.now());
             staffInvitationRepository.save(invitation);
 
-            // Send invitation email with activation link
-            String activationUrl = frontendUrl + "/staff/activate?token=" + token;
-            String subject = "Staff Invitation | Derma Aline Aesthétics Clinic";
-            String body = "Dear " + invitation.getFullName() + ",\n\n"
-                    + "You have been invited by the Clinic Owner to join the operational team at Derma Aline Aesthétics Skin Clinic as " 
+            // Send welcoming email directly with login credentials and no OTP needed
+            String loginUrl = frontendUrl + "/staff/login";
+            String subject = "Staff Account Enrolled | Derma Aline Aesthétics Clinic";
+            String body = "Dear " + staffUser.getFullName() + ",\n\n"
+                    + "You have been enrolled as a staff team member at Derma Aline Aesthétics Skin Clinic as " 
                     + invitation.getDesignation() + ".\n\n"
-                    + "Please click the link below to set your confidential password and activate your staff access:\n"
-                    + activationUrl + "\n\n"
-                    + "Note: For security reasons, this invitation link will expire in 24 hours.\n\n"
+                    + "Your Staff Workspace credentials are:\n"
+                    + "• Portal Login URL: " + loginUrl + "\n"
+                    + "• Email: " + cleanEmail + "\n"
+                    + "• Initial Password: " + dummyPassword + "\n\n"
+                    + "You can log in directly at " + loginUrl + " without needing any OTP code or activation token.\n"
+                    + "Once logged in, you can update your password anytime through your portal.\n\n"
                     + "Warm regards,\n"
                     + "Derma Aline Clinic Administration";
 
             emailService.sendEmail(cleanEmail, subject, body);
-            auditLogService.record("STAFF_INVITED", "admin", "SUPER_ADMIN", "STAFF_INVITATION", cleanEmail, "Invitation generated for " + invitation.getFullName() + " (" + invitation.getDesignation() + ")");
+            auditLogService.record("STAFF_ENROLLED", "admin", "SUPER_ADMIN", "STAFF_USER", cleanEmail, "Staff account created with initial password for " + staffUser.getFullName());
 
             return ResponseEntity.ok(Map.of(
                 "success", true,
-                "message", "Staff invitation link generated and dispatched to " + cleanEmail,
+                "message", "Staff account successfully created with initial password for " + cleanEmail,
                 "email", cleanEmail,
-                "fullName", invitation.getFullName(),
-                "designation", invitation.getDesignation()
+                "fullName", staffUser.getFullName(),
+                "designation", invitation.getDesignation(),
+                "initialPassword", dummyPassword
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Failed to dispatch invitation: " + e.getMessage()));
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Failed to enroll staff member: " + e.getMessage()));
         }
+    }
+
+    @PutMapping("/members/{id}/password")
+    public ResponseEntity<?> updateStaffPassword(@PathVariable Long id, @RequestBody Map<String, String> payload) {
+        String newPassword = payload.get("newPassword");
+        if (newPassword == null || newPassword.trim().length() < 6) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "New password must be at least 6 characters long."));
+        }
+        return userRepository.findById(id).map(user -> {
+            if (user.getRole() != User.Role.STAFF) {
+                return ResponseEntity.status(403).body(Map.of("success", false, "message", "Can only modify staff accounts."));
+            }
+            user.setPassword(passwordEncoder.encode(newPassword.trim()));
+            user.setStatus(User.AccountStatus.ACTIVE);
+            userRepository.save(user);
+
+            try {
+                String subject = "Staff Password Updated | Derma Aline Aesthétics Clinic";
+                String body = "Dear " + user.getFullName() + ",\n\n"
+                        + "Your staff portal password has been updated by the clinic owner.\n\n"
+                        + "• Updated Password: " + newPassword.trim() + "\n"
+                        + "• Staff Login URL: " + frontendUrl + "/staff/login\n\n"
+                        + "Warm regards,\n"
+                        + "Derma Aline Clinic Administration";
+                emailService.sendEmail(user.getEmail(), subject, body);
+            } catch (Exception ignored) {}
+
+            auditLogService.record("STAFF_PASSWORD_UPDATED", "admin", "SUPER_ADMIN", "STAFF_USER", user.getEmail(), "Password reset by owner for " + user.getFullName());
+            return ResponseEntity.ok(Map.of("success", true, "message", "Password for " + user.getFullName() + " (" + user.getEmail() + ") has been updated successfully."));
+        }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Staff account not found.")));
     }
 
     @PostMapping("/invitations/{id}/resend")

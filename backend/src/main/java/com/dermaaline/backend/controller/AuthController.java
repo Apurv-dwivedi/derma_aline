@@ -371,7 +371,13 @@ public class AuthController {
             return ResponseEntity.status(401).body(Map.of("success", false, "message", "Invalid email or password."));
         }
 
-        // Account status check: require 6-digit OTP email verification
+        // Automatic activation for staff accounts upon correct credentials match (no OTP required)
+        if (user.getRole() == User.Role.STAFF && user.getStatus() == User.AccountStatus.PENDING_VERIFICATION) {
+            user.setStatus(User.AccountStatus.ACTIVE);
+            userRepository.save(user);
+        }
+
+        // Account status check: require 6-digit OTP email verification (only for patients/customers)
         if (user.getStatus() == User.AccountStatus.PENDING_VERIFICATION) {
             try {
                 otpService.generateAndSendOtp(cleanEmail, user.getFullName());

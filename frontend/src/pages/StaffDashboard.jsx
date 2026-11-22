@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { 
   HeartPulse, Users, MessageSquare, Calendar, RefreshCw, LogOut, 
   Search, CheckCircle2, AlertCircle, Plus, FileText, Phone, Mail, 
-  ShieldCheck, Info, X, Clock, CheckCircle, Sparkles, ArrowRight
+  ShieldCheck, Info, X, Clock, CheckCircle, Sparkles, ArrowRight, KeyRound
 } from 'lucide-react';
 import API from '../services/api';
 import { TREATMENTS_DATA, TREATMENT_CATEGORIES } from '../data/treatmentsData';
@@ -169,6 +169,28 @@ const StaffDashboard = () => {
     }
   };
 
+  const handleChangePassword = async () => {
+    const currentPass = window.prompt("Enter your current staff password:");
+    if (!currentPass || !currentPass.trim()) return;
+    const newPass = window.prompt("Enter your new confidential password (minimum 6 characters):");
+    if (!newPass || !newPass.trim()) return;
+    if (newPass.trim().length < 6) {
+      alert("New password must be at least 6 characters long.");
+      return;
+    }
+    try {
+      const email = localStorage.getItem('email') || '';
+      const res = await API.post('/auth/change-password', {
+        email,
+        oldPassword: currentPass.trim(),
+        newPassword: newPass.trim()
+      });
+      alert(res.data?.message || 'Password changed successfully!');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update password. Please verify your current password.');
+    }
+  };
+
   const handleLogout = () => {
     localStorage.clear();
     navigate('/staff-login');
@@ -312,6 +334,13 @@ const StaffDashboard = () => {
           >
             <RefreshCw size={15} color="#6e5d53" style={{ animation: (refreshing || loading) ? 'spin 0.8s linear infinite' : 'none' }} />
             {refreshing ? 'Syncing...' : 'Refresh'}
+          </button>
+          <button
+            onClick={handleChangePassword}
+            title="Change your staff workspace password"
+            style={{ backgroundColor: '#ffffff', border: '1px solid #ebdcd0', color: '#6e5d53', padding: '10px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <KeyRound size={15} color="#806657" /> Change Password
           </button>
           <button
             onClick={handleLogout}

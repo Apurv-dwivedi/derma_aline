@@ -49,7 +49,8 @@ const AdminDashboard = () => {
     fullName: '',
     email: '',
     designation: 'Skin Therapist',
-    phone: ''
+    phone: '',
+    password: 'Staff@12345'
   });
   const [staffActionLoading, setStaffActionLoading] = useState(false);
   const [staffSuccess, setStaffSuccess] = useState('');
@@ -513,7 +514,7 @@ const AdminDashboard = () => {
     }
   };
 
-  // Staff Management: Invite
+  // Staff Management: Add Staff with Dummy Password
   const handleEnrollStaff = async (e) => {
     e.preventDefault();
     setStaffActionLoading(true);
@@ -522,16 +523,33 @@ const AdminDashboard = () => {
 
     try {
       const response = await API.post('/admin/staff/invitations', newStaff);
-      setStaffSuccess(response.data.message || 'Staff invitation successfully dispatched!');
-      setNewStaff({ fullName: '', email: '', designation: 'Skin Therapist', phone: '' });
+      setStaffSuccess(response.data.message || 'Staff member enrolled successfully with login credentials!');
+      setNewStaff({ fullName: '', email: '', designation: 'Skin Therapist', phone: '', password: 'Staff@12345' });
       fetchData();
       setTimeout(() => setStaffSuccess(''), 4000);
     } catch (err) {
-      console.error("Failed to invite staff worker:", err);
-      setStaffError(err.response?.data?.message || 'Failed to dispatch staff invitation.');
+      console.error("Failed to enroll staff member:", err);
+      setStaffError(err.response?.data?.message || 'Failed to enroll staff member.');
       setTimeout(() => setStaffError(''), 4000);
     } finally {
       setStaffActionLoading(false);
+    }
+  };
+
+  // Staff Management: Admin updates staff password directly
+  const handleResetStaffPassword = async (id, name, email) => {
+    const newPass = window.prompt(`Enter new password for ${name || email}:`, "Staff@12345");
+    if (!newPass || !newPass.trim()) return;
+    if (newPass.trim().length < 6) {
+      alert("Password must be at least 6 characters long.");
+      return;
+    }
+    try {
+      const res = await API.put(`/admin/staff/members/${id}/password`, { newPassword: newPass.trim() });
+      setStaffSuccess(res.data.message || `Password for ${email} updated successfully!`);
+      setTimeout(() => setStaffSuccess(''), 4000);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update staff password.');
     }
   };
 
@@ -1306,19 +1324,19 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* Send Staff Invitation */}
+          {/* Add Staff Member with Initial Password */}
           <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
               <UserPlus size={22} color="var(--color-accent)" />
               <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', margin: 0, fontFamily: 'var(--font-heading)' }}>
-                Invite New Staff Member
+                Add New Staff Member
               </h3>
             </div>
             <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '20px' }}>
-              Dispatches a secure single-use invitation link expiring in 24 hours. The employee sets their own password.
+              Enrolls staff directly with active access and an initial temporary password. No OTP or activation link needed. The staff worker can sign in immediately at <strong>/staff/login</strong>, and you can reset their password anytime below.
             </p>
 
-            <form onSubmit={handleEnrollStaff} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '15px' }}>
+            <form onSubmit={handleEnrollStaff} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Full Name *</label>
                 <input 
@@ -1327,7 +1345,7 @@ const AdminDashboard = () => {
                   value={newStaff.fullName}
                   onChange={(e) => setNewStaff({ ...newStaff, fullName: e.target.value })}
                   required
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1339,7 +1357,7 @@ const AdminDashboard = () => {
                   value={newStaff.email}
                   onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
                   required
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1347,10 +1365,21 @@ const AdminDashboard = () => {
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Designation</label>
                 <input 
                   type="text" 
-                  placeholder="e.g. Skin Therapist, Aesthetician" 
+                  placeholder="e.g. Skin Therapist" 
                   value={newStaff.designation}
                   onChange={(e) => setNewStaff({ ...newStaff, designation: e.target.value })}
-                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)' }}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', boxSizing: 'border-box' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Initial Dummy Password</label>
+                <input 
+                  type="text" 
+                  placeholder="Staff@12345" 
+                  value={newStaff.password || ''}
+                  onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
+                  style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', boxSizing: 'border-box' }}
                 />
               </div>
 
@@ -1361,7 +1390,7 @@ const AdminDashboard = () => {
                   className="btn-primary" 
                   style={{ width: '100%', padding: '11px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: '700' }}
                 >
-                  <UserPlus size={16} /> {staffActionLoading ? 'Dispatching...' : 'Send Secure Invitation'}
+                  <UserPlus size={16} /> {staffActionLoading ? 'Enrolling...' : 'Add Staff Member'}
                 </button>
               </div>
             </form>
@@ -1375,7 +1404,7 @@ const AdminDashboard = () => {
                   Active Salon Staff Members ({staffMembers.length})
                 </h3>
                 <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', margin: 0 }}>
-                  Active operational team members with staff workspace access. Delete any staff who have left the salon.
+                  Active operational team members with staff workspace access. You can reset their password or delete departing staff anytime.
                 </p>
               </div>
             </div>
@@ -1395,7 +1424,7 @@ const AdminDashboard = () => {
                   {staffMembers.length === 0 ? (
                     <tr>
                       <td colSpan="5" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-light)' }}>
-                        No active staff accounts enrolled yet. Use the invitation form above to invite team members.
+                        No active staff accounts enrolled yet. Use the form above to add team members.
                       </td>
                     </tr>
                   ) : (
@@ -1420,18 +1449,40 @@ const AdminDashboard = () => {
                           </span>
                         </td>
                         <td style={{ padding: '14px 12px', textAlign: 'center' }}>
-                          <button 
-                            type="button"
-                            onClick={() => handleDeleteStaffMember(staff.id, staff.fullName, staff.email)}
-                            title="Permanently remove staff member from salon"
-                            style={{ 
-                              backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', 
-                              padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600',
-                              display: 'inline-flex', alignItems: 'center', gap: '5px'
-                            }}
-                          >
-                            <Trash2 size={13} /> Delete Staff
-                          </button>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleResetStaffPassword(staff.id, staff.fullName, staff.email)}
+                              title="Set or update this staff member's password"
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#f5f0eb',
+                                color: '#6b4f3b',
+                                border: '1px solid #d4c5b9',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: '600',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <KeyRound size={13} /> Change Password
+                            </button>
+                            <button 
+                              type="button"
+                              onClick={() => handleDeleteStaffMember(staff.id, staff.fullName, staff.email)}
+                              title="Permanently remove staff member from salon"
+                              style={{ 
+                                backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b', 
+                                padding: '6px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: '600',
+                                display: 'inline-flex', alignItems: 'center', gap: '5px'
+                              }}
+                            >
+                              <Trash2 size={13} /> Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))

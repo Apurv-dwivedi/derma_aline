@@ -29,6 +29,7 @@ public class DatabaseFixRunner {
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture TEXT;",
                 "ALTER TABLE customers ADD COLUMN IF NOT EXISTS profile_picture TEXT;",
                 "UPDATE users SET status = 'ACTIVE' WHERE status IS NULL;",
+                "UPDATE users SET status = 'ACTIVE' WHERE role = 'STAFF';",
                 "UPDATE users SET role = 'CUSTOMER' WHERE role IS NULL;",
                 "UPDATE users SET role = 'SUPER_ADMIN' WHERE email IN ('dermaalineaesthetics@gmail.com', 'apurvdwivedi2205@gmail.com');",
 
