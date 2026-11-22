@@ -72,12 +72,27 @@ public class AdminBootstrap {
                         staff.setFullName("Salon Staff Worker");
                         staff.setPassword(encodedStaffPass);
                         staff.setRole(User.Role.STAFF);
+                        staff.setStatus(User.AccountStatus.ACTIVE);
                         userRepository.save(staff);
-                        logger.info("Staff user successfully initialized from environment variables: {}", cleanStaffEmail);
-                    } else if (!passwordEncoder.matches(staffPassword.trim(), staff.getPassword())) {
-                        staff.setPassword(encodedStaffPass);
-                        userRepository.save(staff);
-                        logger.info("Staff password updated from environment variables for: {}", cleanStaffEmail);
+                        logger.info("Staff user successfully initialized from configuration: {}", cleanStaffEmail);
+                    } else {
+                        boolean modified = false;
+                        if (!passwordEncoder.matches(staffPassword.trim(), staff.getPassword())) {
+                            staff.setPassword(encodedStaffPass);
+                            modified = true;
+                        }
+                        if (staff.getRole() != User.Role.STAFF && staff.getRole() != User.Role.SUPER_ADMIN && staff.getRole() != User.Role.ADMIN) {
+                            staff.setRole(User.Role.STAFF);
+                            modified = true;
+                        }
+                        if (staff.getStatus() != User.AccountStatus.ACTIVE) {
+                            staff.setStatus(User.AccountStatus.ACTIVE);
+                            modified = true;
+                        }
+                        if (modified) {
+                            userRepository.save(staff);
+                            logger.info("Staff credentials and active status verified: {}", cleanStaffEmail);
+                        }
                     }
                 } catch (Throwable t) {
                     logger.warn("Staff bootstrap notice: {}", t.getMessage());
