@@ -813,7 +813,7 @@ const AdminDashboard = () => {
   const adminTabs = [
     { id: 'clients', label: 'Client CRM', count: clients.length, icon: Users },
     { id: 'treatments', label: 'Treatment Section', count: treatmentsList.length, icon: Sparkles },
-    { id: 'staff', label: 'Staff Management', count: staffMembers.length + staffInvitations.length, icon: Briefcase },
+    { id: 'staff', label: 'Staff Management', count: staffMembers.length, icon: Briefcase },
     { id: 'messages', label: 'Inquiries', count: activeMessages.length, icon: MessageSquare },
     { id: 'reports', label: 'Operational Reports', icon: FileText },
     { id: 'security', label: 'Admin Password', icon: KeyRound },
@@ -1052,7 +1052,7 @@ const AdminDashboard = () => {
                 <Briefcase size={18} color="var(--color-primary)" />
               </div>
               <p style={{ fontSize: '1.75rem', fontWeight: '800', color: 'var(--color-primary)', margin: '4px 0 2px' }}>
-                {staffMembers.length || staffInvitations.length}
+                {staffMembers.length}
               </p>
               <span style={{ fontSize: '0.76rem', color: 'var(--text-light)' }}>Authorized team members</span>
             </div>
@@ -1509,72 +1509,6 @@ const AdminDashboard = () => {
                               }}
                             >
                               <Trash2 size={13} /> Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Pending Staff Invitations */}
-          <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
-            <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', marginBottom: '15px', fontFamily: 'var(--font-heading)' }}>
-              Pending Staff Invitations & Clearances ({staffInvitations.length})
-            </h3>
-            
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid var(--border-light)', color: 'var(--text-light)', fontSize: '0.9rem' }}>
-                    <th style={{ padding: '12px' }}>Invited Worker</th>
-                    <th style={{ padding: '12px' }}>Email</th>
-                    <th style={{ padding: '12px' }}>Designation</th>
-                    <th style={{ padding: '12px' }}>Status</th>
-                    <th style={{ padding: '12px', textAlign: 'center' }}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {staffInvitations.length === 0 ? (
-                    <tr><td colSpan="5" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-light)' }}>No pending staff invitations.</td></tr>
-                  ) : (
-                    staffInvitations.map((staff) => (
-                      <tr key={staff.id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                        <td style={{ padding: '14px 12px', fontWeight: '600', color: 'var(--color-primary)' }}>{staff.fullName || 'Clinic Staff'}</td>
-                        <td style={{ padding: '14px 12px', color: 'var(--text-light)', fontSize: '0.9rem' }}>{staff.email}</td>
-                        <td style={{ padding: '14px 12px', color: 'var(--color-primary)', fontWeight: '500' }}>{staff.designation || 'Skin Therapist'}</td>
-                        <td style={{ padding: '14px 12px' }}>
-                          <span style={{ 
-                            padding: '4px 10px', borderRadius: '15px', fontSize: '0.75rem', fontWeight: '700', 
-                            backgroundColor: staff.status === 'ACTIVE' ? '#d4edda' : staff.status === 'INVITED' ? '#fff3cd' : '#e2e3e5', 
-                            color: staff.status === 'ACTIVE' ? '#155724' : staff.status === 'INVITED' ? '#856404' : '#383d41'
-                          }}>
-                            {staff.status || 'INVITED'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '14px 12px', textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', gap: '8px' }}>
-                            {staff.status === 'INVITED' && (
-                              <button 
-                                onClick={() => handleResendStaffInvite(staff.id)}
-                                style={{ backgroundColor: '#f1f5f9', border: '1px solid #cbd5e1', padding: '6px 10px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' }}
-                              >
-                                Resend
-                              </button>
-                            )}
-                            <button 
-                              type="button"
-                              onClick={() => handleDeleteInvitation(staff.id, staff.email)}
-                              style={{ 
-                                backgroundColor: '#dc3545', color: '#fff', border: 'none', padding: '6px 12px', 
-                                borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem',
-                                display: 'inline-flex', alignItems: 'center', gap: '4px'
-                              }}
-                            >
-                              <Trash2 size={13} /> Revoke / Delete
                             </button>
                           </div>
                         </td>
