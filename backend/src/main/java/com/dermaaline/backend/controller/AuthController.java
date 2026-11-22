@@ -694,7 +694,7 @@ public class AuthController {
         user.setPassword(passwordEncoder.encode(newPassword.trim()));
         userRepository.save(user);
 
-        auditLogService.record("PASSWORD_CHANGED", cleanEmail, user.getRole().name(), "USER", user.getId().toString(), "Password changed successfully" + (isAdmin ? " with 6-digit OTP verification" : ""));
+        auditLogService.record("PASSWORD_CHANGED", cleanEmail, user.getRole().name(), "USER", user.getId().toString(), "Password changed successfully" + (requiresOtp ? " with 6-digit OTP verification" : ""));
 
         return ResponseEntity.ok(Map.of("success", true, "message", "Password changed successfully."));
     }
