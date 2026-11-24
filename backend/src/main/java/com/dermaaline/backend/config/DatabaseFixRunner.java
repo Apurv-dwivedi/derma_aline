@@ -99,11 +99,16 @@ public class DatabaseFixRunner {
                 "CREATE TABLE IF NOT EXISTS email_verification_otps (" +
                     "id BIGSERIAL PRIMARY KEY, " +
                     "email VARCHAR(255) NOT NULL, " +
-                    "hashed_otp VARCHAR(255) NOT NULL, " +
+                    "otp_hash VARCHAR(255), " +
+                    "hashed_otp VARCHAR(255), " +
                     "attempts INT DEFAULT 0, " +
+                    "verified BOOLEAN DEFAULT FALSE, " +
                     "expires_at TIMESTAMP NOT NULL, " +
-                    "last_sent_at TIMESTAMP NOT NULL, " +
                     "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);",
+                "ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS otp_hash VARCHAR(255);",
+                "ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT FALSE;",
+                "ALTER TABLE email_verification_otps ALTER COLUMN last_sent_at DROP NOT NULL;",
+                "ALTER TABLE email_verification_otps ALTER COLUMN hashed_otp DROP NOT NULL;",
 
                 // 7. Clinic settings table verification
                 "CREATE TABLE IF NOT EXISTS clinic_settings (" +
@@ -144,18 +149,9 @@ public class DatabaseFixRunner {
                     "is_read BOOLEAN DEFAULT FALSE, " +
                     "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);",
 
-                // 10. Complete Portal Data Purge: Clean Client, Staff, and Admin portal data
-                // Strictly preserves master clinic administrator (dermaalineaesthetics@gmail.com)
-                "DELETE FROM appointments;",
-                "DELETE FROM treatment_records;",
-                "DELETE FROM contact_messages;",
-                "DELETE FROM customers;",
-                "DELETE FROM notifications;",
-                "DELETE FROM email_verification_otps;",
-                "DELETE FROM audit_logs;",
-                "DELETE FROM staff_invitations;",
-                "DELETE FROM users WHERE LOWER(email) NOT IN ('dermaalineaesthetics@gmail.com');",
-                "DELETE FROM treatments WHERE category = 'Clinical Treatment' OR price IS NULL;"
+                // 10. Core client user auto-registration
+                "INSERT INTO users (email, full_name, role, status) SELECT 'apurvdwivedi12345@gmail.com', 'Apurv Dwivedi', 'CUSTOMER', 'ACTIVE' WHERE NOT EXISTS (SELECT 1 FROM users WHERE LOWER(email) = 'apurvdwivedi12345@gmail.com');",
+                "INSERT INTO customers (email, full_name) SELECT 'apurvdwivedi12345@gmail.com', 'Apurv Dwivedi' WHERE NOT EXISTS (SELECT 1 FROM customers WHERE LOWER(email) = 'apurvdwivedi12345@gmail.com');"
             };
 
             for (String sql : ddlStatements) {

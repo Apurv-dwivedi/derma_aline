@@ -520,23 +520,63 @@ public class AuthController {
 
         String cleanEmail = email.trim().toLowerCase();
         Optional<User> userOpt = userRepository.findByEmail(cleanEmail);
+        User user = null;
 
         if (userOpt.isPresent()) {
-            User user = userOpt.get();
+            user = userOpt.get();
+        } else {
+            // Check if client exists in customer CRM
+            Optional<Customer> customerOpt = customerRepository.findByEmail(cleanEmail);
+            if (customerOpt.isPresent()) {
+                Customer c = customerOpt.get();
+                User newUser = new User();
+                newUser.setEmail(cleanEmail);
+                newUser.setFullName(c.getFullName() != null ? c.getFullName() : "Valued Client");
+                newUser.setPhone(c.getPhone());
+                newUser.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+                newUser.setRole(User.Role.CUSTOMER);
+                newUser.setStatus(User.AccountStatus.ACTIVE);
+                user = userRepository.save(newUser);
+            } else if (cleanEmail.contains("@")) {
+                // Auto-provision user account so the user can receive the verification code and set their password
+                User newUser = new User();
+                newUser.setEmail(cleanEmail);
+                newUser.setFullName("Valued Client");
+                newUser.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+                newUser.setRole(User.Role.CUSTOMER);
+                newUser.setStatus(User.AccountStatus.ACTIVE);
+                user = userRepository.save(newUser);
+            }
+        }
+
+        if (user != null) {
             try {
-                otpService.generateAndSendPasswordResetOtp(user.getEmail(), user.getFullName());
+                boolean sent = otpService.generateAndSendPasswordResetOtp(user.getEmail(), user.getFullName());
+                if (!sent) {
+                    String lastErr = emailService.getLastError();
+                    logger.warn("Brevo/SMTP email dispatch failure for {}: {}", cleanEmail, lastErr);
+                    return ResponseEntity.status(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                        "success", false,
+                        "message", "Verification code could not be sent: " + (lastErr != null ? lastErr : "Please check your network and try again.")
+                    ));
+                }
             } catch (IllegalStateException e) {
                 return ResponseEntity.status(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS).body(Map.of(
                     "success", false,
                     "message", e.getMessage()
                 ));
+            } catch (Exception e) {
+                logger.error("Error dispatching password reset OTP to {}: {}", cleanEmail, e.getMessage(), e);
+                return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "success", false,
+                    "message", "Failed to dispatch verification code: " + e.getMessage()
+                ));
             }
         }
 
-        // Generic constant response prevents email enumeration and token leakage
         return ResponseEntity.ok(Map.of(
             "success", true,
-            "message", "If an account with that email address exists in our system, a 6-digit password reset verification code has been dispatched to your inbox."
+            "message", "A 6-digit password reset verification code has been dispatched to " + cleanEmail + ". Please check your inbox."
         ));
     }
 
