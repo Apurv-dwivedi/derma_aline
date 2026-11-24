@@ -92,12 +92,10 @@ const Auth = () => {
 
     try {
       const response = await axios.post(`${API_BASE_URL}/auth/forgot-password`, { 
-        email: email.trim() 
+        email: email.trim().toLowerCase() 
       });
-      setMessage(response.data?.message || 'Password reset instructions have been sent to your email.');
-      if (response.data?.token) {
-        setDirectResetToken(response.data.token);
-      }
+      setMessage(response.data?.message || 'A 6-digit password reset verification code has been sent to your email.');
+      setMode('reset');
     } catch (err) {
       setError(err.response?.data?.message || 'Unable to process reset request. Please verify your email.');
     } finally {
@@ -108,10 +106,6 @@ const Auth = () => {
   const handleResetPassword = async (e) => {
     e.preventDefault();
     const tokenToUse = resetToken || directResetToken;
-    if (!tokenToUse || !tokenToUse.trim()) {
-      setError('No active reset token found. Please request a new reset link.');
-      return;
-    }
     if (!password) {
       setError('Please enter a new password.');
       return;
@@ -131,7 +125,9 @@ const Auth = () => {
 
     try {
       const response = await axios.post(`${API_BASE_URL}/auth/reset-password`, { 
-        token: tokenToUse.trim(), 
+        email: email.trim().toLowerCase(),
+        otp: tokenToUse ? tokenToUse.trim() : undefined,
+        token: tokenToUse ? tokenToUse.trim() : undefined, 
         newPassword: password 
       });
       setMessage(response.data?.message || 'Password reset successfully! Redirecting to login...');
@@ -143,7 +139,7 @@ const Auth = () => {
         setDirectResetToken('');
       }, 1800);
     } catch (err) {
-      setError(err.response?.data?.message || 'Reset link is invalid or has expired. Please request a new one.');
+      setError(err.response?.data?.message || 'Reset code is invalid or has expired. Please request a new one.');
     } finally {
       setLoading(false);
     }

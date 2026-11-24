@@ -258,7 +258,7 @@ public class AuthControllerTest {
         user.setFullName("User Test");
 
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(emailService.sendPasswordResetEmail(anyString(), anyString(), anyString())).thenReturn(true);
+        when(otpService.generateAndSendPasswordResetOtp("user@example.com", "User Test")).thenReturn(true);
 
         Map<String, String> payload = Map.of("email", "user@example.com");
 
@@ -270,12 +270,37 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.message")
                         .value(org.hamcrest.Matchers.containsStringIgnoringCase("password reset")));
 
-        verify(userRepository, times(1)).save(any(User.class));
-        verify(emailService, times(1)).sendPasswordResetEmail(eq("user@example.com"), eq("User Test"), anyString());
+        verify(otpService, times(1)).generateAndSendPasswordResetOtp(eq("user@example.com"), eq("User Test"));
     }
 
     @Test
-    void testResetPasswordSuccess() throws Exception {
+    void testResetPasswordViaOtpSuccess() throws Exception {
+        User user = new User();
+        user.setId(10L);
+        user.setEmail("user@example.com");
+        user.setRole(User.Role.CUSTOMER);
+
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(otpService.verifyOtp("user@example.com", "123456")).thenReturn(true);
+        when(passwordEncoder.encode("NewSecret123")).thenReturn("encodedNewSecret");
+
+        Map<String, String> payload = Map.of(
+                "email", "user@example.com",
+                "otp", "123456",
+                "newPassword", "NewSecret123");
+
+        mockMvc.perform(post("/api/auth/reset-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("reset successfully")));
+
+        verify(userRepository, times(1)).save(user);
+    }
+
+    @Test
+    void testResetPasswordViaTokenSuccess() throws Exception {
         User user = new User();
         user.setEmail("user@example.com");
         user.setResetToken("valid-token-123");

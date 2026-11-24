@@ -72,6 +72,45 @@ public class OtpService {
     }
 
     /**
+     * Generates, stores, and emails a confidential 6-digit password reset OTP (Zero links).
+     */
+    @Transactional
+    public boolean generateAndSendPasswordResetOtp(String email, String fullName) {
+        String cleanEmail = email.trim().toLowerCase();
+
+        // Check resend cooldown
+        Optional<EmailVerificationOtp> latestOpt = otpRepository.findTopByEmailOrderByCreatedAtDesc(cleanEmail);
+        if (latestOpt.isPresent()) {
+            EmailVerificationOtp latest = latestOpt.get();
+            if (latest.getCreatedAt().plusSeconds(RESEND_COOLDOWN_SECONDS).isAfter(LocalDateTime.now())) {
+                logger.warn("Password reset OTP resend requested within cooldown period for {}", cleanEmail);
+                throw new IllegalStateException("Please wait " + RESEND_COOLDOWN_SECONDS + " seconds before requesting a new code.");
+            }
+        }
+
+        // Generate 6-digit code
+        int code = 100000 + secureRandom.nextInt(900000);
+        String codeStr = String.valueOf(code);
+
+        // Store hashed OTP
+        EmailVerificationOtp record = new EmailVerificationOtp();
+        record.setEmail(cleanEmail);
+        record.setOtpHash(passwordEncoder.encode(codeStr));
+        record.setExpiresAt(LocalDateTime.now().plusMinutes(OTP_EXPIRY_MINUTES));
+        record.setAttempts(0);
+        record.setVerified(false);
+        record.setCreatedAt(LocalDateTime.now());
+        otpRepository.save(record);
+
+        // Dispatch password reset OTP email with zero reset links
+        boolean sent = emailService.sendPasswordResetOtpEmail(cleanEmail, fullName, codeStr, OTP_EXPIRY_MINUTES);
+        if (!sent) {
+            logger.warn("Failed to dispatch Brevo password reset OTP email to: {}", cleanEmail);
+        }
+        return sent;
+    }
+
+    /**
      * Validates submitted OTP. Returns true if valid and not expired.
      */
     @Transactional

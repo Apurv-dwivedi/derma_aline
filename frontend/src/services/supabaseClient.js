@@ -80,18 +80,11 @@ export const verifySupabaseOtp = async (email, token) => {
 
 /**
  * Password Recovery via Supabase Auth
- * Dispatches secure password recovery link to user's inbox
+ * Note: Password reset strictly uses the clinic 6-digit email OTP system.
+ * We do not dispatch any external reset links via Supabase.
  */
 export const requestSupabasePasswordReset = async (email, redirectPath = '/client/reset-password') => {
-  const origin = window.location.origin;
-  const redirectTo = `${origin}${redirectPath}`;
-
-  const { data, error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-    redirectTo
-  });
-
-  if (error) throw error;
-  return data;
+  return { message: 'OTP dispatched via clinic security service' };
 };
 
 /**

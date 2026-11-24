@@ -8,7 +8,6 @@ import {
   signInWithGoogleSSO,
   signUpWithSupabase,
   verifySupabaseOtp,
-  requestSupabasePasswordReset,
   updateSupabasePassword
 } from '../services/supabaseClient';
 import '../styles/pages.css';
@@ -26,7 +25,13 @@ const ClientAuth = () => {
   const [searchParams] = useSearchParams();
 
   // Mode: 'login' | 'register' | 'verify' | 'forgot' | 'reset'
-  const initialMode = searchParams.get('mode') || (searchParams.get('token') ? 'reset' : 'login');
+  const pathname = window.location.pathname;
+  const initialMode = searchParams.get('mode') ||
+    (pathname.includes('forgot') ? 'forgot' :
+     pathname.includes('reset') ? 'reset' :
+     pathname.includes('register') ? 'register' :
+     pathname.includes('verify') ? 'verify' :
+     (searchParams.get('token') ? 'reset' : 'login'));
   const [mode, setMode] = useState(initialMode);
 
   // Form Fields
@@ -350,88 +355,78 @@ const ClientAuth = () => {
     }
   };
 
-  // 5. Forgot Password
+  // 5. Forgot Password: Direct 6-digit OTP dispatch (Zero links in email)
   const handleForgotPassword = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    if (!email || !email.trim()) {
+      setError('Please provide your registered email address.');
+      return;
+    }
+
     setError('');
     setSuccessMessage('');
     setLoading(true);
-
-    let supabaseSent = false;
-    if (isSupabaseConfigured()) {
-      try {
-        await requestSupabasePasswordReset(email);
-        supabaseSent = true;
-      } catch (sbErr) {
-        console.warn('Supabase password reset notice:', sbErr.message);
-      }
-    }
 
     try {
       const res = await API.post('/auth/forgot-password', {
         email: email.trim().toLowerCase()
       });
-      setSuccessMessage(res.data.message || 'If an account exists with that email, password reset instructions have been sent.');
+      setSuccessMessage(res.data.message || `A 6-digit verification code has been dispatched to ${email.trim().toLowerCase()}.`);
+      setOtp('');
+      setPassword('');
+      setConfirmPassword('');
+      setCooldown(60);
+      setMode('reset');
     } catch (err) {
-      if (supabaseSent) {
-        setSuccessMessage('Password reset instructions have been dispatched to your email address.');
-      } else {
-        setError(err.response?.data?.message || 'Request failed. Please try again.');
-      }
+      setError(err.response?.data?.message || 'Request failed. Please verify your email address and try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  // 6. Reset Password
+  // 6. Reset Password: Direct 6-digit OTP verification (Zero links required)
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setError('');
     setSuccessMessage('');
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
+    if (!email || !email.trim()) {
+      setError('Please enter your registered email address.');
+      return;
+    }
+    if (!otp || otp.trim().length !== 6) {
+      setError('Please enter the 6-digit verification code sent to your email.');
       return;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError('New password must be at least 6 characters long.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match. Please re-enter.');
       return;
     }
 
     setLoading(true);
 
-    if (isSupabaseConfigured()) {
-      try {
-        await updateSupabasePassword(password);
-      } catch (sbErr) {
-        console.warn('Supabase password update notice:', sbErr.message);
-      }
-    }
-
     try {
-      // Sync password with backend
-      await API.post('/auth/sync-password', {
+      const res = await API.post('/auth/reset-password', {
         email: email.trim().toLowerCase(),
-        newPassword: password
+        otp: otp.trim(),
+        newPassword: password,
+        token: resetToken || undefined
       });
-      setSuccessMessage('Your password has been updated successfully! Redirecting to sign in...');
-      setTimeout(() => setMode('login'), 1500);
+      setSuccessMessage(res.data.message || 'Your password has been updated successfully! Redirecting to sign in...');
+      setTimeout(() => {
+        setMode('login');
+        setPassword('');
+        setConfirmPassword('');
+        setOtp('');
+        setError('');
+        setSuccessMessage('');
+      }, 1800);
     } catch (err) {
-      if (resetToken) {
-        try {
-          const res = await API.post('/auth/reset-password', {
-            token: resetToken.trim(),
-            newPassword: password
-          });
-          setSuccessMessage(res.data.message);
-          setTimeout(() => setMode('login'), 1500);
-          return;
-        } catch (innerErr) {
-          setError(innerErr.response?.data?.message || 'Password reset link has expired.');
-          return;
-        }
-      }
-      setError(err.response?.data?.message || 'Failed to update password. Please request a new reset link.');
+      setError(err.response?.data?.message || 'Failed to update password. Please check your verification code.');
     } finally {
       setLoading(false);
     }
@@ -490,8 +485,8 @@ const ClientAuth = () => {
             {mode === 'login' && 'Sign in to access your personal treatment records and aftercare instructions.'}
             {mode === 'register' && 'Register with Derma Aline for personalized clinical aesthetics care.'}
             {mode === 'verify' && `Enter the 6-digit verification code sent to ${email}`}
-            {mode === 'forgot' && 'Enter your registered email to receive secure reset instructions.'}
-            {mode === 'reset' && 'Enter your new confidential password below.'}
+            {mode === 'forgot' && 'Enter your registered email to receive a confidential 6-digit reset code.'}
+            {mode === 'reset' && 'Enter the 6-digit verification code sent to your email and set your new password.'}
           </p>
         </div>
 
@@ -891,6 +886,9 @@ const ClientAuth = () => {
                   style={{ width: '100%', padding: '10px 14px 10px 38px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem' }}
                 />
               </div>
+              <span style={{ fontSize: '0.76rem', color: '#8c7b70', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <ShieldCheck size={14} color="#806657" /> A confidential 6-digit verification code will be sent to your inbox. No reset links required.
+              </span>
             </div>
 
             <button
@@ -899,7 +897,7 @@ const ClientAuth = () => {
               className="btn-primary"
               style={{ width: '100%', padding: '12px', fontSize: '0.95rem', fontWeight: '600' }}
             >
-              {loading ? 'Sending Instructions...' : 'Send Reset Instructions'}
+              {loading ? 'Sending Verification Code...' : 'Send 6-Digit Reset Code'}
             </button>
 
             <div style={{ textAlign: 'center' }}>
@@ -917,6 +915,68 @@ const ClientAuth = () => {
         {/* Form: RESET PASSWORD */}
         {mode === 'reset' && (
           <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '6px' }}>
+                Registered Email Address
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Mail size={16} style={{ position: 'absolute', left: '12px', top: '13px', color: '#a8988d' }} />
+                <input
+                  type="email"
+                  required
+                  placeholder="your.email@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  style={{ width: '100%', padding: '10px 14px 10px 38px', borderRadius: '8px', border: '1px solid #ebdcd0', outline: 'none', fontSize: '0.9rem' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '6px', textAlign: 'center' }}>
+                Enter 6-Digit Reset Code
+              </label>
+              <input
+                type="text"
+                required
+                maxLength={6}
+                placeholder="123456"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: '2px solid #806657',
+                  textAlign: 'center',
+                  fontSize: '1.5rem',
+                  letterSpacing: '0.25em',
+                  fontWeight: '700',
+                  outline: 'none',
+                  color: '#2c221e',
+                  backgroundColor: '#faf8f5'
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                <span style={{ fontSize: '0.78rem', color: '#8c7b70' }}>Code valid for 5 minutes</span>
+                <button
+                  type="button"
+                  disabled={cooldown > 0 || loading}
+                  onClick={() => handleForgotPassword()}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: cooldown > 0 ? '#b0a49c' : '#806657',
+                    fontWeight: '600',
+                    fontSize: '0.8rem',
+                    cursor: cooldown > 0 ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend Code'}
+                </button>
+              </div>
+            </div>
+
             <div>
               <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '6px' }}>New Password</label>
               <div style={{ position: 'relative' }}>
@@ -955,12 +1015,22 @@ const ClientAuth = () => {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || otp.length !== 6}
               className="btn-primary"
               style={{ width: '100%', padding: '12px', fontSize: '0.95rem', fontWeight: '600' }}
             >
-              {loading ? 'Updating Password...' : 'Save New Password'}
+              {loading ? 'Verifying & Updating...' : 'Verify Code & Set New Password'}
             </button>
+
+            <div style={{ textAlign: 'center' }}>
+              <button
+                type="button"
+                onClick={() => { setMode('login'); setError(''); setSuccessMessage(''); }}
+                style={{ background: 'none', border: 'none', color: '#806657', fontSize: '0.85rem', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+              >
+                <ArrowLeft size={14} /> Back to Sign In
+              </button>
+            </div>
           </form>
         )}
       </div>

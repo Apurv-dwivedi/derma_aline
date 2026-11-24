@@ -261,21 +261,59 @@ public class EmailService {
                 .replace("\t", "\\t");
     }
 
-    public boolean sendPasswordResetEmail(String to, String recipientName, String resetLink) {
-        String greeting = (recipientName != null && !recipientName.trim().isEmpty()) 
-                ? "Dear " + recipientName + ",\n\n" 
-                : "Hello,\n\n";
+    public boolean sendPasswordResetOtpEmail(String to, String fullName, String codeStr, int expiryMinutes) {
+        lastError = null;
+        String recipientName = (fullName != null && !fullName.trim().isEmpty()) ? fullName.trim() : "Valued Client";
+        String subject = "Your 6-Digit Password Reset Code: " + codeStr + " | Derma Aline Aesthétics";
 
-        String subject = "Reset Your Password - Derma Aline Aesthetics";
-        String body = greeting +
-                "We received a request to reset your password for your Derma Aline Aesthetics account.\n\n" +
-                "To reset your password, please click the link below (or copy and paste it into your browser). This link is valid for 1 hour:\n\n" +
-                resetLink + "\n\n" +
-                "If you did not make this request, you can safely ignore this email and your password will remain unchanged.\n\n" +
-                "Warm regards, \n"
-                + "Derma Aline Aesthetics Team\n"
-                + "https://derma-aline.vercel.app";
+        String textBody = "Dear " + recipientName + ",\n\n"
+                + "We received a request to reset the password for your Derma Aline Aesthétics client portal account.\n\n"
+                + "Your 6-digit password reset verification code is: " + codeStr + "\n\n"
+                + "This verification code will expire in " + expiryMinutes + " minutes. "
+                + "Enter this code on the password reset screen to set your new password.\n\n"
+                + "For your privacy and security, never share this code with anyone. If you did not make this request, your password remains completely secure and unchanged.\n\n"
+                + "Warm regards,\n"
+                + "Derma Aline Aesthétics Skin Clinic\n"
+                + "+91 93195 44704";
 
-        return sendEmail(to, subject, body);
+        String htmlBody = "<div style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 36px 28px; background-color: #FAFAF8; border-radius: 12px; border: 1px solid #E8E5E0;\">"
+                + "<div style=\"text-align: center; padding-bottom: 24px; border-bottom: 1px solid #E8E5E0;\">"
+                + "<h2 style=\"margin: 0; font-size: 20px; font-weight: 700; letter-spacing: 0.08em; color: #806657; text-transform: uppercase;\">DERMA ALINE AESTH\u00c9TICS</h2>"
+                + "<p style=\"margin: 4px 0 0 0; font-size: 11px; letter-spacing: 0.15em; color: #8F857D; text-transform: uppercase;\">Skin Clinic & Aesthetic Centre</p>"
+                + "</div>"
+                + "<div style=\"padding: 28px 0; color: #3E3834; font-size: 15px; line-height: 1.7;\">"
+                + "<p style=\"margin-top: 0;\">Dear <strong>" + recipientName + "</strong>,</p>"
+                + "<p>We received a request to reset the password for your Derma Aline Aesth\u00e9tics client portal suite. To set a new confidential password, please enter the 6-digit verification code below:</p>"
+                + "<div style=\"text-align: center; margin: 28px 0;\">"
+                + "<span style=\"display: inline-block; font-size: 34px; font-weight: 700; letter-spacing: 10px; color: #806657; background: #FAF7F2; padding: 14px 28px; border-radius: 8px; border: 2px solid #806657;\">"
+                + codeStr
+                + "</span>"
+                + "<p style=\"margin: 10px 0 0 0; font-size: 13px; color: #8F857D;\">Code expires in " + expiryMinutes
+                + " minutes</p>"
+                + "</div>"
+                + "<p style=\"font-size: 13px; color: #736B63; background: #F3EFEA; padding: 12px 16px; border-radius: 6px;\">Security Notice: Never share this verification code with anyone. If you did not request this password reset, please disregard this email. Your current password remains active.</p>"
+                + "</div>"
+                + "<div style=\"margin-top: 24px; padding-top: 20px; border-top: 1px solid #E8E5E0; text-align: center; font-size: 12px; color: #A09891;\">"
+                + "<p style=\"margin: 0; font-weight: 600;\">Derma Aline Aesth\u00e9tics Skin Clinic</p>"
+                + "<p style=\"margin: 4px 0 0 0;\">First Floor, F-121, near Roshan di Kulfi, Main Market, Rajouri Garden, New Delhi &bull; +91 93195 44704</p>"
+                + "</div>"
+                + "</div>";
+
+        if (brevoApiKey != null && !brevoApiKey.trim().isEmpty()) {
+            if (sendViaBrevoHttpApi(to, subject, textBody, htmlBody)) return true;
+        }
+        if (resendApiKey != null && !resendApiKey.trim().isEmpty()) {
+            if (sendViaResendHttpApi(to, subject, textBody, htmlBody)) return true;
+        }
+        if (sendViaGoogleSmtp(to, subject, textBody, htmlBody)) return true;
+        return false;
+    }
+
+    public boolean sendPasswordResetEmail(String to, String recipientName, String resetCodeOrLink) {
+        String cleaned = resetCodeOrLink != null ? resetCodeOrLink.trim() : "";
+        if (cleaned.matches("\\d{6}")) {
+            return sendPasswordResetOtpEmail(to, recipientName, cleaned, 5);
+        }
+        return sendPasswordResetOtpEmail(to, recipientName, "------", 5);
     }
 }

@@ -508,8 +508,8 @@ public class AuthController {
 
     /**
      * Password Reset Request:
-     * Generates a 1-hour secure reset token and emails it.
-     * NEVER returns reset tokens or links in the API response.
+     * Generates a 6-digit confidential verification OTP and emails it directly (Zero links).
+     * NEVER returns reset tokens, OTPs, or links in the API response.
      */
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> payload) {
@@ -523,19 +523,20 @@ public class AuthController {
 
         if (userOpt.isPresent()) {
             User user = userOpt.get();
-            String token = UUID.randomUUID().toString();
-            user.setResetToken(token);
-            user.setResetTokenExpiry(LocalDateTime.now().plusHours(1));
-            userRepository.save(user);
-
-            String resetUrl = frontendUrl + "/auth?resetToken=" + token;
-            emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), resetUrl);
+            try {
+                otpService.generateAndSendPasswordResetOtp(user.getEmail(), user.getFullName());
+            } catch (IllegalStateException e) {
+                return ResponseEntity.status(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS).body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+                ));
+            }
         }
 
         // Generic constant response prevents email enumeration and token leakage
         return ResponseEntity.ok(Map.of(
             "success", true,
-            "message", "If an account with that email address exists in our system, password reset instructions have been sent to your inbox."
+            "message", "If an account with that email address exists in our system, a 6-digit password reset verification code has been dispatched to your inbox."
         ));
     }
 
@@ -560,39 +561,72 @@ public class AuthController {
     }
 
     /**
-     * Complete Password Reset
+     * Complete Password Reset:
+     * Primary Flow: Verified via 6-digit Email OTP (Zero links required)
+     * Legacy Flow: Verified via reset token
      */
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> payload) {
+        String email = payload.get("email");
+        String otp = payload.get("otp");
         String token = payload.get("token");
         String newPassword = payload.get("newPassword");
 
-        if (token == null || token.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Reset token is required."));
-        }
         if (newPassword == null || newPassword.trim().length() < 6) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Password must be at least 6 characters long."));
         }
 
-        Optional<User> userOpt = userRepository.findByResetToken(token.trim());
-        if (userOpt.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid or expired reset link."));
+        // 1. Password reset via 6-digit OTP verification (Primary Client Portal flow)
+        if (email != null && !email.trim().isEmpty() && otp != null && !otp.trim().isEmpty()) {
+            String cleanEmail = email.trim().toLowerCase();
+            Optional<User> userOpt = userRepository.findByEmail(cleanEmail);
+            if (userOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid email address or verification code."));
+            }
+
+            boolean isOtpValid = otpService.verifyOtp(cleanEmail, otp.trim());
+            if (!isOtpValid) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid or expired 6-digit verification code. Please request a new code."));
+            }
+
+            User user = userOpt.get();
+            user.setPassword(passwordEncoder.encode(newPassword.trim()));
+            user.setResetToken(null);
+            user.setResetTokenExpiry(null);
+            userRepository.save(user);
+
+            auditLogService.record("PASSWORD_RESET_OTP", cleanEmail, user.getRole().name(), "USER", user.getId().toString(), "Password reset successfully via 6-digit email OTP verification");
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Your password has been reset successfully! You can now log in with your new password."
+            ));
         }
 
-        User user = userOpt.get();
-        if (user.getResetTokenExpiry() == null || user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Password reset link has expired. Please request a new one."));
+        // 2. Legacy fallback via token
+        if (token != null && !token.trim().isEmpty()) {
+            Optional<User> userOpt = userRepository.findByResetToken(token.trim());
+            if (userOpt.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid or expired reset code."));
+            }
+
+            User user = userOpt.get();
+            if (user.getResetTokenExpiry() == null || user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Password reset code has expired. Please request a new one."));
+            }
+
+            user.setPassword(passwordEncoder.encode(newPassword.trim()));
+            user.setResetToken(null);
+            user.setResetTokenExpiry(null);
+            userRepository.save(user);
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Your password has been reset successfully! You can now log in with your new password."
+            ));
         }
 
-        user.setPassword(passwordEncoder.encode(newPassword.trim()));
-        user.setResetToken(null);
-        user.setResetTokenExpiry(null);
-        userRepository.save(user);
-
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "message", "Your password has been reset successfully! You can now log in with your new password."
-        ));
+        return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Email address and 6-digit verification code are required."));
     }
 
     /**
