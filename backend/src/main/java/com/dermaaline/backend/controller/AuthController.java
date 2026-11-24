@@ -11,6 +11,8 @@ import com.dermaaline.backend.security.JwtTokenProvider;
 import com.dermaaline.backend.service.EmailService;
 import com.dermaaline.backend.service.OtpService;
 import com.dermaaline.backend.security.SecuritySanitizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -26,6 +28,8 @@ import java.util.*;
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
 
     @Autowired
     private UserRepository userRepository;
