@@ -1,4 +1,3 @@
-﻿import React from 'react';
 import { Sparkles, Shield, Award } from 'lucide-react';
 import '../styles/pages.css';
 
@@ -17,7 +16,7 @@ const About = () => {
       <div style={{ display: 'flex', gap: '50px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '60px' }}>
         
         {/* Left Side: Square Clinic Interior Image */}
-        <div style={{ flex: '1', minWidth: '350px', maxWidth: '480px', margin: '0 auto' }}>
+        <div style={{ flex: '1', minWidth: 'min(100%, 280px)', maxWidth: '480px', margin: '0 auto' }}>
           <div style={{ aspectRatio: '1 / 1', width: '100%', borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)', backgroundColor: 'var(--bg-white)' }}>
             <img 
               src="/clinic-interior.webp" 
@@ -28,7 +27,7 @@ const About = () => {
         </div>
 
         {/* Right Side: Philosophy & Info */}
-        <div style={{ flex: '1.2', minWidth: '320px', display: 'flex', flexDirection: 'column', gap: '25px' }}>
+        <div style={{ flex: '1.2', minWidth: 'min(100%, 280px)', display: 'flex', flexDirection: 'column', gap: '25px' }}>
           <div>
             <h2 style={{ fontSize: '2.2rem', color: 'var(--color-primary)', fontFamily: 'var(--font-heading)', marginBottom: '15px' }}>
               Our Philosophy & Vision

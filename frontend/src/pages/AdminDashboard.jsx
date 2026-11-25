@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Calendar, CheckCircle, Clock, Edit2, Trash2, X, Save, LogOut, 
+  Calendar, Edit2, Trash2, X, Save, LogOut, 
   RefreshCw, MessageSquare, Mail, Phone, Search, Users, UserPlus, 
-  Shield, Briefcase, Award, KeyRound, Lock, Eye, EyeOff, 
-  CheckCircle2, AlertCircle, Sparkles, HeartPulse, Settings, FileText,
-  Menu, Camera, Upload, User
+  Shield, Briefcase, KeyRound, Lock, Eye, EyeOff, 
+  CheckCircle2, AlertCircle, Sparkles, FileText,
+  Menu, Camera, Upload
 } from 'lucide-react';
-import API from '../services/api';
+import API, { performServerLogout } from '../services/api';
 import { TREATMENTS_DATA, TREATMENT_CATEGORIES } from '../data/treatmentsData';
 import '../styles/pages.css';
 
@@ -23,7 +23,6 @@ const AdminDashboard = () => {
   const [appointments, setAppointments] = useState([]);
   const [clients, setClients] = useState([]);
   const [messages, setMessages] = useState([]);
-  const [auditLogs, setAuditLogs] = useState([]);
   const [treatmentsList, setTreatmentsList] = useState([]);
   const [staffMembers, setStaffMembers] = useState([]);
 
@@ -44,29 +43,15 @@ const AdminDashboard = () => {
   });
 
   // Staff State
-  const [staffInvitations, setStaffInvitations] = useState([]);
   const [newStaff, setNewStaff] = useState({
     fullName: '',
     email: '',
     designation: 'Skin Therapist',
-    phone: '',
-    password: ''
+    phone: ''
   });
   const [staffActionLoading, setStaffActionLoading] = useState(false);
   const [staffSuccess, setStaffSuccess] = useState('');
   const [staffError, setStaffError] = useState('');
-
-  // Clinic Settings State
-  const [settings, setSettings] = useState({
-    clinicName: 'DERMA ALINE AESTHÉTICS SKIN CLINIC',
-    contactEmail: 'dermaalineaesthetics@gmail.com',
-    contactPhone: '+91 93195 44704',
-    address: 'Derma Aline Aesthétics Clinic, Luxury Care Suite',
-    openingHours: 'Mon - Sat: 10:00 AM - 08:00 PM',
-    generalInformation: 'Premier aesthetic skin clinic providing tailored clinical treatments, skin rejuvenation, and luxury dermatological care.'
-  });
-  const [settingsLoading, setSettingsLoading] = useState(false);
-  const [settingsSuccess, setSettingsSuccess] = useState('');
 
   // Security & Password State
   const [passwordForm, setPasswordForm] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
@@ -96,7 +81,6 @@ const AdminDashboard = () => {
 
   // Selected Client Details Modal
   const [selectedClient, setSelectedClient] = useState(null);
-  const [clientDetailLoading, setClientDetailLoading] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -110,7 +94,7 @@ const AdminDashboard = () => {
     try {
       deletedIds = JSON.parse(localStorage.getItem('derma_deleted_treatment_ids') || '[]');
       inactiveIds = JSON.parse(localStorage.getItem('derma_inactive_treatment_ids') || '[]');
-    } catch (e) {
+    } catch {
       deletedIds = [];
       inactiveIds = [];
     }
@@ -179,23 +163,18 @@ const AdminDashboard = () => {
     );
   };
 
-  const fetchData = async (isManual = false) => {
+  const fetchData = useCallback(async (isManual = false) => {
     try {
       if (isManual) {
         setRefreshing(true);
-      } else {
-        setLoading(true);
+        setError('');
       }
-      setError('');
 
-      const [apptRes, msgRes, reportRes, staffRes, clientsRes, settingsRes, auditRes, treatRes, staffMembersRes] = await Promise.allSettled([
+      const [apptRes, msgRes, reportRes, clientsRes, treatRes, staffMembersRes] = await Promise.allSettled([
         API.get('/appointments'),
         API.get('/contact'),
         API.get('/admin/reports/overview'),
-        API.get('/admin/staff/invitations'),
         API.get('/admin/clients'),
-        API.get('/admin/settings'),
-        API.get('/admin/audit-logs'),
         API.get('/treatments'),
         API.get('/admin/staff/members')
       ]);
@@ -209,20 +188,11 @@ const AdminDashboard = () => {
       if (reportRes.status === 'fulfilled' && reportRes.value.data) {
         setReports(reportRes.value.data);
       }
-      if (staffRes.status === 'fulfilled') {
-        setStaffInvitations(staffRes.value.data || []);
-      }
       if (staffMembersRes.status === 'fulfilled' && Array.isArray(staffMembersRes.value.data)) {
         setStaffMembers(staffMembersRes.value.data);
       }
       if (clientsRes.status === 'fulfilled') {
         setClients(clientsRes.value.data || []);
-      }
-      if (settingsRes.status === 'fulfilled' && settingsRes.value.data) {
-        setSettings(settingsRes.value.data);
-      }
-      if (auditRes.status === 'fulfilled') {
-        setAuditLogs(auditRes.value.data || []);
       }
       if (treatRes.status === 'fulfilled') {
         setTreatmentsList(buildTreatmentList(treatRes.value.data || []));
@@ -241,11 +211,14 @@ const AdminDashboard = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchData]);
 
   useEffect(() => {
     if (otpCooldown > 0) {
@@ -323,7 +296,7 @@ const AdminDashboard = () => {
       try {
         await API.delete('/appointments/' + targetId);
         fetchData();
-      } catch (err) {
+      } catch {
         alert('Error deleting appointment');
       }
     }
@@ -335,7 +308,7 @@ const AdminDashboard = () => {
       try {
         await API.delete('/contact/' + targetId);
         fetchData();
-      } catch (err) {
+      } catch {
         alert('Error deleting message');
       }
     }
@@ -405,7 +378,7 @@ const AdminDashboard = () => {
         let deletedIds = [];
         try {
           deletedIds = JSON.parse(localStorage.getItem('derma_deleted_treatment_ids') || '[]');
-        } catch (e) {
+        } catch {
           deletedIds = [];
         }
         if (!deletedIds.includes(String(id))) deletedIds.push(String(id));
@@ -436,7 +409,7 @@ const AdminDashboard = () => {
       let inactiveIds = [];
       try {
         inactiveIds = JSON.parse(localStorage.getItem('derma_inactive_treatment_ids') || '[]');
-      } catch (e) {
+      } catch {
         inactiveIds = [];
       }
 
@@ -457,7 +430,7 @@ const AdminDashboard = () => {
       }
 
       setTreatmentsList(prev => prev.map(item => (item.id === tr.id || item.name === tr.name) ? { ...item, active: newActive } : item));
-    } catch (err) {
+    } catch {
       alert('Failed to update treatment status.');
     }
   };
@@ -467,7 +440,6 @@ const AdminDashboard = () => {
     if (window.confirm(`Are you sure you want to permanently remove "${name || email || 'this staff member'}" from the salon? Their account and operational access will be completely deleted.`)) {
       try {
         setStaffMembers(prev => prev.filter(s => s.id !== id && (!email || s.email !== email)));
-        setStaffInvitations(prev => prev.filter(inv => inv.id !== id && (!email || inv.email !== email)));
         await API.delete(`/admin/staff/members/${id}`);
         setStaffSuccess(`Staff member "${name || email || ''}" removed from the salon successfully.`);
         fetchData();
@@ -481,40 +453,7 @@ const AdminDashboard = () => {
     }
   };
 
-  // Staff Management: Delete / Revoke Invitation
-  const handleDeleteInvitation = async (id, email) => {
-    if (window.confirm(`Are you sure you want to revoke and delete the invitation for ${email}?`)) {
-      try {
-        setStaffInvitations(prev => prev.filter(inv => inv.id !== id && (!email || inv.email !== email)));
-        setStaffMembers(prev => prev.filter(s => s.id !== id && (!email || s.email !== email)));
-        await API.delete(`/admin/staff/invitations/${id}`);
-        setStaffSuccess(`Staff invitation for ${email} has been removed.`);
-        fetchData();
-        setTimeout(() => setStaffSuccess(''), 4000);
-      } catch (err) {
-        console.error("Failed to delete invitation:", err);
-        setStaffError(err.response?.data?.message || 'Failed to delete invitation.');
-        fetchData();
-        setTimeout(() => setStaffError(''), 4000);
-      }
-    }
-  };
-
-  // Audit Logs: Purge All
-  const handleClearAllAuditLogs = async () => {
-    if (window.confirm("Are you sure you want to permanently delete ALL audit logs from the portal? This action cannot be undone.")) {
-      try {
-        await API.delete('/admin/audit-logs');
-        setAuditLogs([]);
-        setRefreshToast('All audit logs have been purged from the portal.');
-        setTimeout(() => setRefreshToast(''), 3000);
-      } catch (err) {
-        alert(err.response?.data?.message || 'Failed to clear audit logs.');
-      }
-    }
-  };
-
-  // Staff Management: Add Staff with Dummy Password
+  // Staff Management: Send secure single-use invitation link (zero plaintext passwords)
   const handleEnrollStaff = async (e) => {
     e.preventDefault();
     setStaffActionLoading(true);
@@ -522,64 +461,72 @@ const AdminDashboard = () => {
     setStaffError('');
 
     try {
-      const response = await API.post('/admin/staff/invitations', newStaff);
-      setStaffSuccess(response.data.message || 'Staff member enrolled successfully with login credentials!');
-      setNewStaff({ fullName: '', email: '', designation: 'Skin Therapist', phone: '', password: '' });
+      const response = await API.post('/admin/staff/invitations', {
+        fullName: newStaff.fullName,
+        email: newStaff.email,
+        designation: newStaff.designation,
+        phone: newStaff.phone
+      });
+      setStaffSuccess(response.data.message || 'Secure staff onboarding link dispatched!');
+      setNewStaff({ fullName: '', email: '', designation: 'Skin Therapist', phone: '' });
       fetchData();
-      setTimeout(() => setStaffSuccess(''), 4000);
+      setTimeout(() => setStaffSuccess(''), 5000);
     } catch (err) {
-      console.error("Failed to enroll staff member:", err);
-      setStaffError(err.response?.data?.message || 'Failed to enroll staff member.');
-      setTimeout(() => setStaffError(''), 4000);
+      console.error("Failed to invite staff member:", err);
+      setStaffError(err.response?.data?.message || 'Failed to send staff invitation.');
+      fetchData();
+      setTimeout(() => setStaffError(''), 5000);
     } finally {
       setStaffActionLoading(false);
     }
   };
 
-  // Staff Management: Admin updates staff password directly
-  const handleResetStaffPassword = async (id, name, email) => {
-    const newPass = window.prompt(`Enter new password for ${name || email} (min 6 characters):`, "");
-    if (!newPass || !newPass.trim()) return;
-    if (newPass.trim().length < 6) {
-      alert("Password must be at least 6 characters long.");
+  // Staff Management: Send secure single-use password setup / reset link (never prompts/emails plaintext password)
+  const handleSendStaffResetLink = async (id, name, email) => {
+    if (!window.confirm(`Send a secure 24-hour onboarding / password reset link to ${name || email}?\n\nExisting sessions for this staff member will be signed out until setup is completed.`)) {
       return;
     }
+    setStaffSuccess('');
+    setStaffError('');
     try {
-      const res = await API.put(`/admin/staff/members/${id}/password`, { newPassword: newPass.trim() });
-      setStaffSuccess(res.data.message || `Password for ${email} updated successfully!`);
+      const res = await API.post(`/admin/staff/members/${id}/reset-invite`);
+      setStaffSuccess(res.data.message || `Secure setup/reset link sent to ${email}!`);
+      fetchData();
+      setTimeout(() => setStaffSuccess(''), 5000);
+    } catch (err) {
+      setStaffError(err.response?.data?.message || 'Failed to dispatch staff setup link.');
+      setTimeout(() => setStaffError(''), 5000);
+    }
+  };
+
+  // Staff Management: Enable or Disable staff portal access immediately
+  const handleToggleStaffStatus = async (staff) => {
+    const isCurrentlyDisabled = staff.status === 'DISABLED';
+    const nextStatus = isCurrentlyDisabled ? 'ACTIVE' : 'DISABLED';
+    const actionLabel = isCurrentlyDisabled ? 'enable' : 'disable';
+    if (!window.confirm(`Are you sure you want to ${actionLabel} portal access for "${staff.fullName || staff.email}"?`)) {
+      return;
+    }
+    setStaffSuccess('');
+    setStaffError('');
+    try {
+      const res = await API.patch(`/admin/staff/members/${staff.id}/status`, { status: nextStatus });
+      setStaffSuccess(res.data.message || `Staff status updated to ${nextStatus}.`);
+      fetchData();
       setTimeout(() => setStaffSuccess(''), 4000);
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update staff password.');
+      setStaffError(err.response?.data?.message || 'Failed to update staff status.');
+      setTimeout(() => setStaffError(''), 4000);
     }
-  };
-
-  // Staff Management: Resend Invitation
-  const handleResendStaffInvite = async (id) => {
-    try {
-      const res = await API.post(`/admin/staff/invitations/${id}/resend`);
-      setStaffSuccess(res.data.message || 'Invitation resent.');
-      fetchData();
-      setTimeout(() => setStaffSuccess(''), 3000);
-    } catch (err) {
-      setStaffError('Failed to resend invitation.');
-    }
-  };
-
-  // Staff Management: Revoke
-  const handleRevokeStaff = async (id) => {
-    handleDeleteInvitation(id, 'this staff invitee');
   };
 
   // Client Details Modal
   const handleViewClientDetails = async (clientId) => {
-    setClientDetailLoading(true);
     try {
       const res = await API.get(`/admin/clients/${clientId}`);
       setSelectedClient(res.data);
-    } catch (err) {
+    } catch {
       alert("Failed to load client details.");
-    } finally {
-      setClientDetailLoading(false);
     }
   };
 
@@ -618,34 +565,19 @@ const AdminDashboard = () => {
     }
   };
 
-  // System: Purge All Portal Data (Client, Staff, and Admin portals)
+  // System: Purge Operational Portal Data (preserves audit logs and admin credentials)
   const handlePurgeAllPortalData = async () => {
-    if (window.confirm("WARNING: Are you sure you want to permanently delete ALL data across Client Portal, Staff Portal, and Admin Portal (appointments, treatment records, clients, enquiries, staff accounts, OTPs)?\n\nOnly your clinic administrator account and core treatments will be kept.")) {
+    if (window.confirm("WARNING: Are you sure you want to permanently delete operational portal data (appointments, treatment records, clients, enquiries, staff accounts, OTPs)?\n\nYour clinic administrator account, core treatments, and compliance audit logs will be preserved.")) {
       try {
-        await API.delete('/admin/system/purge-all-data');
-        setRefreshToast('All portal data has been completely wiped. Admin credentials preserved.');
+        await API.delete('/admin/system/purge-all-data', {
+          params: { confirm: 'PURGE_ALL_PORTAL_DATA' }
+        });
+        setRefreshToast('Operational portal data purged. Admin credentials and compliance audit logs preserved.');
         fetchData();
         setTimeout(() => setRefreshToast(''), 4000);
       } catch (err) {
         alert(err.response?.data?.message || 'Failed to purge portal data.');
       }
-    }
-  };
-
-  // Clinic Settings Save
-  const handleSaveSettings = async (e) => {
-    e.preventDefault();
-    setSettingsLoading(true);
-    setSettingsSuccess('');
-
-    try {
-      const res = await API.put('/admin/settings', settings);
-      setSettingsSuccess(res.data.message || 'Clinic settings updated successfully.');
-      setTimeout(() => setSettingsSuccess(''), 3000);
-    } catch (err) {
-      alert('Failed to save settings.');
-    } finally {
-      setSettingsLoading(false);
     }
   };
 
@@ -738,16 +670,10 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
+  const handleLogout = async () => {
+    await performServerLogout();
     navigate('/owner/login');
   };
-
-  // Active appointments needing clinic action
-  const activeAppointments = appointments.filter(a => {
-    const st = (a.status || 'PENDING').toUpperCase();
-    return st === 'PENDING' || st === 'CONFIRMED';
-  });
 
   // Active patient inquiries awaiting resolution (excludes RESOLVED)
   const activeMessages = messages.filter(m => {
@@ -1365,11 +1291,11 @@ const AdminDashboard = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
               <UserPlus size={22} color="var(--color-accent)" />
               <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', margin: 0, fontFamily: 'var(--font-heading)' }}>
-                Add New Staff Member
+                Invite New Staff Member
               </h3>
             </div>
             <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '20px' }}>
-              Enrolls staff directly with active access and an initial temporary password. No OTP or activation link needed. The staff worker can sign in immediately at <strong>/staff/login</strong>, and you can reset their password anytime below.
+              Sends a secure 24-hour single-use onboarding link to your team member so they can activate their account and set their personal password at <strong>/staff/activate</strong>. No plaintext passwords are ever generated or emailed.
             </p>
 
             <form onSubmit={handleEnrollStaff} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
@@ -1409,12 +1335,12 @@ const AdminDashboard = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Initial Temporary Password</label>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Phone Number (Optional)</label>
                 <input 
-                  type="text" 
-                  placeholder="Min 6 chars (auto-generated if blank)" 
-                  value={newStaff.password || ''}
-                  onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
+                  type="tel" 
+                  placeholder="e.g. +91 98765 43210" 
+                  value={newStaff.phone || ''}
+                  onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', boxSizing: 'border-box' }}
                 />
               </div>
@@ -1426,21 +1352,21 @@ const AdminDashboard = () => {
                   className="btn-primary" 
                   style={{ width: '100%', padding: '11px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontWeight: '700' }}
                 >
-                  <UserPlus size={16} /> {staffActionLoading ? 'Enrolling...' : 'Add Staff Member'}
+                  <UserPlus size={16} /> {staffActionLoading ? 'Sending Invite...' : 'Send Onboarding Invite'}
                 </button>
               </div>
             </form>
           </div>
 
-          {/* Active Salon Staff Team Members */}
+          {/* Salon Staff Team Members */}
           <div style={{ backgroundColor: 'var(--bg-white)', padding: '30px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-soft)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
               <div>
                 <h3 style={{ fontSize: '1.3rem', color: 'var(--color-primary)', margin: '0 0 4px', fontFamily: 'var(--font-heading)' }}>
-                  Active Salon Staff Members ({staffMembers.length})
+                  Salon Staff Members ({staffMembers.length})
                 </h3>
                 <p style={{ color: 'var(--text-light)', fontSize: '0.85rem', margin: 0 }}>
-                  Active operational team members with staff workspace access. You can reset their password or delete departing staff anytime.
+                  Manage clinical staff access. Issue secure password reset links, disable access immediately, or remove departing staff.
                 </p>
               </div>
             </div>
@@ -1460,7 +1386,7 @@ const AdminDashboard = () => {
                   {staffMembers.length === 0 ? (
                     <tr>
                       <td colSpan="5" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-light)' }}>
-                        No active staff accounts enrolled yet. Use the form above to add team members.
+                        No staff accounts invited yet. Use the form above to invite team members.
                       </td>
                     </tr>
                   ) : (
@@ -1478,23 +1404,45 @@ const AdminDashboard = () => {
                         <td style={{ padding: '14px 12px' }}>
                           <span style={{ 
                             padding: '4px 10px', borderRadius: '15px', fontSize: '0.75rem', fontWeight: '700', 
-                            backgroundColor: staff.status === 'ACTIVE' ? '#d4edda' : '#f8d7da', 
-                            color: staff.status === 'ACTIVE' ? '#155724' : '#721c24'
+                            backgroundColor: staff.status === 'ACTIVE' ? '#d4edda' : (staff.status === 'PENDING_VERIFICATION' ? '#fef3c7' : '#f8d7da'), 
+                            color: staff.status === 'ACTIVE' ? '#155724' : (staff.status === 'PENDING_VERIFICATION' ? '#92400e' : '#721c24')
                           }}>
-                            {staff.status || 'ACTIVE'}
+                            {staff.status === 'PENDING_VERIFICATION' ? 'AWAITING ACTIVATION' : (staff.status || 'ACTIVE')}
                           </span>
                         </td>
                         <td style={{ padding: '14px 12px', textAlign: 'center' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
                             <button
                               type="button"
-                              onClick={() => handleResetStaffPassword(staff.id, staff.fullName, staff.email)}
-                              title="Set or update this staff member's password"
+                              onClick={() => handleSendStaffResetLink(staff.id, staff.fullName, staff.email)}
+                              disabled={staff.status === 'DISABLED'}
+                              title="Send single-use onboarding or password reset link"
                               style={{
                                 padding: '6px 12px',
                                 backgroundColor: '#f5f0eb',
                                 color: '#6b4f3b',
                                 border: '1px solid #d4c5b9',
+                                borderRadius: '6px',
+                                fontSize: '0.8rem',
+                                fontWeight: '600',
+                                cursor: staff.status === 'DISABLED' ? 'not-allowed' : 'pointer',
+                                opacity: staff.status === 'DISABLED' ? 0.5 : 1,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <Mail size={13} /> {staff.status === 'PENDING_VERIFICATION' ? 'Resend Invite' : 'Send Reset Link'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleStaffStatus(staff)}
+                              title={staff.status === 'DISABLED' ? 'Re-enable staff access' : 'Disable staff access and revoke active sessions'}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: staff.status === 'DISABLED' ? '#ecfdf5' : '#fffbeb',
+                                color: staff.status === 'DISABLED' ? '#065f46' : '#92400e',
+                                border: staff.status === 'DISABLED' ? '1px solid #a7f3d0' : '1px solid #fde68a',
                                 borderRadius: '6px',
                                 fontSize: '0.8rem',
                                 fontWeight: '600',
@@ -1504,7 +1452,7 @@ const AdminDashboard = () => {
                                 gap: '4px'
                               }}
                             >
-                              <KeyRound size={13} /> Change Password
+                              <Shield size={13} /> {staff.status === 'DISABLED' ? 'Enable' : 'Disable'}
                             </button>
                             <button 
                               type="button"
@@ -2130,7 +2078,7 @@ const AdminDashboard = () => {
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: '#4a3b32' }}>Price (INR)</label>
                   <input 

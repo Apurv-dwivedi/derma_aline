@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   HeartPulse, Users, MessageSquare, Calendar, RefreshCw, LogOut, 
-  Search, CheckCircle2, AlertCircle, Plus, FileText, Phone, Mail, 
-  ShieldCheck, Info, X, Clock, CheckCircle, Sparkles, ArrowRight, KeyRound, Menu
+  Search, CheckCircle2, AlertCircle, Plus,
+  ShieldCheck, Sparkles, X, KeyRound, Menu
 } from 'lucide-react';
-import API from '../services/api';
+import API, { performServerLogout } from '../services/api';
 import { TREATMENTS_DATA, TREATMENT_CATEGORIES } from '../data/treatmentsData';
 import '../styles/pages.css';
 
@@ -16,7 +16,6 @@ const StaffDashboard = () => {
   const [activeTab, setActiveTab] = useState('treatments');
 
   // Data States
-  const [dashboardData, setDashboardData] = useState(null);
   const [treatmentRecords, setTreatmentRecords] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [enquiries, setEnquiries] = useState([]);
@@ -71,20 +70,14 @@ const StaffDashboard = () => {
   const staffName = localStorage.getItem('fullName') || 'Clinical Staff';
   const staffRole = localStorage.getItem('role') || 'STAFF';
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async (isManual = false) => {
+  const fetchDashboardData = useCallback(async (isManual = false) => {
     if (isManual) {
       setRefreshing(true);
-    } else {
-      setLoading(true);
+      setError('');
     }
-    setError('');
 
     try {
-      const [dashRes, treatRecordsRes, custRes, enqRes, apptRes, treatsRes] = await Promise.all([
+      const [, treatRecordsRes, custRes, enqRes, apptRes, treatsRes] = await Promise.all([
         API.get('/staff/dashboard').catch(() => ({ data: {} })),
         API.get('/staff/treatments/records').catch(() => ({ data: [] })),
         API.get('/staff/customers').catch(() => ({ data: [] })),
@@ -93,7 +86,6 @@ const StaffDashboard = () => {
         API.get('/treatments/active').catch(() => ({ data: [] }))
       ]);
 
-      setDashboardData(dashRes.data);
       setTreatmentRecords(treatRecordsRes.data || []);
       setCustomers(custRes.data || []);
       setEnquiries(enqRes.data || []);
@@ -111,7 +103,14 @@ const StaffDashboard = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchDashboardData();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [fetchDashboardData]);
 
   const handleCreateTreatmentRecord = async (e) => {
     e.preventDefault();
@@ -166,7 +165,7 @@ const StaffDashboard = () => {
       );
       setSuccessMessage(`Enquiry marked as ${status}`);
       setTimeout(() => setSuccessMessage(''), 2500);
-    } catch (err) {
+    } catch {
       setError('Failed to update enquiry status.');
     }
   };
@@ -179,7 +178,7 @@ const StaffDashboard = () => {
       );
       setSuccessMessage(`Appointment status updated to ${status}`);
       setTimeout(() => setSuccessMessage(''), 2500);
-    } catch (err) {
+    } catch {
       setError('Failed to update status.');
     }
   };
@@ -257,8 +256,8 @@ const StaffDashboard = () => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
+  const handleLogout = async () => {
+    await performServerLogout();
     navigate('/staff-login');
   };
 
@@ -278,12 +277,6 @@ const StaffDashboard = () => {
       (tr.customerName && tr.customerName.toLowerCase().includes(q)) ||
       (tr.customerEmail && tr.customerEmail.toLowerCase().includes(q))
     );
-  });
-
-  // Active appointments needing clinic action (excludes COMPLETED, CANCELLED, REJECTED)
-  const activeAppointments = appointments.filter((a) => {
-    const st = (a.status || 'PENDING').toUpperCase();
-    return st === 'PENDING' || st === 'CONFIRMED';
   });
 
   // Active patient enquiries awaiting resolution (excludes RESOLVED)
@@ -1173,7 +1166,7 @@ const StaffDashboard = () => {
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '600', color: '#4a3b32', marginBottom: '4px' }}>Treatment Service</label>
                   <input

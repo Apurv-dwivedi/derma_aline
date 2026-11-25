@@ -41,6 +41,9 @@ public class User {
     @Column(name = "reset_token_expiry")
     private LocalDateTime resetTokenExpiry;
 
+    @Column(name = "token_version", nullable = false)
+    private Long tokenVersion = 0L;
+
     public enum Role {
         SUPER_ADMIN, ADMIN, STAFF, CUSTOMER, PATIENT
     }
@@ -81,4 +84,8 @@ public class User {
 
     public LocalDateTime getResetTokenExpiry() { return resetTokenExpiry; }
     public void setResetTokenExpiry(LocalDateTime resetTokenExpiry) { this.resetTokenExpiry = resetTokenExpiry; }
+
+    public Long getTokenVersion() { return tokenVersion != null ? tokenVersion : 0L; }
+    public void setTokenVersion(Long tokenVersion) { this.tokenVersion = tokenVersion != null ? tokenVersion : 0L; }
+    public void incrementTokenVersion() { this.tokenVersion = getTokenVersion() + 1L; }
 }

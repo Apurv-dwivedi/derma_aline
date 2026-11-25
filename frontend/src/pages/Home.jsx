@@ -1,8 +1,7 @@
-import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Sparkles, ShieldCheck, Award, MapPin, Phone, Mail,
-  ExternalLink, Calendar, Check, ChevronRight, 
+  ExternalLink, Calendar, ChevronRight, 
   Clock, Droplets, Zap, HeartPulse, UserCheck
 } from 'lucide-react';
 import '../styles/pages.css';
@@ -290,7 +289,7 @@ const Home = () => {
           
           <div style={{ 
             flex: '1', 
-            minWidth: '290px', 
+            minWidth: 'min(100%, 280px)', 
             backgroundColor: 'var(--color-primary, #5a4638)', 
             color: '#ffffff', 
             padding: '35px 28px', 
@@ -353,7 +352,7 @@ const Home = () => {
 
           <div style={{ 
             flex: '1', 
-            minWidth: '290px', 
+            minWidth: 'min(100%, 280px)', 
             backgroundColor: '#ffffff', 
             border: '1px solid var(--border-light, #e2d9cf)', 
             borderRadius: '12px', 

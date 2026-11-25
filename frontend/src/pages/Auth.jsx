@@ -1,14 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Eye, EyeOff, KeyRound, Mail, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, CheckCircle2, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 
 const Auth = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
+  const initialToken = searchParams.get('resetToken') || searchParams.get('token') || '';
+  const initialModeParam = searchParams.get('mode');
+  const initialMode = initialToken ? 'reset' : (initialModeParam === 'forgot' ? 'forgot' : 'login');
+
   // Mode can be: 'login', 'register', 'forgot', 'reset'
-  const [mode, setMode] = useState('login');
+  const [mode, setMode] = useState(initialMode);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -17,7 +21,7 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
-  const [resetToken, setResetToken] = useState('');
+  const [resetToken, setResetToken] = useState(initialToken);
   const [directResetToken, setDirectResetToken] = useState('');
 
   // Status states
@@ -26,18 +30,6 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
 
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://derma-aline.onrender.com/api';
-
-  useEffect(() => {
-    const tokenFromUrl = searchParams.get('resetToken') || searchParams.get('token');
-    const modeFromUrl = searchParams.get('mode');
-
-    if (tokenFromUrl) {
-      setResetToken(tokenFromUrl);
-      setMode('reset');
-    } else if (modeFromUrl === 'forgot') {
-      setMode('forgot');
-    }
-  }, [searchParams]);
 
   const handleLoginOrRegister = async (e) => {
     e.preventDefault();
@@ -186,8 +178,8 @@ const Auth = () => {
           <p style={{ color: '#8c7b70', fontSize: '0.9rem', margin: 0 }}>
             {mode === 'login' && 'Sign in to access your appointments and care records'}
             {mode === 'register' && 'Join Derma Aline for personalized aesthetic care'}
-            {mode === 'forgot' && "Enter your email and we'll send you a password reset link"}
-            {mode === 'reset' && 'Create a new secure password for your account'}
+            {mode === 'forgot' && "Enter your email and we'll send you a 6-digit password reset verification code"}
+            {mode === 'reset' && 'Enter the 6-digit verification code sent to your email and create a new password'}
           </p>
         </div>
 

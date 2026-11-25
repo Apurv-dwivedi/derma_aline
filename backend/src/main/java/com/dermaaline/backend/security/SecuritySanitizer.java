@@ -14,6 +14,9 @@ public final class SecuritySanitizer {
     private static final Pattern CONTROL_CHARS = Pattern.compile("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,10}$");
     private static final Pattern PHONE_PATTERN = Pattern.compile("^[+0-9\\s()-]{7,25}$");
+    private static final Pattern DATA_IMAGE_PATTERN = Pattern.compile("^data:image/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=\\r\\n]+$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern HTTPS_URL_PATTERN = Pattern.compile("^https://[^\\s<>\"']+$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern RELATIVE_PATH_PATTERN = Pattern.compile("^/[A-Za-z0-9._~!$&'()*+,;=:@/-]+$");
 
     private SecuritySanitizer() {
         // Utility class
@@ -71,5 +74,66 @@ public final class SecuritySanitizer {
             return null;
         }
         return clean;
+    }
+
+    /**
+     * Validates and sanitizes an image URL or base64 image payload (blocks javascript:, data:text/html, SVG scripts).
+     */
+    public static String sanitizeImageUrl(String input, int maxLength) {
+        if (input == null) {
+            return null;
+        }
+        String trimmed = CONTROL_CHARS.matcher(input.trim()).replaceAll("");
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        if (trimmed.length() > maxLength) {
+            return null;
+        }
+        if (SCRIPT_PATTERN.matcher(trimmed).find()) {
+            return null;
+        }
+        if (DATA_IMAGE_PATTERN.matcher(trimmed).matches()
+                || HTTPS_URL_PATTERN.matcher(trimmed).matches()
+                || RELATIVE_PATH_PATTERN.matcher(trimmed).matches()) {
+            return trimmed;
+        }
+        return null;
+    }
+
+    /**
+     * Sanitizes an external/navigation URL to allow only safe https:// or relative paths.
+     */
+    public static String sanitizeSafeUrl(String input, int maxLength) {
+        if (input == null) {
+            return null;
+        }
+        String trimmed = CONTROL_CHARS.matcher(input.trim()).replaceAll("");
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        if (trimmed.length() > maxLength) {
+            return null;
+        }
+        if (HTTPS_URL_PATTERN.matcher(trimmed).matches() || RELATIVE_PATH_PATTERN.matcher(trimmed).matches()) {
+            return trimmed;
+        }
+        return null;
+    }
+
+    /**
+     * Masks an email address for privacy-preserving logs (e.g., ap***@gmail.com).
+     */
+    public static String maskEmail(String email) {
+        if (email == null || email.isBlank()) {
+            return "[redacted]";
+        }
+        String trimmed = email.trim();
+        int atIdx = trimmed.indexOf('@');
+        if (atIdx <= 1) {
+            return "***" + (atIdx >= 0 ? trimmed.substring(atIdx) : "");
+        }
+        String prefix = trimmed.substring(0, Math.min(2, atIdx));
+        return prefix + "***" + trimmed.substring(atIdx);
     }
 }

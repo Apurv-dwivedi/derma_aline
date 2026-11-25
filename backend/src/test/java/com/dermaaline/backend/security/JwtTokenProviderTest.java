@@ -39,4 +39,14 @@ public class JwtTokenProviderTest {
         String invalidToken = "eyJhbGciOiJIUzI1NiJ9.InvalidPayload.Signature";
         assertFalse(jwtTokenProvider.validateToken(invalidToken));
     }
+
+    @Test
+    public void testTokenVersionClaimRoundTrip() {
+        Authentication authentication = new UsernamePasswordAuthenticationToken("staff@test.com", "password", Collections.emptyList());
+        String defaultToken = jwtTokenProvider.generateToken(authentication);
+        String bumpedToken = jwtTokenProvider.generateToken(authentication, 4L);
+
+        assertEquals(0L, jwtTokenProvider.getTokenVersion(defaultToken));
+        assertEquals(4L, jwtTokenProvider.getTokenVersion(bumpedToken));
+    }
 }

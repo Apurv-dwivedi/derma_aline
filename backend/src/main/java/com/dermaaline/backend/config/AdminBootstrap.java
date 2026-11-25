@@ -44,12 +44,23 @@ public class AdminBootstrap {
                         admin.setFullName("Clinic Administrator");
                         admin.setPassword(encodedAdminPass);
                         admin.setRole(User.Role.SUPER_ADMIN);
+                        admin.setStatus(User.AccountStatus.ACTIVE);
                         userRepository.save(admin);
                         logger.info("Admin user successfully initialized from environment variables: {}", cleanEmail);
-                    } else if (!passwordEncoder.matches(adminPassword.trim(), admin.getPassword())) {
-                        admin.setPassword(encodedAdminPass);
-                        userRepository.save(admin);
-                        logger.info("Admin password updated from environment variables for: {}", cleanEmail);
+                    } else {
+                        boolean modified = false;
+                        if (!passwordEncoder.matches(adminPassword.trim(), admin.getPassword())) {
+                            admin.setPassword(encodedAdminPass);
+                            modified = true;
+                        }
+                        if (admin.getStatus() != User.AccountStatus.ACTIVE) {
+                            admin.setStatus(User.AccountStatus.ACTIVE);
+                            modified = true;
+                        }
+                        if (modified) {
+                            userRepository.save(admin);
+                            logger.info("Admin credentials and status verified from environment variables: {}", cleanEmail);
+                        }
                     }
                 } catch (Throwable t) {
                     logger.warn("Admin bootstrap notice: {}", t.getMessage());

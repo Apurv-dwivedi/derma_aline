@@ -33,7 +33,6 @@ public class DatabaseFixRunner {
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_picture TEXT;",
                 "ALTER TABLE customers ADD COLUMN IF NOT EXISTS profile_picture TEXT;",
                 "UPDATE users SET status = 'ACTIVE' WHERE status IS NULL;",
-                "UPDATE users SET status = 'ACTIVE' WHERE role = 'STAFF';",
                 "UPDATE users SET role = 'CUSTOMER' WHERE role IS NULL;",
 
                 // 2. Appointments table backward-compatible column mappings
@@ -110,8 +109,19 @@ public class DatabaseFixRunner {
                     "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);",
                 "ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS otp_hash VARCHAR(255);",
                 "ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS verified BOOLEAN DEFAULT FALSE;",
+                "ALTER TABLE email_verification_otps ADD COLUMN IF NOT EXISTS purpose VARCHAR(50);",
                 "ALTER TABLE email_verification_otps ALTER COLUMN last_sent_at DROP NOT NULL;",
                 "ALTER TABLE email_verification_otps ALTER COLUMN hashed_otp DROP NOT NULL;",
+
+                // Performance and uniqueness safety indexes (non-destructive)
+                "CREATE TABLE IF NOT EXISTS appointment_slot_locks (" +
+                    "slot_key VARCHAR(64) PRIMARY KEY, " +
+                    "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);",
+                "CREATE INDEX IF NOT EXISTS idx_users_email ON users (LOWER(email));",
+                "CREATE INDEX IF NOT EXISTS idx_appointments_slot ON appointments (appointment_date, status);",
+                "CREATE INDEX IF NOT EXISTS idx_appointments_customer_email ON appointments (LOWER(customer_email));",
+                "CREATE INDEX IF NOT EXISTS idx_otps_email_created ON email_verification_otps (LOWER(email), created_at DESC);",
+                "CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs (created_at DESC);",
 
                 // 7. Clinic settings table verification
                 "CREATE TABLE IF NOT EXISTS clinic_settings (" +

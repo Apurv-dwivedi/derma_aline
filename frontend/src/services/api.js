@@ -1,15 +1,20 @@
 import axios from 'axios';
+import { clearAuthSession, isJwtTokenValid } from '../utils/authSession';
 
 // Use environment variable for production, fallback to live Render backend for development/production safety
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'https://derma-aline.onrender.com/api',
 });
 
-// Intercept requests to attach the JWT token
+// Intercept requests to attach a non-expired JWT token
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
-    config.headers.Authorization = "Bearer " + token;
+    if (isJwtTokenValid(token)) {
+      config.headers.Authorization = "Bearer " + token;
+    } else {
+      clearAuthSession();
+    }
   }
   return config;
 }, (error) => {
@@ -22,14 +27,19 @@ API.interceptors.response.use((response) => {
 }, (error) => {
   if (error.response && error.response.status === 401) {
     const requestUrl = error.config?.url || '';
-    const isAuthAttempt = requestUrl.includes('/auth/login') || requestUrl.includes('/login');
+    const isAuthAttempt = requestUrl.includes('/auth/login')
+      || requestUrl.includes('/auth/internal-login')
+      || requestUrl.includes('/auth/sync-supabase-user')
+      || requestUrl.includes('/auth/register')
+      || requestUrl.includes('/auth/verify-otp')
+      || requestUrl.includes('/auth/reset-password')
+      || requestUrl.includes('/auth/staff/activate')
+      || requestUrl.includes('/login');
 
     // Never redirect if the failing request is the authentication request itself,
     // so the UI can display the error message instead of refreshing the page
     if (!isAuthAttempt) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('role');
-      localStorage.removeItem('fullName');
+      clearAuthSession();
 
       const currentPath = window.location.pathname;
       if (currentPath.startsWith('/admin') || currentPath.startsWith('/owner')) {
@@ -43,5 +53,19 @@ API.interceptors.response.use((response) => {
   }
   return Promise.reject(error);
 });
+
+export const performServerLogout = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    if (token && isJwtTokenValid(token)) {
+      await API.post('/auth/logout');
+    }
+  } catch {
+    // Clear client state cleanly even if session is already expired or server unreachable
+  } finally {
+    clearAuthSession();
+    localStorage.clear();
+  }
+};
 
 export default API;

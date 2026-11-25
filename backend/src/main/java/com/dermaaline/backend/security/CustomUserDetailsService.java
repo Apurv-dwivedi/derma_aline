@@ -27,7 +27,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         User user = userRepository.findByEmail(email.trim().toLowerCase())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
-        boolean enabled = user.getStatus() != User.AccountStatus.DISABLED;
+        boolean enabled = user.getStatus() == User.AccountStatus.ACTIVE;
 
         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
         User.Role role = user.getRole() != null ? user.getRole() : User.Role.CUSTOMER;

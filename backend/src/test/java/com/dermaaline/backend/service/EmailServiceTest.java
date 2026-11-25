@@ -96,4 +96,19 @@ public class EmailServiceTest {
         assertTrue(escaped.contains("\\n"), "Newlines must be escaped as literal \\n");
         assertTrue(escaped.contains("\\\\"), "Backslashes must be escaped as double backslashes");
     }
+
+    @Test
+    @DisplayName("EVAL: Password reset email subject never exposes raw 6-digit OTP")
+    void testPasswordResetEmailSubjectNeverContainsOtpCode() throws Exception {
+        jakarta.mail.internet.MimeMessage mimeMessage = new jakarta.mail.internet.MimeMessage((jakarta.mail.Session) null);
+        org.mockito.Mockito.when(mailSender.createMimeMessage()).thenReturn(mimeMessage);
+
+        String secretCode = "928174";
+        boolean dispatched = emailService.sendPasswordResetOtpEmail("client@example.com", "Eleanor", secretCode, 5);
+
+        assertTrue(dispatched);
+        String subject = mimeMessage.getSubject();
+        assertNotNull(subject);
+        assertFalse(subject.contains(secretCode), "Email subject must never contain plaintext OTP verification code");
+    }
 }

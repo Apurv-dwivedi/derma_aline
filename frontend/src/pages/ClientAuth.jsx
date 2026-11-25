@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Eye, EyeOff, Lock, Mail, User, Phone, CheckCircle2, AlertCircle, ArrowLeft, RefreshCw, Sparkles, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, User, Phone, CheckCircle2, AlertCircle, ArrowLeft, Sparkles, ShieldCheck } from 'lucide-react';
 import API from '../services/api';
 import {
   supabase,
@@ -9,8 +9,11 @@ import {
   signUpWithSupabase,
   resendSupabaseSignupOtp,
   verifySupabaseOtp,
-  updateSupabasePassword
+  extractSupabaseErrorFromUrl,
+  hasOAuthCallbackParams,
+  syncSupabaseSessionWithBackend
 } from '../services/supabaseClient';
+import { getAuthenticatedSession } from '../utils/authSession';
 import '../styles/pages.css';
 
 /**
@@ -43,13 +46,12 @@ const ClientAuth = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [termsAccepted, setTermsAccepted] = useState(false);
-  const [resetToken, setResetToken] = useState(searchParams.get('token') || '');
 
   // UI States
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(() => extractSupabaseErrorFromUrl() || searchParams.get('oauthError') || '');
   const [successMessage, setSuccessMessage] = useState('');
 
   // Resend Cooldown Timer
@@ -63,65 +65,76 @@ const ClientAuth = () => {
     return () => clearInterval(timer);
   }, [cooldown]);
 
+  // Detect Supabase OAuth Redirect, Auth State Events, or Active Session on Load
   useEffect(() => {
-    const token = searchParams.get('token');
-    if (token) {
-      setResetToken(token);
-      setMode('reset');
-    }
-  }, [searchParams]);
+    let isMounted = true;
 
-  // Detect Supabase OAuth Redirect or Active Session on Load
-  useEffect(() => {
-    const checkSupabaseSession = async () => {
+    const urlOAuthError = extractSupabaseErrorFromUrl();
+    if (urlOAuthError) {
+      window.history.replaceState(null, '', window.location.pathname);
+      return;
+    }
+
+    const oauthErrorParam = searchParams.get('oauthError');
+    if (oauthErrorParam) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+
+    // If user is already signed in with a valid clinic JWT and no OAuth callback is pending, enter suite directly
+    const existingClinicSession = getAuthenticatedSession();
+    if (existingClinicSession.token && (existingClinicSession.role === 'CUSTOMER' || existingClinicSession.role === 'PATIENT') && !hasOAuthCallbackParams()) {
+      navigate('/client/dashboard', { replace: true });
+      return;
+    }
+
+    const syncSession = async (session) => {
+      if (!session?.user || !session?.access_token || !isMounted) {
+        return;
+      }
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        setLoading(true);
+        setError('');
+        const data = await syncSupabaseSessionWithBackend(API, session);
+        if (isMounted && data?.token) {
+          navigate('/client/dashboard', { replace: true });
+        }
+      } catch (err) {
+        console.warn('OAuth session sync notice:', err);
+        if (isMounted) {
+          setError(err.response?.data?.message || 'Google sign-in could not be completed. Please try again or sign in with your email.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session?.access_token) {
+        syncSession(session);
+      }
+    });
+
+    supabase.auth.getSession()
+      .then(({ data: { session }, error: sessionError }) => {
         if (sessionError) {
           console.warn('Supabase session inspection notice:', sessionError.message);
           return;
         }
-
         if (session?.user && session?.access_token) {
-          const user = session.user;
-          const userMeta = user.user_metadata || {};
-          const detectedFullName = userMeta.full_name || userMeta.name || 'Valued Client';
-          const detectedPhone = userMeta.phone || user.phone || '';
-          const provider = user.app_metadata?.provider || 'google';
-
-          setLoading(true);
-          const res = await API.post('/auth/sync-supabase-user', {
-            accessToken: session.access_token,
-            fullName: detectedFullName,
-            phone: detectedPhone,
-            provider
-          });
-
-          if (res.data?.token) {
-            localStorage.setItem('token', res.data.token);
-            localStorage.setItem('role', res.data.role || 'CUSTOMER');
-            localStorage.setItem('fullName', res.data.fullName || detectedFullName);
-            localStorage.setItem('email', user.email);
-            if (res.data.profilePicture) {
-              localStorage.setItem('profilePicture', res.data.profilePicture);
-            }
-
-            // Remove URL hash tokens to clean address bar
-            if (window.location.hash) {
-              window.history.replaceState(null, '', window.location.pathname);
-            }
-
-            navigate('/client/dashboard');
-          }
+          syncSession(session);
         }
-      } catch (err) {
-        console.warn('OAuth session sync notice:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      })
+      .catch((err) => {
+        console.warn('OAuth session lookup notice:', err);
+      });
 
-    checkSupabaseSession();
-  }, [navigate]);
+    return () => {
+      isMounted = false;
+      subscription?.unsubscribe();
+    };
+  }, [navigate, searchParams]);
 
   // Google SSO Handler
   const handleGoogleSSO = async () => {
@@ -171,7 +184,7 @@ const ClientAuth = () => {
       if (err.response?.data?.requiresVerification) {
         setError(err.response.data.message || 'Please verify your email with the 6-digit code sent to your inbox.');
         setMode('verify');
-        setCooldown(60);
+        setCooldown(err.response?.data?.emailSent === false ? 10 : 60);
         return;
       }
       setError(err.response?.data?.message || 'Invalid email or password.');
@@ -230,9 +243,15 @@ const ClientAuth = () => {
       });
 
       if (res.data?.requiresVerification || !res.data?.token) {
-        setSuccessMessage(res.data?.message || `A 6-digit verification code has been dispatched to ${email.trim()}. Please enter it below.`);
-        setMode('verify');
-        setCooldown(60);
+        if (res.data?.emailSent === false) {
+          setError(res.data?.message || 'Verification email could not be delivered right now. Please click Resend Code shortly.');
+          setMode('verify');
+          setCooldown(10);
+        } else {
+          setSuccessMessage(res.data?.message || `A 6-digit verification code has been dispatched to ${email.trim()}. Please enter it below.`);
+          setMode('verify');
+          setCooldown(60);
+        }
       } else if (res.data?.token) {
         const { token, role, fullName: userFullName, profilePicture } = res.data;
         localStorage.setItem('token', token);
@@ -252,7 +271,13 @@ const ClientAuth = () => {
         setMode('login');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed. Please check your details.');
+      if (err.response?.data?.requiresVerification) {
+        setError(err.response.data.message || 'Registration saved, but verification email delivery failed. Please click Resend Code shortly.');
+        setMode('verify');
+        setCooldown(10);
+      } else {
+        setError(err.response?.data?.message || 'Registration failed. Please check your details.');
+      }
     } finally {
       setLoading(false);
     }
@@ -414,8 +439,7 @@ const ClientAuth = () => {
       const res = await API.post('/auth/reset-password', {
         email: email.trim().toLowerCase(),
         otp: otp.trim(),
-        newPassword: password,
-        token: resetToken || undefined
+        newPassword: password
       });
       setSuccessMessage(res.data.message || 'Your password has been updated successfully! Redirecting to sign in...');
       setTimeout(() => {

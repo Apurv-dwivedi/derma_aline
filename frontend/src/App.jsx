@@ -1,8 +1,16 @@
 import React, { useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import Navbar from './components/layout/Navbar.jsx';
 import Footer from './components/layout/Footer.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
+import API from './services/api.js';
+import {
+  supabase,
+  isSupabaseConfigured,
+  hasOAuthCallbackParams,
+  extractSupabaseErrorFromUrl,
+  syncSupabaseSessionWithBackend
+} from './services/supabaseClient.js';
 
 // Core public pages loaded eagerly for instant navigation and 100% immunity to deployment chunk mismatches
 import Home from './pages/Home.jsx';
@@ -120,6 +128,62 @@ const ScrollToTop = () => {
   return null;
 };
 
+// Handles Supabase OAuth redirects cleanly if Supabase falls back to the Site URL (/) instead of /client/login
+const OAuthCallbackBridge = () => {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const isAuthPage = pathname.startsWith('/client/') || pathname === '/auth';
+    if (isAuthPage || !hasOAuthCallbackParams() || !isSupabaseConfigured()) {
+      return;
+    }
+
+    const urlErr = extractSupabaseErrorFromUrl();
+    if (urlErr) {
+      window.history.replaceState(null, '', pathname);
+      navigate(`/client/login?oauthError=${encodeURIComponent(urlErr)}`, { replace: true });
+      return;
+    }
+
+    let cancelled = false;
+    const handleRootOAuth = async (session) => {
+      if (!session?.access_token || cancelled) return;
+      try {
+        const data = await syncSupabaseSessionWithBackend(API, session);
+        if (!cancelled && data?.token) {
+          navigate('/client/dashboard', { replace: true });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const msg = err.response?.data?.message || 'Google sign-in could not be completed. Please try again.';
+          window.history.replaceState(null, '', pathname);
+          navigate(`/client/login?oauthError=${encodeURIComponent(msg)}`, { replace: true });
+        }
+      }
+    };
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.access_token) {
+        handleRootOAuth(session);
+      }
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.access_token) {
+        handleRootOAuth(session);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      subscription?.unsubscribe();
+    };
+  }, [pathname, navigate]);
+
+  return null;
+};
+
 function App() {
   // Silent background warm-up ping to wake Render backend on initial app load
   useEffect(() => {
@@ -130,6 +194,7 @@ function App() {
   return (
     <Router>
       <ScrollToTop />
+      <OAuthCallbackBridge />
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <Navbar />
 

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Calendar, LogOut, Phone, Mail, Clock, RefreshCw } from 'lucide-react';
-import API from '../services/api';
+import { User, Calendar, LogOut, Clock, RefreshCw } from 'lucide-react';
+import API, { performServerLogout } from '../services/api';
 import '../styles/pages.css';
 
 const Profile = () => {
@@ -13,18 +13,8 @@ const Profile = () => {
   const fullName = localStorage.getItem('fullName') || 'Patient';
   const role = localStorage.getItem('role');
 
-  useEffect(() => {
-    // If not logged in, or is an admin masquerading as a patient, kick out
-    if (!localStorage.getItem('token') || role !== 'PATIENT') {
-      navigate('/auth');
-      return;
-    }
-    fetchMyAppointments();
-  }, [navigate, role]);
-
-  const fetchMyAppointments = async () => {
+  const fetchMyAppointments = useCallback(async () => {
     try {
-      setLoading(true);
       // Calls the secure endpoint that identifies the user via JWT
       const res = await API.get('/appointments/my');
       // Sort newest first
@@ -36,12 +26,22 @@ const Profile = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('role');
-    localStorage.removeItem('fullName');
+  useEffect(() => {
+    // If not logged in, or is an admin masquerading as a patient, kick out
+    if (!localStorage.getItem('token') || role !== 'PATIENT') {
+      navigate('/auth');
+      return;
+    }
+    const timer = setTimeout(() => {
+      fetchMyAppointments();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [navigate, role, fetchMyAppointments]);
+
+  const handleLogout = async () => {
+    await performServerLogout();
     navigate('/');
   };
 

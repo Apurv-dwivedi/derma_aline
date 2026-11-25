@@ -13,18 +13,32 @@ import com.dermaaline.backend.repository.NotificationRepository;
 import com.dermaaline.backend.repository.TreatmentRecordRepository;
 import com.dermaaline.backend.repository.UserRepository;
 import com.dermaaline.backend.security.SecuritySanitizer;
+import com.dermaaline.backend.service.AppointmentBookingService;
+import com.dermaaline.backend.service.AppointmentBookingService.AppointmentNotFoundException;
+import com.dermaaline.backend.service.AppointmentBookingService.BookingConflictException;
+import com.dermaaline.backend.service.AppointmentBookingService.BookingValidationException;
+import com.dermaaline.backend.service.AppointmentBookingService.ForbiddenAppointmentAccessException;
+import com.dermaaline.backend.service.AuditLogService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 
 @RestController
 @RequestMapping("/api/client")
+@PreAuthorize("hasAnyRole('CUSTOMER', 'PATIENT', 'SUPER_ADMIN', 'ADMIN')")
 public class ClientPortalController {
+
+    private static final Logger logger = LoggerFactory.getLogger(ClientPortalController.class);
 
     @Autowired
     private UserRepository userRepository;
@@ -45,6 +59,12 @@ public class ClientPortalController {
     private AppointmentRepository appointmentRepository;
 
     @Autowired
+    private AppointmentBookingService appointmentBookingService;
+
+    @Autowired(required = false)
+    private AuditLogService auditLogService;
+
+    @Autowired
     private PasswordEncoder passwordEncoder;
 
     /**
@@ -54,7 +74,7 @@ public class ClientPortalController {
     private String getAuthenticatedEmail() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null || !auth.isAuthenticated() || "anonymousUser".equalsIgnoreCase(auth.getName())) {
-            throw new SecurityException("Unauthorized access: no authenticated user found.");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized access: no authenticated user found.");
         }
         return auth.getName().trim().toLowerCase();
     }
@@ -99,28 +119,44 @@ public class ClientPortalController {
             return ResponseEntity.status(404).body(Map.of("success", false, "message", "User not found."));
         }
 
+        if (payload == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Request body is required."));
+        }
+
         User user = userOpt.get();
         String newFullName = SecuritySanitizer.sanitizeText(payload.get("fullName"), 100);
-        String newPhone = SecuritySanitizer.sanitizePhone(payload.get("phone"));
-        String newProfilePicture = payload.get("profilePicture");
+        String rawPhone = payload.get("phone");
+        String newPhone = rawPhone != null && !rawPhone.trim().isEmpty() ? SecuritySanitizer.sanitizePhone(rawPhone) : null;
+        if (rawPhone != null && !rawPhone.trim().isEmpty() && newPhone == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid phone number format."));
+        }
+
+        String rawPic = payload.get("profilePicture");
+        String safePic = null;
+        if (rawPic != null) {
+            safePic = SecuritySanitizer.sanitizeImageUrl(rawPic, 500_000);
+            if (safePic == null) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid profile picture format."));
+            }
+        }
 
         if (newFullName != null && !newFullName.trim().isEmpty()) {
             user.setFullName(newFullName.trim());
         }
-        if (newPhone != null) {
-            user.setPhone(newPhone.trim());
+        if (rawPhone != null) {
+            user.setPhone(newPhone != null ? newPhone.trim() : "");
         }
-        if (newProfilePicture != null) {
-            user.setProfilePicture(newProfilePicture.trim());
+        if (safePic != null) {
+            user.setProfilePicture(safePic.isEmpty() ? null : safePic);
         }
 
         userRepository.save(user);
 
-        // Synchronize corresponding Customer CRM record if present
+        final String finalSafePic = safePic;
         customerRepository.findByEmail(email).ifPresent(customer -> {
             if (newFullName != null && !newFullName.trim().isEmpty()) customer.setFullName(newFullName.trim());
-            if (newPhone != null) customer.setPhone(newPhone.trim());
-            if (newProfilePicture != null) customer.setProfilePicture(newProfilePicture.trim());
+            if (rawPhone != null) customer.setPhone(newPhone != null ? newPhone.trim() : "");
+            if (finalSafePic != null) customer.setProfilePicture(finalSafePic.isEmpty() ? null : finalSafePic);
             customerRepository.save(customer);
         });
 
@@ -137,7 +173,7 @@ public class ClientPortalController {
      * Customer Profile Photo Upload/Update: PUT /api/client/profile/photo
      */
     @PutMapping("/profile/photo")
-    public ResponseEntity<?> updateProfilePhoto(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<?> updateProfilePhoto(@RequestBody(required = false) Map<String, String> payload) {
         String email = getAuthenticatedEmail();
         Optional<User> userOpt = userRepository.findByEmail(email);
 
@@ -145,19 +181,28 @@ public class ClientPortalController {
             return ResponseEntity.status(404).body(Map.of("success", false, "message", "User not found."));
         }
 
+        String rawPhoto = payload != null ? payload.get("profilePicture") : null;
+        String safePhoto = "";
+        if (rawPhoto != null && !rawPhoto.trim().isEmpty()) {
+            safePhoto = SecuritySanitizer.sanitizeImageUrl(rawPhoto, 500_000);
+            if (safePhoto == null) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid image data or URL."));
+            }
+        }
+
         User user = userOpt.get();
-        String photo = payload.get("profilePicture");
-        user.setProfilePicture(photo != null && !photo.trim().isEmpty() ? photo.trim() : null);
+        String storedPhoto = safePhoto.isEmpty() ? null : safePhoto;
+        user.setProfilePicture(storedPhoto);
         userRepository.save(user);
 
         customerRepository.findByEmail(email).ifPresent(customer -> {
-            customer.setProfilePicture(photo != null && !photo.trim().isEmpty() ? photo.trim() : null);
+            customer.setProfilePicture(storedPhoto);
             customerRepository.save(customer);
         });
 
         return ResponseEntity.ok(Map.of(
             "success", true,
-            "message", photo != null && !photo.trim().isEmpty() ? "Profile photo updated successfully." : "Profile photo removed.",
+            "message", storedPhoto != null ? "Profile photo updated successfully." : "Profile photo removed.",
             "profilePicture", user.getProfilePicture() != null ? user.getProfilePicture() : ""
         ));
     }
@@ -254,63 +299,102 @@ public class ClientPortalController {
      * Customer Self-Booking: POST /api/client/appointments
      */
     @PostMapping("/appointments")
-    public ResponseEntity<?> bookAppointment(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<?> bookAppointment(@RequestBody(required = false) Map<String, Object> payload) {
         String email = getAuthenticatedEmail();
+        if (payload == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Booking details are required."));
+        }
+
         Optional<User> userOpt = userRepository.findByEmail(email);
-
-        String treatmentName = (String) payload.get("treatmentName");
-        String dateStr = (String) payload.get("appointmentDate");
-        String timeStr = (String) payload.get("appointmentTime");
-        String notes = (String) payload.get("notes");
-
-        if (treatmentName == null || treatmentName.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Treatment selection is required."));
-        }
-        if (dateStr == null || dateStr.trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Appointment date is required."));
-        }
-
         User user = userOpt.orElse(null);
         String clientName = user != null && user.getFullName() != null ? user.getFullName() : "Valued Client";
         String clientPhone = user != null && user.getPhone() != null ? user.getPhone() : "";
 
-        Appointment appt = new Appointment();
-        appt.setCustomerName(clientName);
-        appt.setPatientName(clientName);
-        appt.setCustomerEmail(email);
-        appt.setEmail(email);
-        appt.setCustomerPhone(clientPhone);
-        appt.setPhone(clientPhone);
-        appt.setTreatmentName(treatmentName.trim());
-        appt.setAppointmentTime(timeStr != null && !timeStr.trim().isEmpty() ? timeStr.trim() : "10:00 AM");
-        appt.setNotes(notes != null ? notes.trim() : "");
-        appt.setStatus("PENDING");
-        appt.setCreatedAt(java.time.LocalDateTime.now());
+        String treatmentName = payload.get("treatmentName") != null ? payload.get("treatmentName").toString() : null;
+        String dateStr = payload.get("appointmentDate") != null ? payload.get("appointmentDate").toString() : null;
+        String timeStr = payload.get("appointmentTime") != null ? payload.get("appointmentTime").toString() : null;
+        String notes = payload.get("notes") != null ? payload.get("notes").toString() : "";
 
         try {
-            java.time.LocalDate localDate = java.time.LocalDate.parse(dateStr.trim().substring(0, 10));
-            appt.setAppointmentDate(localDate.atStartOfDay());
+            Appointment saved = appointmentBookingService.createBooking(
+                    clientName, email, clientPhone, treatmentName, dateStr, timeStr, notes, false);
+
+            try {
+                Notification notif = new Notification();
+                notif.setRecipientEmail(email);
+                notif.setTitle("Appointment Requested: " + saved.getTreatmentName());
+                notif.setMessage("Your consultation booking for " + saved.getTreatmentName() + " on " + saved.getAppointmentDate().toLocalDate()
+                        + " (" + saved.getAppointmentTime() + ") has been received. Our clinical desk will confirm your scheduled slot.");
+                notif.setCategory("APPOINTMENT");
+                notif.setRead(false);
+                notif.setCreatedAt(java.time.LocalDateTime.now());
+                notificationRepository.save(notif);
+            } catch (Exception ignored) {}
+
+            if (auditLogService != null) {
+                auditLogService.record("CLIENT_APPOINTMENT_BOOKED", email, "CUSTOMER", "APPOINTMENT",
+                        saved.getId() != null ? saved.getId().toString() : "N/A",
+                        "Booked " + saved.getTreatmentName() + " for " + saved.getAppointmentDate().toLocalDate());
+            }
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Appointment booked successfully! Our clinic desk will confirm your session.",
+                "appointment", saved
+            ));
+        } catch (BookingValidationException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        } catch (BookingConflictException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("success", false, "message", e.getMessage()));
         } catch (Exception e) {
-            appt.setAppointmentDate(java.time.LocalDateTime.now().plusDays(1));
+            logger.error("Failed to create client appointment for {}", email, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("success", false, "message", "Unable to complete appointment booking."));
         }
+    }
 
-        Appointment saved = appointmentRepository.save(appt);
-
+    /**
+     * Customer Self-Service Appointment Cancellation: PATCH /api/client/appointments/{id}/cancel
+     */
+    @PatchMapping("/appointments/{id}/cancel")
+    public ResponseEntity<?> cancelMyAppointment(@PathVariable Long id) {
+        String email = getAuthenticatedEmail();
         try {
-            Notification notif = new Notification();
-            notif.setRecipientEmail(email);
-            notif.setTitle("Appointment Requested: " + treatmentName.trim());
-            notif.setMessage("Your consultation booking for " + treatmentName.trim() + " on " + dateStr.trim() + " (" + appt.getAppointmentTime() + ") has been received. Our clinical desk will confirm your scheduled slot.");
-            notif.setCategory("APPOINTMENT");
-            notif.setRead(false);
-            notif.setCreatedAt(java.time.LocalDateTime.now());
-            notificationRepository.save(notif);
-        } catch (Exception ignored) {}
+            Appointment cancelled = appointmentBookingService.cancelCustomerAppointment(id, email);
 
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "message", "Appointment booked successfully! Our clinic desk will confirm your session.",
-            "appointment", saved
-        ));
+            try {
+                Notification notif = new Notification();
+                notif.setRecipientEmail(email);
+                notif.setTitle("Appointment Cancelled: " + cancelled.getTreatmentName());
+                notif.setMessage("Your scheduled appointment for " + cancelled.getTreatmentName()
+                        + (cancelled.getAppointmentDate() != null ? " on " + cancelled.getAppointmentDate().toLocalDate() : "")
+                        + " has been cancelled as requested.");
+                notif.setCategory("APPOINTMENT");
+                notif.setRead(false);
+                notif.setCreatedAt(java.time.LocalDateTime.now());
+                notificationRepository.save(notif);
+            } catch (Exception ignored) {}
+
+            if (auditLogService != null) {
+                auditLogService.record("CLIENT_APPOINTMENT_CANCELLED", email, "CUSTOMER", "APPOINTMENT",
+                        id.toString(), "Client cancelled appointment");
+            }
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Appointment cancelled successfully.",
+                "appointment", cancelled
+            ));
+        } catch (ForbiddenAppointmentAccessException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("success", false, "message", e.getMessage()));
+        } catch (AppointmentNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("success", false, "message", e.getMessage()));
+        } catch (BookingConflictException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("success", false, "message", e.getMessage()));
+        } catch (BookingValidationException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Failed to cancel appointment {} for {}", id, email, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("success", false, "message", "Unable to cancel appointment."));
+        }
     }
 }

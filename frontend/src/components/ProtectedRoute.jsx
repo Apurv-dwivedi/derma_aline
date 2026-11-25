@@ -1,9 +1,8 @@
-import React from 'react';
 import { Navigate } from 'react-router-dom';
+import { getAuthenticatedSession } from '../utils/authSession';
 
 const ProtectedRoute = ({ children, requireAdmin = false, requireStaff = false, requireCustomer = false }) => {
-  const token = localStorage.getItem('token');
-  const role = (localStorage.getItem('role') || '').toUpperCase();
+  const { token, role } = getAuthenticatedSession();
 
   if (!token) {
     if (requireAdmin) return <Navigate to="/owner/login" replace />;

@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Lock, Mail, Sparkles, AlertCircle, Shield } from 'lucide-react';
+import { Lock, Mail, AlertCircle, Shield } from 'lucide-react';
 import API from '../services/api';
 import '../styles/pages.css';
 

@@ -5,6 +5,7 @@ import com.dermaaline.backend.repository.ContactRepository;
 import com.dermaaline.backend.security.SecuritySanitizer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +19,7 @@ public class ContactController {
     private ContactRepository contactRepository;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('STAFF', 'SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<List<ContactMessage>> getAllContactMessages() {
         return ResponseEntity.ok(contactRepository.findAll());
     }
@@ -52,6 +54,7 @@ public class ContactController {
             contactMessage.setEmail(sanitizedEmail);
             contactMessage.setPhone(sanitizedPhone);
             contactMessage.setMessage(sanitizedMessage);
+            contactMessage.setStatus(com.dermaaline.backend.entity.ContactStatus.UNREAD);
 
             contactRepository.save(contactMessage);
             return ResponseEntity.ok(Map.of("success", true, "message", "Message received successfully!"));
@@ -61,9 +64,10 @@ public class ContactController {
     }
 
     @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('STAFF', 'SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<?> updateContactStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {
         return contactRepository.findById(id).map(msg -> {
-            String statusStr = payload.get("status");
+            String statusStr = payload != null ? payload.get("status") : null;
             if (statusStr != null) {
                 try {
                     msg.setStatus(com.dermaaline.backend.entity.ContactStatus.valueOf(statusStr.trim().toUpperCase()));
@@ -78,6 +82,7 @@ public class ContactController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<?> deleteContactMessage(@PathVariable Long id) {
         return contactRepository.findById(id).map(msg -> {
             contactRepository.delete(msg);

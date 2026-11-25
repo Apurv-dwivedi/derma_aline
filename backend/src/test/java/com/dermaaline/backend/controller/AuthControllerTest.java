@@ -36,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -109,15 +110,45 @@ public class AuthControllerTest {
         when(userRepository.findByEmail(anyString())).thenReturn(Optional.empty());
         when(passwordEncoder.encode("Secret123")).thenReturn("encodedPassword");
         when(userRepository.save(any(User.class))).thenReturn(savedUser);
+        when(otpService.generateAndSendOtp(eq("newuser@derma.com"), eq("John Doe"))).thenReturn(true);
 
         mockMvc.perform(post("/api/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.emailSent").value(true))
                 .andExpect(jsonPath("$.email").value("newuser@derma.com"));
 
         verify(userRepository, times(1)).save(any(User.class));
+    }
+
+    @Test
+    void testRegisterReturns503WhenOtpDeliveryFailsWithoutFalselyReportingDispatch() throws Exception {
+        RegisterRequest request = new RegisterRequest();
+        request.setEmail("mailfail@derma.com");
+        request.setPassword("Secret123");
+        request.setFullName("Mail Fail User");
+
+        User savedUser = new User();
+        savedUser.setId(22L);
+        savedUser.setEmail("mailfail@derma.com");
+        savedUser.setFullName("Mail Fail User");
+        savedUser.setRole(User.Role.CUSTOMER);
+        savedUser.setStatus(User.AccountStatus.PENDING_VERIFICATION);
+
+        when(userRepository.findByEmail("mailfail@derma.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("Secret123")).thenReturn("encodedPassword");
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
+        when(otpService.generateAndSendOtp("mailfail@derma.com", "Mail Fail User")).thenReturn(false);
+
+        mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.emailSent").value(false))
+                .andExpect(jsonPath("$.requiresVerification").value(true));
     }
 
     @Test
@@ -294,14 +325,79 @@ public class AuthControllerTest {
     }
 
     @Test
+    void testVerifyRegistrationOtpActivatesCustomer() throws Exception {
+        User user = new User();
+        user.setId(9L);
+        user.setEmail("newclient@example.com");
+        user.setFullName("New Client");
+        user.setRole(User.Role.CUSTOMER);
+        user.setStatus(User.AccountStatus.PENDING_VERIFICATION);
+
+        when(userRepository.findByEmail("newclient@example.com")).thenReturn(Optional.of(user));
+        when(otpService.verifyOtpForPurpose("newclient@example.com", "654321", OtpService.PURPOSE_REGISTRATION)).thenReturn(true);
+        when(customerRepository.findByEmail("newclient@example.com")).thenReturn(Optional.empty());
+        when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("verified-jwt");
+
+        Map<String, String> payload = Map.of("email", "newclient@example.com", "otp", "654321");
+
+        mockMvc.perform(post("/api/auth/verify-otp")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.token").value("verified-jwt"));
+
+        assertEquals(User.AccountStatus.ACTIVE, user.getStatus());
+        verify(customerRepository, times(1)).save(any(Customer.class));
+    }
+
+    @Test
+    void testForgotPasswordDoesNotAutoProvisionUnknownEmail() throws Exception {
+        when(userRepository.findByEmail("stranger@example.com")).thenReturn(Optional.empty());
+        when(customerRepository.findByEmail("stranger@example.com")).thenReturn(Optional.empty());
+
+        Map<String, String> payload = Map.of("email", "stranger@example.com");
+
+        mockMvc.perform(post("/api/auth/forgot-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(userRepository, never()).save(any(User.class));
+        verify(otpService, never()).generateAndSendPasswordResetOtp(anyString(), anyString());
+    }
+
+    @Test
+    void testForgotPasswordBlocksInternalAdminOtpDispatch() throws Exception {
+        User admin = new User();
+        admin.setId(1L);
+        admin.setEmail("admin@dermaaline.com");
+        admin.setRole(User.Role.SUPER_ADMIN);
+        admin.setStatus(User.AccountStatus.ACTIVE);
+
+        when(userRepository.findByEmail("admin@dermaaline.com")).thenReturn(Optional.of(admin));
+
+        mockMvc.perform(post("/api/auth/forgot-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("email", "admin@dermaaline.com"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(otpService, never()).generateAndSendPasswordResetOtp(anyString(), anyString());
+        verify(auditLogService, times(1)).record(eq("PASSWORD_RESET_BLOCKED_INTERNAL"), eq("admin@dermaaline.com"), anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
     void testResetPasswordViaOtpSuccess() throws Exception {
         User user = new User();
         user.setId(10L);
         user.setEmail("user@example.com");
         user.setRole(User.Role.CUSTOMER);
+        user.setStatus(User.AccountStatus.ACTIVE);
 
         when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(otpService.verifyOtp("user@example.com", "123456")).thenReturn(true);
+        when(otpService.verifyOtpForPurpose("user@example.com", "123456", OtpService.PURPOSE_PASSWORD_RESET)).thenReturn(true);
         when(passwordEncoder.encode("NewSecret123")).thenReturn("encodedNewSecret");
 
         Map<String, String> payload = Map.of(
@@ -320,15 +416,7 @@ public class AuthControllerTest {
     }
 
     @Test
-    void testResetPasswordViaTokenSuccess() throws Exception {
-        User user = new User();
-        user.setEmail("user@example.com");
-        user.setResetToken("valid-token-123");
-        user.setResetTokenExpiry(java.time.LocalDateTime.now().plusHours(1));
-
-        when(userRepository.findByResetToken("valid-token-123")).thenReturn(Optional.of(user));
-        when(passwordEncoder.encode("NewSecret123")).thenReturn("encodedNewSecret");
-
+    void testResetPasswordRejectsLegacyLinkToken() throws Exception {
         Map<String, String> payload = Map.of(
                 "token", "valid-token-123",
                 "newPassword", "NewSecret123");
@@ -336,11 +424,29 @@ public class AuthControllerTest {
         mockMvc.perform(post("/api/auth/reset-password")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("reset successfully")));
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.success").value(false));
 
-        verify(userRepository, times(1)).save(user);
+        mockMvc.perform(get("/api/auth/verify-reset-token").param("token", "valid-token-123"))
+                .andExpect(status().isGone())
+                .andExpect(jsonPath("$.valid").value(false));
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void testChangePasswordRejectsUnauthenticatedCaller() throws Exception {
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        Map<String, String> payload = Map.of(
+                "email", "user@example.com",
+                "oldPassword", "OldSecret123",
+                "newPassword", "NewSecret123");
+
+        mockMvc.perform(post("/api/auth/change-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
     }
 
     // ==========================================
@@ -501,5 +607,106 @@ public class AuthControllerTest {
                 .andExpect(jsonPath("$.success").value(false));
 
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void testLoginBlocksUnactivatedStaffBeforeOnboardingCompletion() throws Exception {
+        User invitedStaff = new User();
+        invitedStaff.setId(55L);
+        invitedStaff.setEmail("invited@dermaaline.com");
+        invitedStaff.setPassword("randomPlaceholderHash");
+        invitedStaff.setRole(User.Role.STAFF);
+        invitedStaff.setStatus(User.AccountStatus.PENDING_VERIFICATION);
+
+        when(userRepository.findByEmail("invited@dermaaline.com")).thenReturn(Optional.of(invitedStaff));
+        when(passwordEncoder.matches("AttemptPass123", "randomPlaceholderHash")).thenReturn(true);
+
+        mockMvc.perform(post("/api/auth/internal-login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "email", "invited@dermaaline.com",
+                        "password", "AttemptPass123"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.requiresStaffActivation").value(true));
+
+        verify(userRepository, never()).save(invitedStaff);
+    }
+
+    @Test
+    void testLogoutIncrementsTokenVersionAndRevokesSession() throws Exception {
+        User activeUser = new User();
+        activeUser.setId(77L);
+        activeUser.setEmail("client.logout@example.com");
+        activeUser.setRole(User.Role.CUSTOMER);
+        activeUser.setStatus(User.AccountStatus.ACTIVE);
+        activeUser.setTokenVersion(0L);
+
+        when(userRepository.findByEmail("client.logout@example.com")).thenReturn(Optional.of(activeUser));
+
+        Authentication auth = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                "client.logout@example.com", null, java.util.Collections.emptyList());
+        org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(auth);
+
+        try {
+            mockMvc.perform(post("/api/auth/logout"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.success").value(true));
+
+            assertEquals(1L, activeUser.getTokenVersion());
+            verify(userRepository, times(1)).save(activeUser);
+            verify(auditLogService, times(1)).record(eq("LOGOUT"), eq("client.logout@example.com"), anyString(), anyString(), anyString(), anyString());
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+    }
+
+    @Test
+    void testSyncSupabaseUserVerifiesEs256JwksTokenAndAudClaims() throws Exception {
+        java.security.KeyPairGenerator kpg = java.security.KeyPairGenerator.getInstance("EC");
+        kpg.initialize(new java.security.spec.ECGenParameterSpec("secp256r1"));
+        java.security.KeyPair ecPair = kpg.generateKeyPair();
+
+        @SuppressWarnings("unchecked")
+        Map<String, java.security.PublicKey> cache = (Map<String, java.security.PublicKey>) ReflectionTestUtils.getField(
+                authController, "supabaseJwksCache");
+        cache.put("test-es256-kid", ecPair.getPublic());
+        ReflectionTestUtils.setField(authController, "jwksCacheLastFetchedMs", System.currentTimeMillis());
+        ReflectionTestUtils.setField(authController, "supabaseUrl", "https://mockproject.supabase.co");
+        ReflectionTestUtils.setField(authController, "supabaseJwtSecret", "");
+
+        String es256Token = Jwts.builder()
+                .setHeaderParam("kid", "test-es256-kid")
+                .setSubject("sub-es256")
+                .claim("email", "googlesso@gmail.com")
+                .setAudience("authenticated")
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 300_000L))
+                .signWith(ecPair.getPrivate(), SignatureAlgorithm.ES256)
+                .compact();
+
+        User savedUser = new User();
+        savedUser.setId(205L);
+        savedUser.setEmail("googlesso@gmail.com");
+        savedUser.setFullName("Google User");
+        savedUser.setRole(User.Role.CUSTOMER);
+        savedUser.setStatus(User.AccountStatus.ACTIVE);
+
+        when(userRepository.findByEmail("googlesso@gmail.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(anyString())).thenReturn("encodedSecret");
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
+        when(customerRepository.findByEmail("googlesso@gmail.com")).thenReturn(Optional.empty());
+        when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("es256-clinic-jwt");
+
+        mockMvc.perform(post("/api/auth/sync-supabase-user")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "accessToken", es256Token,
+                        "fullName", "Google User",
+                        "provider", "google"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.token").value("es256-clinic-jwt"))
+                .andExpect(jsonPath("$.email").value("googlesso@gmail.com"));
     }
 }

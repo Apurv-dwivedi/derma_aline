@@ -1,24 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   UserCircle, LogOut, Menu, X, 
   Home, Info, Sparkles, Mail, Shield, ChevronRight, User, Calendar
 } from 'lucide-react';
+import { getAuthenticatedSession } from '../../utils/authSession';
+import { performServerLogout } from '../../services/api';
 import '../../styles/navbar.css';
 
 const Navbar = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const isLoggedIn = !!localStorage.getItem('token');
-    const userRole = (localStorage.getItem('role') || '').toUpperCase();
-    const userName = localStorage.getItem('fullName') || '';
-    const userPhoto = localStorage.getItem('profilePicture') || '';
-
-    // Close sidebar on route change
-    useEffect(() => {
-        setIsSidebarOpen(false);
-    }, [location.pathname]);
+    const [openSidebarPath, setOpenSidebarPath] = useState(null);
+    const isSidebarOpen = openSidebarPath === location.pathname;
+    const { token: validToken, role: userRole } = getAuthenticatedSession();
+    const isLoggedIn = !!validToken;
+    const userName = isLoggedIn ? (localStorage.getItem('fullName') || '') : '';
+    const userPhoto = isLoggedIn ? (localStorage.getItem('profilePicture') || '') : '';
 
     // Prevent body scrolling when mobile sidebar is open
     useEffect(() => {
@@ -32,14 +30,16 @@ const Navbar = () => {
         };
     }, [isSidebarOpen]);
 
-    const handleLogout = () => {
-        localStorage.clear();
-        setIsSidebarOpen(false);
+    const closeSidebar = () => setOpenSidebarPath(null);
+
+    const handleLogout = async () => {
+        await performServerLogout();
+        closeSidebar();
         navigate("/");
     };
 
     const toggleSidebar = () => {
-        setIsSidebarOpen(!isSidebarOpen);
+        setOpenSidebarPath((prev) => (prev === location.pathname ? null : location.pathname));
     };
 
     const isClient = userRole === 'CUSTOMER' || userRole === 'PATIENT';
@@ -255,7 +255,7 @@ const Navbar = () => {
             {isSidebarOpen && (
                 <div 
                     className="sidebar-backdrop" 
-                    onClick={() => setIsSidebarOpen(false)}
+                    onClick={closeSidebar}
                     aria-hidden="true"
                 />
             )}
@@ -275,7 +275,7 @@ const Navbar = () => {
                     </div>
                     <button 
                         className="sidebar-close-btn" 
-                        onClick={() => setIsSidebarOpen(false)} 
+                        onClick={closeSidebar} 
                         aria-label="Close Sidebar"
                     >
                         <X size={22} color="#5a4638" />
@@ -371,7 +371,7 @@ const Navbar = () => {
 
                 {/* Sidebar Bottom CTAs */}
                 <div className="sidebar-footer">
-                    <Link to="/contact" style={{ textDecoration: 'none' }} onClick={() => setIsSidebarOpen(false)}>
+                    <Link to="/contact" style={{ textDecoration: 'none' }} onClick={closeSidebar}>
                         <button className="btn-primary sidebar-booking-btn" style={{ width: '100%', marginBottom: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                             <Calendar size={18} />
                             <span>Book Appointment</span>
@@ -380,13 +380,13 @@ const Navbar = () => {
 
                     {!isLoggedIn ? (
                         <>
-                            <Link to="/client/login" style={{ textDecoration: 'none' }} onClick={() => setIsSidebarOpen(false)}>
+                            <Link to="/client/login" style={{ textDecoration: 'none' }} onClick={closeSidebar}>
                                 <button style={{ width: '100%', padding: '10px', backgroundColor: '#ffffff', border: '1px solid #806657', color: '#806657', borderRadius: '8px', fontWeight: '600', fontSize: '0.9rem', marginBottom: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
                                     <User size={16} />
                                     <span>Client Portal Sign In</span>
                                 </button>
                             </Link>
-                            <Link to="/client/register" onClick={() => setIsSidebarOpen(false)} style={{ display: 'block', textAlign: 'center', fontSize: '0.85rem', color: '#806657', textDecoration: 'none', fontWeight: '600', padding: '6px 0' }}>
+                            <Link to="/client/register" onClick={closeSidebar} style={{ display: 'block', textAlign: 'center', fontSize: '0.85rem', color: '#806657', textDecoration: 'none', fontWeight: '600', padding: '6px 0' }}>
                                 New Client? Create Account &rarr;
                             </Link>
                         </>

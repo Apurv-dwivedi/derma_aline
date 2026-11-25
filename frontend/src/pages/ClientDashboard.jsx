@@ -1,22 +1,25 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   User, Sparkles, Calendar, Clock, FileText, MessageSquare, Bell, 
-  ShieldCheck, LogOut, CheckCircle2, AlertCircle, Edit2, KeyRound, 
-  Lock, RefreshCw, ChevronRight, HeartPulse, Info, Camera, Trash2, Upload,
+  ShieldCheck, LogOut, CheckCircle2, AlertCircle, Edit2, 
+  Lock, RefreshCw, ChevronRight, HeartPulse, Info, Camera, Trash2,
   Search, Plus, ArrowRight, Menu, X
 } from 'lucide-react';
-import API from '../services/api';
+import API, { performServerLogout } from '../services/api';
 import { TREATMENTS_DATA, TREATMENT_CATEGORIES } from '../data/treatmentsData';
+import { clearAuthSession, getAuthenticatedSession, getTodayLocalDateString } from '../utils/authSession';
 import '../styles/pages.css';
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fileInputRef = useRef(null);
+  const requestedTreatmentParam = searchParams.get('bookTreatment') || '';
+  const [lastRequestedTreatment, setLastRequestedTreatment] = useState(requestedTreatmentParam);
 
   // Active Tab: 'overview' | 'appointments' | 'catalogue' | 'treatments' | 'profile' | 'enquiries' | 'notifications' | 'security'
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(requestedTreatmentParam ? 'appointments' : 'overview');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Client Data States
@@ -30,11 +33,21 @@ const ClientDashboard = () => {
   const [successMessage, setSuccessMessage] = useState('');
 
   // Booking Form State
-  const [bookTreatment, setBookTreatment] = useState('Hair GFC + PRP');
+  const [bookTreatment, setBookTreatment] = useState(requestedTreatmentParam || 'Hair GFC + PRP');
   const [bookDate, setBookDate] = useState('');
   const [bookTime, setBookTime] = useState('11:00 AM');
   const [bookNotes, setBookNotes] = useState('');
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [cancellingId, setCancellingId] = useState(null);
+  const [slotAvailability, setSlotAvailability] = useState(null);
+
+  if (requestedTreatmentParam !== lastRequestedTreatment) {
+    setLastRequestedTreatment(requestedTreatmentParam);
+    if (requestedTreatmentParam) {
+      setBookTreatment(requestedTreatmentParam);
+      setActiveTab('appointments');
+    }
+  }
 
   // Catalogue Browse State
   const [catalogueSearch, setCatalogueSearch] = useState('');
@@ -59,33 +72,11 @@ const ClientDashboard = () => {
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [passwordLoading, setPasswordLoading] = useState(false);
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    const role = (localStorage.getItem('role') || '').toUpperCase();
-
-    if (!token || (role !== 'CUSTOMER' && role !== 'PATIENT')) {
-      navigate('/client/login');
-      return;
-    }
-
-    fetchClientData();
-  }, [navigate]);
-
-  useEffect(() => {
-    const requestedTreatment = searchParams.get('bookTreatment');
-    if (requestedTreatment) {
-      setBookTreatment(requestedTreatment);
-      setActiveTab('appointments');
-    }
-  }, [searchParams]);
-
-  const fetchClientData = async (isManual = false) => {
+  const fetchClientData = useCallback(async (isManual = false) => {
     if (isManual) {
       setRefreshing(true);
-    } else {
-      setLoading(true);
+      setError('');
     }
-    setError('');
 
     try {
       const [profileRes, treatmentsRes, enquiriesRes, notificationsRes, appointmentsRes] = await Promise.all([
@@ -117,6 +108,7 @@ const ClientDashboard = () => {
     } catch (err) {
       console.error("Failed to fetch client suite data:", err);
       if (err.response?.status === 401 || err.response?.status === 403) {
+        clearAuthSession();
         localStorage.clear();
         navigate('/client/login');
       } else {
@@ -126,7 +118,42 @@ const ClientDashboard = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    const { token, role } = getAuthenticatedSession();
+    if (!token || (role !== 'CUSTOMER' && role !== 'PATIENT')) {
+      navigate('/client/login');
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetchClientData();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [navigate, fetchClientData]);
+
+  useEffect(() => {
+    if (!bookDate) {
+      return;
+    }
+    let cancelled = false;
+    API.get('/appointments/availability', {
+      params: {
+        date: bookDate,
+        treatmentName: bookTreatment || undefined
+      }
+    })
+      .then((res) => {
+        if (!cancelled && res.data?.slots) {
+          setSlotAvailability(res.data.slots);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setSlotAvailability(null);
+      });
+    return () => { cancelled = true; };
+  }, [bookDate, bookTreatment]);
 
   // Self-Booking Handler from Client Suite
   const handleBookAppointment = async (e) => {
@@ -150,11 +177,32 @@ const ClientDashboard = () => {
 
       setSuccessMessage(res.data.message || 'Appointment request submitted successfully!');
       setBookNotes('');
-      fetchClientData();
+      setBookDate('');
+      setSlotAvailability(null);
+      fetchClientData(true);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to submit appointment request. Please try again.');
     } finally {
       setBookingLoading(false);
+    }
+  };
+
+  const handleCancelAppointment = async (appointmentId) => {
+    if (!window.confirm('Are you sure you want to cancel this upcoming appointment?')) {
+      return;
+    }
+    setCancellingId(appointmentId);
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      const res = await API.patch(`/client/appointments/${appointmentId}/cancel`);
+      setSuccessMessage(res.data?.message || 'Appointment cancelled successfully.');
+      fetchClientData(true);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Unable to cancel this appointment.');
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -318,8 +366,8 @@ const ClientDashboard = () => {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.clear();
+  const handleLogout = async () => {
+    await performServerLogout();
     navigate('/');
   };
 
@@ -746,7 +794,7 @@ const ClientDashboard = () => {
       {activeTab === 'appointments' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
           {/* Booking Card */}
-          <div style={{ backgroundColor: '#ffffff', padding: '32px', borderRadius: '16px', border: '1px solid #ebdcd0' }}>
+          <div style={{ backgroundColor: '#ffffff', padding: 'clamp(18px, 4vw, 32px)', borderRadius: '16px', border: '1px solid #ebdcd0' }}>
             <div style={{ marginBottom: '22px' }}>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: '#806657', fontSize: '0.78rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '4px' }}>
                 <Calendar size={14} /> Self-Service In-Clinic Scheduling
@@ -760,7 +808,7 @@ const ClientDashboard = () => {
             </div>
 
             <form onSubmit={handleBookAppointment} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '18px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '18px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', color: '#4a3b32', marginBottom: '6px' }}>
                     Procedure / Treatment <span style={{ color: '#b91c1c' }}>*</span>
@@ -794,7 +842,7 @@ const ClientDashboard = () => {
                   </label>
                   <input
                     type="date"
-                    min={new Date().toISOString().split('T')[0]}
+                    min={getTodayLocalDateString()}
                     value={bookDate}
                     onChange={(e) => setBookDate(e.target.value)}
                     required
@@ -829,9 +877,14 @@ const ClientDashboard = () => {
                       outline: 'none'
                     }}
                   >
-                    {['10:00 AM', '11:00 AM', '12:00 PM', '01:30 PM', '03:00 PM', '04:30 PM', '06:00 PM', '07:00 PM'].map((slot) => (
-                      <option key={slot} value={slot}>{slot}</option>
-                    ))}
+                    {['10:00 AM', '11:00 AM', '12:00 PM', '01:30 PM', '03:00 PM', '04:30 PM', '05:30 PM', '06:30 PM'].map((slot) => {
+                      const available = slotAvailability ? slotAvailability[slot] !== false : true;
+                      return (
+                        <option key={slot} value={slot} disabled={!available}>
+                          {slot}{!available ? ' (Unavailable)' : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -885,7 +938,7 @@ const ClientDashboard = () => {
           </div>
 
           {/* Appointments List */}
-          <div style={{ backgroundColor: '#ffffff', padding: '32px', borderRadius: '16px', border: '1px solid #ebdcd0' }}>
+          <div style={{ backgroundColor: '#ffffff', padding: 'clamp(18px, 4vw, 32px)', borderRadius: '16px', border: '1px solid #ebdcd0' }}>
             <h3 style={{ fontSize: '1.25rem', color: '#2c221e', fontFamily: 'var(--font-heading)', fontWeight: '600', margin: '0 0 16px 0' }}>
               My In-Clinic Visits & Status ({appointments.length})
             </h3>
@@ -941,9 +994,12 @@ const ClientDashboard = () => {
                             {status}
                           </span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.85rem', color: '#6e5d53' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', fontSize: '0.85rem', color: '#6e5d53', flexWrap: 'wrap' }}>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            <Calendar size={14} color="#806657" /> {appt.appointmentDate}
+                            <Calendar size={14} color="#806657" />{' '}
+                            {typeof appt.appointmentDate === 'string' && appt.appointmentDate.includes('T')
+                              ? appt.appointmentDate.split('T')[0]
+                              : appt.appointmentDate}
                           </span>
                           {appt.appointmentTime && (
                             <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
@@ -957,8 +1013,28 @@ const ClientDashboard = () => {
                           </p>
                         )}
                       </div>
-                      <div style={{ textAlign: 'right', fontSize: '0.8rem', color: '#8c7b70' }}>
-                        Ref: #{appt.id}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: '0.8rem', color: '#8c7b70' }}>Ref: #{appt.id}</span>
+                        {(status === 'PENDING' || status === 'CONFIRMED') && (
+                          <button
+                            type="button"
+                            onClick={() => handleCancelAppointment(appt.id)}
+                            disabled={cancellingId === appt.id}
+                            style={{
+                              padding: '7px 14px',
+                              borderRadius: '8px',
+                              border: '1px solid #fca5a5',
+                              backgroundColor: '#fef2f2',
+                              color: '#991b1b',
+                              fontSize: '0.8rem',
+                              fontWeight: '600',
+                              cursor: cancellingId === appt.id ? 'wait' : 'pointer',
+                              opacity: cancellingId === appt.id ? 0.65 : 1
+                            }}
+                          >
+                            {cancellingId === appt.id ? 'Cancelling...' : 'Cancel Visit'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

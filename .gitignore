@@ -3,36 +3,48 @@
 *.env
 .env.*
 !.env.example
+!.env.*.example
 creds.txt
 *.creds
+*.pem
+*.p12
+*.key
 *.log
 
 # Dependencies
 node_modules/
+frontend/node_modules/
 dist/
+dist-ssr/
+frontend/dist/
 
 # Build artifacts
+target/
 backend/target/
 build/
 *.class
 
 # IDE & Editor files
 .idea/
+backend/.idea/
 .vscode/
+backend/.vscode/
+frontend/.vscode/
 *.iml
 *.iws
 *.ipr
 
-# OS Files
+# OS & Temp Archive Files
 .DS_Store
 Thumbs.db
+*.zip
 
-# Frontend local env (never commit real keys)
+# Frontend & Backend private local env (never commit real keys)
 frontend/.env
 frontend/.env.local
 frontend/.env.production
-
-# Backend local env (never commit real credentials)
+frontend/.env.staging
 backend/.env
 backend/.env.local
 backend/.env.production
+backend/.env.staging

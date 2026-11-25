@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { MapPin, Phone, Mail, Clock, Send, MessageSquare, Calendar } from 'lucide-react';
+import { MapPin, Phone, Mail, Clock, Calendar } from 'lucide-react';
 import API from '../services/api';
 import '../styles/pages.css';
 
 const Contact = () => {
   const [searchParams] = useSearchParams();
   const treatmentParam = searchParams.get('treatment') || '';
+  const [lastTreatmentParam, setLastTreatmentParam] = useState(treatmentParam);
 
   const [formData, setFormData] = useState({ 
     name: '', 
@@ -17,14 +18,15 @@ const Contact = () => {
   const [status, setStatus] = useState({ type: '', message: '' });
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  if (treatmentParam !== lastTreatmentParam) {
+    setLastTreatmentParam(treatmentParam);
     if (treatmentParam) {
       setFormData((prev) => ({
         ...prev,
         message: `I would like to book an appointment for ${treatmentParam}.`
       }));
     }
-  }, [treatmentParam]);
+  }
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });

@@ -2,8 +2,17 @@ package com.dermaaline.backend.controller;
 
 import com.dermaaline.backend.entity.*;
 import com.dermaaline.backend.repository.*;
+import com.dermaaline.backend.security.SecuritySanitizer;
+import com.dermaaline.backend.service.AppointmentBookingService;
+import com.dermaaline.backend.service.AppointmentBookingService.AppointmentNotFoundException;
+import com.dermaaline.backend.service.AppointmentBookingService.BookingConflictException;
+import com.dermaaline.backend.service.AppointmentBookingService.BookingValidationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
@@ -14,7 +23,10 @@ import java.util.*;
 
 @RestController
 @RequestMapping("/api/staff")
+@PreAuthorize("hasAnyRole('STAFF', 'SUPER_ADMIN', 'ADMIN')")
 public class StaffPortalController {
+
+    private static final Logger logger = LoggerFactory.getLogger(StaffPortalController.class);
 
     @Autowired
     private CustomerRepository customerRepository;
@@ -33,6 +45,9 @@ public class StaffPortalController {
 
     @Autowired
     private AppointmentRepository appointmentRepository;
+
+    @Autowired
+    private AppointmentBookingService appointmentBookingService;
 
     @Autowired
     private UserRepository userRepository;
@@ -90,15 +105,35 @@ public class StaffPortalController {
      */
     @PostMapping("/customers")
     public ResponseEntity<?> createCustomer(@RequestBody Customer customer) {
-        if (customer.getFullName() == null || customer.getEmail() == null || customer.getEmail().trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Full name and email are required."));
+        if (customer == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Client details are required."));
+        }
+        String cleanName = SecuritySanitizer.sanitizeText(customer.getFullName(), 100);
+        String cleanEmail = SecuritySanitizer.sanitizeEmail(customer.getEmail());
+        if (cleanName == null || cleanName.isEmpty() || cleanEmail == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Valid full name and email are required."));
         }
 
-        String cleanEmail = customer.getEmail().trim().toLowerCase();
         if (customerRepository.findByEmail(cleanEmail).isPresent()) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "A client record with this email already exists."));
         }
 
+        if (customer.getPhone() != null && !customer.getPhone().trim().isEmpty()) {
+            String cleanPhone = SecuritySanitizer.sanitizePhone(customer.getPhone());
+            if (cleanPhone == null) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid phone number format."));
+            }
+            customer.setPhone(cleanPhone);
+        }
+        if (customer.getNotes() != null) {
+            customer.setNotes(SecuritySanitizer.sanitizeText(customer.getNotes(), 2000));
+        }
+        if (customer.getProfilePicture() != null) {
+            String safeImg = SecuritySanitizer.sanitizeImageUrl(customer.getProfilePicture(), 500_000);
+            customer.setProfilePicture(safeImg != null && !safeImg.isEmpty() ? safeImg : null);
+        }
+
+        customer.setFullName(cleanName);
         customer.setEmail(cleanEmail);
         Customer saved = customerRepository.save(customer);
         return ResponseEntity.ok(Map.of("success", true, "message", "Client profile created.", "customer", saved));
@@ -119,20 +154,28 @@ public class StaffPortalController {
      * Authorized staff member logs a treatment performed for a client.
      */
     @PostMapping("/treatments/records")
-    public ResponseEntity<?> recordTreatment(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<?> recordTreatment(@RequestBody(required = false) Map<String, Object> payload) {
+        if (payload == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Treatment record payload is required."));
+        }
         try {
-            String customerEmail = (String) payload.get("customerEmail");
-            String treatmentName = (String) payload.get("treatmentName");
-            String dateStr = (String) payload.get("treatmentDate");
-            String description = (String) payload.get("description");
-            String clinicalNotes = (String) payload.get("clinicalNotes");
-            String aftercare = (String) payload.get("aftercareInstructions");
+            String rawEmail = payload.get("customerEmail") != null ? payload.get("customerEmail").toString() : null;
+            String rawTreatment = payload.get("treatmentName") != null ? payload.get("treatmentName").toString() : null;
+            String dateStr = payload.get("treatmentDate") != null ? payload.get("treatmentDate").toString() : null;
+            String rawDescription = payload.get("description") != null ? payload.get("description").toString() : null;
+            String rawClinicalNotes = payload.get("clinicalNotes") != null ? payload.get("clinicalNotes").toString() : null;
+            String rawAftercare = payload.get("aftercareInstructions") != null ? payload.get("aftercareInstructions").toString() : null;
 
-            if (customerEmail == null || treatmentName == null || customerEmail.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Client email and treatment name are required."));
+            String cleanEmail = SecuritySanitizer.sanitizeEmail(rawEmail);
+            String treatmentName = SecuritySanitizer.sanitizeText(rawTreatment, 150);
+            if (cleanEmail == null || treatmentName == null || treatmentName.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Valid client email and treatment name are required."));
             }
 
-            String cleanEmail = customerEmail.trim().toLowerCase();
+            String description = SecuritySanitizer.sanitizeText(rawDescription, 1500);
+            String clinicalNotes = SecuritySanitizer.sanitizeText(rawClinicalNotes, 2000);
+            String aftercare = SecuritySanitizer.sanitizeText(rawAftercare, 2000);
+
             Optional<Customer> customerOpt = customerRepository.findByEmail(cleanEmail);
             String customerName = customerOpt.map(Customer::getFullName).orElse("Valued Client");
             Long customerId = customerOpt.map(Customer::getId).orElse(0L);
@@ -144,21 +187,23 @@ public class StaffPortalController {
             if (dateStr != null && !dateStr.trim().isEmpty()) {
                 try {
                     tDate = LocalDate.parse(dateStr.trim());
-                } catch (Exception ignored) {}
+                } catch (Exception e) {
+                    return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid treatment date format. Use YYYY-MM-DD."));
+                }
             }
 
             TreatmentRecord record = new TreatmentRecord();
             record.setCustomerId(customerId);
             record.setCustomerEmail(cleanEmail);
             record.setCustomerName(customerName);
-            record.setTreatmentName(treatmentName.trim());
+            record.setTreatmentName(treatmentName);
             record.setTreatmentDate(tDate);
             record.setPractitionerEmail(staffEmail);
             record.setPractitionerName(staffName);
             record.setDescription(description);
             record.setClinicalNotes(clinicalNotes);
-            record.setAftercareInstructions(aftercare != null && !aftercare.trim().isEmpty() 
-                    ? aftercare.trim() 
+            record.setAftercareInstructions(aftercare != null && !aftercare.isEmpty()
+                    ? aftercare
                     : "Keep skin hydrated, avoid direct sun exposure for 48 hours, and apply broad-spectrum SPF 50+ daily.");
             record.setCreatedAt(LocalDateTime.now());
             record.setUpdatedAt(LocalDateTime.now());
@@ -181,7 +226,8 @@ public class StaffPortalController {
                 "record", saved
             ));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Failed to record treatment: " + e.getMessage()));
+            logger.error("Failed to record treatment", e);
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Failed to record treatment."));
         }
     }
 
@@ -222,25 +268,32 @@ public class StaffPortalController {
     }
 
     @PatchMapping("/appointments/{id}/status")
-    public ResponseEntity<?> updateStaffAppointmentStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {
-        String newStatus = payload.get("status");
+    public ResponseEntity<?> updateStaffAppointmentStatus(@PathVariable Long id, @RequestBody(required = false) Map<String, String> payload) {
+        String newStatus = payload != null ? payload.get("status") : null;
         if (newStatus == null || newStatus.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Status is required"));
         }
 
-        return appointmentRepository.findById(id).map(appointment -> {
-            appointment.setStatus(newStatus.trim().toUpperCase());
-            Appointment saved = appointmentRepository.save(appointment);
-            if ("COMPLETED".equalsIgnoreCase(saved.getStatus())) {
-                String staffEmail = getStaffEmail();
-                String staffName = userRepository.findByEmail(staffEmail).map(User::getFullName).orElse("Clinic Staff");
-                ensureTreatmentRecordCreated(saved, staffName);
-            }
+        try {
+            String staffEmail = getStaffEmail();
+            String staffName = userRepository != null
+                    ? userRepository.findByEmail(staffEmail).map(User::getFullName).orElse("Clinic Staff")
+                    : "Clinic Staff";
+            Appointment saved = appointmentBookingService.transitionStatus(id, newStatus, staffName);
             return ResponseEntity.ok(Map.of(
                 "success", true,
-                "message", "Appointment status updated to " + appointment.getStatus()
+                "message", "Appointment status updated to " + saved.getStatus()
             ));
-        }).orElse(ResponseEntity.status(404).body(Map.of("success", false, "message", "Appointment not found")));
+        } catch (AppointmentNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("success", false, "message", e.getMessage()));
+        } catch (BookingValidationException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
+        } catch (BookingConflictException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("success", false, "message", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Failed to update staff appointment status for ID {}", id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("success", false, "message", "Failed to update appointment status."));
+        }
     }
 
     private void syncCompletedAppointments() {
@@ -249,61 +302,7 @@ public class StaffPortalController {
                 .filter(a -> "COMPLETED".equalsIgnoreCase(a.getStatus()))
                 .toList();
             for (Appointment a : completed) {
-                ensureTreatmentRecordCreated(a, "Derma Aline Specialist");
-            }
-        } catch (Exception ignored) {}
-    }
-
-    private void ensureTreatmentRecordCreated(Appointment appointment, String practitioner) {
-        if (appointment == null || !"COMPLETED".equalsIgnoreCase(appointment.getStatus())) {
-            return;
-        }
-        try {
-            final String rawEmail = appointment.getCustomerEmail() != null ? appointment.getCustomerEmail() : appointment.getEmail();
-            final String cleanEmail = (rawEmail != null && !rawEmail.trim().isEmpty()) 
-                ? rawEmail.trim().toLowerCase() 
-                : "patient@dermaaline.com";
-
-            final String finalTreatmentName = (appointment.getTreatmentName() != null && !appointment.getTreatmentName().trim().isEmpty())
-                ? appointment.getTreatmentName().trim()
-                : "Clinical Treatment";
-
-            final LocalDate finalTreatmentDate = appointment.getAppointmentDate() != null 
-                ? appointment.getAppointmentDate().toLocalDate() 
-                : LocalDate.now();
-
-            List<TreatmentRecord> existing = treatmentRecordRepository.findByCustomerEmailIgnoreCaseOrderByTreatmentDateDesc(cleanEmail);
-            boolean exists = existing.stream().anyMatch(r -> 
-                finalTreatmentName.equalsIgnoreCase(r.getTreatmentName()) && 
-                finalTreatmentDate.equals(r.getTreatmentDate())
-            );
-
-            if (!exists) {
-                Optional<Customer> customerOpt = customerRepository.findByEmail(cleanEmail);
-                Customer customer;
-                if (customerOpt.isEmpty()) {
-                    customer = new Customer();
-                    customer.setEmail(cleanEmail);
-                    customer.setFullName(appointment.getCustomerName() != null ? appointment.getCustomerName() : "Valued Client");
-                    customer.setPhone(appointment.getCustomerPhone());
-                    customer = customerRepository.save(customer);
-                } else {
-                    customer = customerOpt.get();
-                }
-
-                TreatmentRecord tr = new TreatmentRecord();
-                tr.setCustomerId(customer.getId());
-                tr.setCustomerEmail(cleanEmail);
-                tr.setCustomerName(customer.getFullName() != null ? customer.getFullName() : "Valued Client");
-                tr.setTreatmentName(finalTreatmentName);
-                tr.setTreatmentDate(finalTreatmentDate);
-                tr.setPractitionerName(practitioner != null ? practitioner : "Derma Aline Specialist");
-                tr.setDescription("Clinical appointment procedure completed.");
-                tr.setClinicalNotes(appointment.getNotes() != null && !appointment.getNotes().trim().isEmpty() 
-                    ? appointment.getNotes() 
-                    : "Clinical appointment procedure completed successfully.");
-                tr.setAftercareInstructions("Keep treated area clean and hydrated. Avoid direct heat/sun and apply broad-spectrum SPF 50+ sunscreen daily.");
-                treatmentRecordRepository.save(tr);
+                appointmentBookingService.ensureTreatmentRecordCreated(a, "Derma Aline Specialist");
             }
         } catch (Exception ignored) {}
     }

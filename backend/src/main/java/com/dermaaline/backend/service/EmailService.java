@@ -1,5 +1,6 @@
 package com.dermaaline.backend.service;
 
+import com.dermaaline.backend.security.SecuritySanitizer;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +48,7 @@ public class EmailService {
     public boolean sendOtpEmail(String to, String fullName, String codeStr, int expiryMinutes) {
         lastError = null;
         String recipientName = (fullName != null && !fullName.trim().isEmpty()) ? fullName.trim() : "Valued Client";
+        String safeHtmlName = escapeHtml(recipientName);
         String subject = "Your 6-Digit Verification Code | Derma Aline Aesthétics";
 
         String textBody = "Dear " + recipientName + ",\n\n"
@@ -64,7 +66,7 @@ public class EmailService {
                 + "<p style=\"margin: 4px 0 0 0; font-size: 11px; letter-spacing: 0.15em; color: #8F857D; text-transform: uppercase;\">Skin Clinic & Aesthetic Centre</p>"
                 + "</div>"
                 + "<div style=\"padding: 28px 0; color: #3E3834; font-size: 15px; line-height: 1.7;\">"
-                + "<p style=\"margin-top: 0;\">Dear <strong>" + recipientName + "</strong>,</p>"
+                + "<p style=\"margin-top: 0;\">Dear <strong>" + safeHtmlName + "</strong>,</p>"
                 + "<p>Thank you for choosing Derma Aline Aesth\u00e9tics Skin Clinic. To verify your email address and activate your personal client portal suite, please use the 6-digit security code below:</p>"
                 + "<div style=\"text-align: center; margin: 28px 0;\">"
                 + "<span style=\"display: inline-block; font-size: 34px; font-weight: 700; letter-spacing: 10px; color: #806657; background: #FAF7F2; padding: 14px 28px; border-radius: 8px; border: 2px solid #806657;\">"
@@ -114,7 +116,7 @@ public class EmailService {
                 + "<p style=\"margin: 4px 0 0 0; font-size: 12px; letter-spacing: 0.1em; color: #8F857D; text-transform: uppercase;\">Skin Clinic & Aesthetic Centre</p>"
                 + "</div>"
                 + "<div style=\"padding: 24px 0; color: #3E3834; font-size: 15px; line-height: 1.7;\">"
-                + body.replace("\n", "<br/>")
+                + escapeHtml(body != null ? body : "").replace("\n", "<br/>")
                 + "</div>"
                 + "<div style=\"margin-top: 24px; padding-top: 16px; border-top: 1px solid #E8E5E0; text-align: center; font-size: 12px; color: #A09891;\">"
                 + "<p style=\"margin: 0;\">Derma Aline Aesth\u00e9tics Skin Clinic &bull; +91 93195 44704</p>"
@@ -159,7 +161,7 @@ public class EmailService {
             helper.setText(textBody, htmlBody);
 
             mailSender.send(mimeMessage);
-            logger.info("Email dispatched successfully via Google SMTP to {}", to);
+            logger.info("Email dispatched successfully via Google SMTP to {}", SecuritySanitizer.maskEmail(to));
             return true;
         } catch (Exception e) {
             lastError = "Google SMTP error: " + e.getMessage();
@@ -181,7 +183,7 @@ public class EmailService {
 
             String jsonPayload = String.format(
                     "{\"from\":\"Derma Aline <onboarding@resend.dev>\",\"to\":[\"%s\"],\"subject\":\"%s\",\"text\":\"%s\",\"html\":\"%s\"}",
-                    to, escapeJson(subject), escapeJson(textBody), escapeJson(htmlBody));
+                    escapeJson(to), escapeJson(subject), escapeJson(textBody), escapeJson(htmlBody));
 
             try (OutputStream os = conn.getOutputStream()) {
                 os.write(jsonPayload.getBytes(StandardCharsets.UTF_8));
@@ -190,13 +192,13 @@ public class EmailService {
 
             int code = conn.getResponseCode();
             if (code >= 200 && code < 300) {
-                logger.info("Email dispatched successfully via Resend HTTPS API to {}", to);
+                logger.info("Email dispatched successfully via Resend HTTPS API to {}", SecuritySanitizer.maskEmail(to));
                 return true;
             } else {
                 try (java.io.InputStream es = conn.getErrorStream()) {
                     String err = es != null ? new String(es.readAllBytes(), StandardCharsets.UTF_8) : "";
-                    logger.warn("Resend API returned status {}: {}", code, err);
-                    lastError = "Resend API error (" + code + "): " + err;
+                    logger.warn("Resend API returned status {}", code);
+                    lastError = "Resend API status (" + code + "): " + err;
                 }
             }
         } catch (Exception e) {
@@ -223,7 +225,7 @@ public class EmailService {
 
             String jsonPayload = String.format(
                     "{\"sender\":{\"name\":\"Derma Aline Aesthétics\",\"email\":\"%s\"},\"to\":[{\"email\":\"%s\"}],\"subject\":\"%s\",\"textContent\":\"%s\",\"htmlContent\":\"%s\"}",
-                    senderEmailToUse, to, escapeJson(subject), escapeJson(textBody), escapeJson(htmlBody));
+                    escapeJson(senderEmailToUse), escapeJson(to), escapeJson(subject), escapeJson(textBody), escapeJson(htmlBody));
 
             try (OutputStream os = conn.getOutputStream()) {
                 os.write(jsonPayload.getBytes(StandardCharsets.UTF_8));
@@ -233,14 +235,16 @@ public class EmailService {
             int code = conn.getResponseCode();
             if (code >= 200 && code < 300) {
                 try (java.io.InputStream is = conn.getInputStream()) {
-                    String responseBody = is != null ? new String(is.readAllBytes(), StandardCharsets.UTF_8) : "";
-                    logger.info("Email dispatched successfully via Brevo HTTPS API to {}: {}", to, responseBody);
+                    if (is != null) {
+                        is.readAllBytes();
+                    }
+                    logger.info("Email dispatched successfully via Brevo HTTPS API to {}", SecuritySanitizer.maskEmail(to));
                 }
                 return true;
             } else {
                 try (java.io.InputStream es = conn.getErrorStream()) {
                     String err = es != null ? new String(es.readAllBytes(), StandardCharsets.UTF_8) : "";
-                    logger.warn("Brevo API returned status {}: {}", code, err);
+                    logger.warn("Brevo API returned status {}", code);
                     lastError = "Brevo API status (" + code + "): " + err;
                 }
             }
@@ -249,6 +253,17 @@ public class EmailService {
             lastError = "Brevo error: " + e.getMessage();
         }
         return false;
+    }
+
+    private String escapeHtml(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        return raw.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 
     private String escapeJson(String raw) {
@@ -264,7 +279,8 @@ public class EmailService {
     public boolean sendPasswordResetOtpEmail(String to, String fullName, String codeStr, int expiryMinutes) {
         lastError = null;
         String recipientName = (fullName != null && !fullName.trim().isEmpty()) ? fullName.trim() : "Valued Client";
-        String subject = "Your 6-Digit Password Reset Code: " + codeStr + " | Derma Aline Aesthétics";
+        String safeHtmlName = escapeHtml(recipientName);
+        String subject = "Your 6-Digit Password Reset Code | Derma Aline Aesthétics";
 
         String textBody = "Dear " + recipientName + ",\n\n"
                 + "We received a request to reset the password for your Derma Aline Aesthétics client portal account.\n\n"
@@ -282,7 +298,7 @@ public class EmailService {
                 + "<p style=\"margin: 4px 0 0 0; font-size: 11px; letter-spacing: 0.15em; color: #8F857D; text-transform: uppercase;\">Skin Clinic & Aesthetic Centre</p>"
                 + "</div>"
                 + "<div style=\"padding: 28px 0; color: #3E3834; font-size: 15px; line-height: 1.7;\">"
-                + "<p style=\"margin-top: 0;\">Dear <strong>" + recipientName + "</strong>,</p>"
+                + "<p style=\"margin-top: 0;\">Dear <strong>" + safeHtmlName + "</strong>,</p>"
                 + "<p>We received a request to reset the password for your Derma Aline Aesth\u00e9tics client portal suite. To set a new confidential password, please enter the 6-digit verification code below:</p>"
                 + "<div style=\"text-align: center; margin: 28px 0;\">"
                 + "<span style=\"display: inline-block; font-size: 34px; font-weight: 700; letter-spacing: 10px; color: #806657; background: #FAF7F2; padding: 14px 28px; border-radius: 8px; border: 2px solid #806657;\">"

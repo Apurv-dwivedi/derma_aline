@@ -3,14 +3,20 @@ package com.dermaaline.backend.controller;
 import com.dermaaline.backend.entity.Customer;
 import com.dermaaline.backend.repository.CustomerRepository;
 import com.dermaaline.backend.repository.TreatmentRecordRepository;
+import com.dermaaline.backend.security.SecuritySanitizer;
+import com.dermaaline.backend.service.AuditLogService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
 @RestController
 @RequestMapping({"/api/admin/clients", "/api/customers"})
+@PreAuthorize("hasAnyRole('STAFF', 'SUPER_ADMIN', 'ADMIN')")
 public class CustomerController {
 
     @Autowired
@@ -18,6 +24,14 @@ public class CustomerController {
 
     @Autowired
     private TreatmentRecordRepository treatmentRecordRepository;
+
+    @Autowired(required = false)
+    private AuditLogService auditLogService;
+
+    private String getActorEmail() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return (auth != null && auth.getName() != null) ? auth.getName() : "system";
+    }
 
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> getAllCustomers(@RequestParam(required = false) String search) {
@@ -61,24 +75,58 @@ public class CustomerController {
             return ResponseEntity.status(404).body(Map.of("success", false, "message", "Customer not found"));
         }
         Customer c = customerOpt.get();
+        Map<String, Object> customerDto = new HashMap<>();
+        customerDto.put("id", c.getId());
+        customerDto.put("fullName", c.getFullName());
+        customerDto.put("email", c.getEmail());
+        customerDto.put("phone", c.getPhone());
+        customerDto.put("notes", c.getNotes());
+        customerDto.put("createdAt", c.getCreatedAt());
+
         Map<String, Object> res = new HashMap<>();
-        res.put("customer", c);
-        res.put("treatments", treatmentRecordRepository.findByCustomerEmailIgnoreCaseOrderByTreatmentDateDesc(c.getEmail()));
+        res.put("customer", customerDto);
+        res.put("treatments", c.getEmail() != null
+                ? treatmentRecordRepository.findByCustomerEmailIgnoreCaseOrderByTreatmentDateDesc(c.getEmail().trim())
+                : Collections.emptyList());
         return ResponseEntity.ok(res);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<?> updateCustomer(@PathVariable Long id, @RequestBody Customer details) {
+        if (details == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Request body cannot be empty."));
+        }
         Optional<Customer> opt = customerRepository.findById(id);
         if (opt.isEmpty()) {
             return ResponseEntity.status(404).body(Map.of("success", false, "message", "Customer not found"));
         }
         Customer c = opt.get();
-        if (details.getFullName() != null) c.setFullName(details.getFullName().trim());
-        if (details.getPhone() != null) c.setPhone(details.getPhone().trim());
-        if (details.getNotes() != null) c.setNotes(details.getNotes());
+        if (details.getFullName() != null) {
+            String cleanName = SecuritySanitizer.sanitizeText(details.getFullName(), 100);
+            if (cleanName == null || cleanName.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Customer name cannot be blank."));
+            }
+            c.setFullName(cleanName);
+        }
+        if (details.getPhone() != null) {
+            if (details.getPhone().trim().isEmpty()) {
+                c.setPhone("");
+            } else {
+                String cleanPhone = SecuritySanitizer.sanitizePhone(details.getPhone());
+                if (cleanPhone == null) {
+                    return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Invalid phone number format."));
+                }
+                c.setPhone(cleanPhone);
+            }
+        }
+        if (details.getNotes() != null) {
+            c.setNotes(SecuritySanitizer.sanitizeText(details.getNotes(), 2000));
+        }
 
         customerRepository.save(c);
+        if (auditLogService != null) {
+            auditLogService.record("CUSTOMER_UPDATED", getActorEmail(), "STAFF_OR_ADMIN", "CUSTOMER", id.toString(), "Updated CRM profile for " + c.getEmail());
+        }
         return ResponseEntity.ok(Map.of("success", true, "message", "Customer profile updated successfully"));
     }
 
@@ -86,6 +134,7 @@ public class CustomerController {
      * Delete Individual Client from CRM: DELETE /api/admin/clients/{id}
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<?> deleteCustomer(@PathVariable Long id) {
         Optional<Customer> opt = customerRepository.findById(id);
         if (opt.isEmpty()) {
@@ -94,6 +143,9 @@ public class CustomerController {
         Customer c = opt.get();
         String email = c.getEmail();
         customerRepository.delete(c);
+        if (auditLogService != null) {
+            auditLogService.record("CUSTOMER_DELETED", getActorEmail(), "ADMIN", "CUSTOMER", id.toString(), "Deleted CRM profile: " + (email != null ? email : id));
+        }
         return ResponseEntity.ok(Map.of("success", true, "message", "Client profile deleted from CRM successfully.", "email", email != null ? email : ""));
     }
 
@@ -101,8 +153,12 @@ public class CustomerController {
      * Delete All Client CRM Data: DELETE /api/admin/clients
      */
     @DeleteMapping
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<?> deleteAllCustomers() {
         customerRepository.deleteAll();
+        if (auditLogService != null) {
+            auditLogService.record("CUSTOMER_ALL_DELETED", getActorEmail(), "ADMIN", "CUSTOMER", "ALL", "Purged all CRM customer profiles");
+        }
         return ResponseEntity.ok(Map.of("success", true, "message", "All client CRM profiles have been deleted successfully."));
     }
 }

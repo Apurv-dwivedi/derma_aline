@@ -9,15 +9,21 @@ import com.dermaaline.backend.repository.CustomerRepository;
 import com.dermaaline.backend.repository.TreatmentRecordRepository;
 import com.dermaaline.backend.repository.TreatmentRepository;
 import com.dermaaline.backend.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
 @RestController
 @RequestMapping("/api/admin/reports")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
 public class ReportController {
+
+    private static final Logger logger = LoggerFactory.getLogger(ReportController.class);
 
     @Autowired
     private CustomerRepository customerRepository;
@@ -69,7 +75,8 @@ public class ReportController {
 
             return ResponseEntity.ok(report);
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Failed to compile operational report: " + e.getMessage()));
+            logger.error("Failed to compile operational report", e);
+            return ResponseEntity.status(500).body(Map.of("success", false, "message", "Failed to compile operational report."));
         }
     }
 }

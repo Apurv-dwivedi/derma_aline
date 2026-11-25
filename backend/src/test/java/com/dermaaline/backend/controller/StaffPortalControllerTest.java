@@ -2,6 +2,11 @@ package com.dermaaline.backend.controller;
 
 import com.dermaaline.backend.entity.Appointment;
 import com.dermaaline.backend.repository.AppointmentRepository;
+import com.dermaaline.backend.repository.CustomerRepository;
+import com.dermaaline.backend.repository.NotificationRepository;
+import com.dermaaline.backend.repository.TreatmentRecordRepository;
+import com.dermaaline.backend.repository.UserRepository;
+import com.dermaaline.backend.service.AppointmentBookingService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,8 +20,9 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -31,10 +37,25 @@ public class StaffPortalControllerTest {
     @Mock
     private AppointmentRepository appointmentRepository;
 
+    @Mock
+    private AppointmentBookingService appointmentBookingService;
+
+    @Mock
+    private CustomerRepository customerRepository;
+
+    @Mock
+    private TreatmentRecordRepository treatmentRecordRepository;
+
+    @Mock
+    private NotificationRepository notificationRepository;
+
+    @Mock
+    private UserRepository userRepository;
+
     @InjectMocks
     private StaffPortalController staffPortalController;
 
-    private ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
@@ -65,9 +86,9 @@ public class StaffPortalControllerTest {
     void testUpdateStaffAppointmentStatus() throws Exception {
         Appointment a1 = new Appointment();
         a1.setId(15L);
-        a1.setStatus("PENDING");
+        a1.setStatus("COMPLETED");
 
-        when(appointmentRepository.findById(15L)).thenReturn(Optional.of(a1));
+        when(appointmentBookingService.transitionStatus(eq(15L), eq("COMPLETED"), anyString())).thenReturn(a1);
 
         Map<String, String> payload = Map.of("status", "COMPLETED");
 
@@ -77,7 +98,5 @@ public class StaffPortalControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("COMPLETED")));
-
-        verify(appointmentRepository, times(1)).save(a1);
     }
 }

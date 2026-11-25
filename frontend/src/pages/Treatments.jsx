@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Search, X, MessageSquare, Calendar, Sparkles, 
-  Info, ArrowRight, CheckCircle2, ChevronRight 
+  Info, ArrowRight, CheckCircle2 
 } from 'lucide-react';
 import { 
   TREATMENTS_DATA, 
@@ -48,7 +48,7 @@ const Treatments = () => {
     let deletedIds = [];
     try {
       deletedIds = JSON.parse(localStorage.getItem('derma_deleted_treatment_ids') || '[]');
-    } catch (e) {
+    } catch {
       deletedIds = [];
     }
 
@@ -138,7 +138,7 @@ const Treatments = () => {
     });
 
     // Remove empty categories from display
-    return Object.entries(groups).filter(([_, data]) => {
+    return Object.entries(groups).filter(([, data]) => {
       return Object.keys(data.subcategories).length > 0;
     });
   }, [filteredTreatments]);
