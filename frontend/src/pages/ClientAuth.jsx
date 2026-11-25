@@ -7,6 +7,7 @@ import {
   isSupabaseConfigured,
   signInWithGoogleSSO,
   signUpWithSupabase,
+  resendSupabaseSignupOtp,
   verifySupabaseOtp,
   updateSupabasePassword
 } from '../services/supabaseClient';
@@ -80,7 +81,7 @@ const ClientAuth = () => {
           return;
         }
 
-        if (session?.user) {
+        if (session?.user && session?.access_token) {
           const user = session.user;
           const userMeta = user.user_metadata || {};
           const detectedFullName = userMeta.full_name || userMeta.name || 'Valued Client';
@@ -89,7 +90,7 @@ const ClientAuth = () => {
 
           setLoading(true);
           const res = await API.post('/auth/sync-supabase-user', {
-            email: user.email,
+            accessToken: session.access_token,
             fullName: detectedFullName,
             phone: detectedPhone,
             provider
@@ -268,9 +269,9 @@ const ClientAuth = () => {
     if (isSupabaseConfigured()) {
       try {
         const data = await verifySupabaseOtp(email, otp);
-        if (data?.session || data?.user) {
+        if (data?.session?.access_token) {
           const res = await API.post('/auth/sync-supabase-user', {
-            email: email.trim().toLowerCase(),
+            accessToken: data.session.access_token,
             fullName: fullName.trim() || 'Valued Client',
             phone: phone.trim(),
             provider: 'supabase_email_otp'
@@ -332,7 +333,7 @@ const ClientAuth = () => {
 
     if (isSupabaseConfigured()) {
       try {
-        await signUpWithSupabase(email, password || 'DermaAlineTemp@2026', fullName, phone);
+        await resendSupabaseSignupOtp(email);
         setSuccessMessage(`A fresh verification code has been dispatched to ${email.trim()}.`);
         setCooldown(60);
         setLoading(false);

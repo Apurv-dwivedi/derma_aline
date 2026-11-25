@@ -76,7 +76,10 @@ public class RateLimitingFilter extends OncePerRequestFilter {
         } else if (path.startsWith("/api/auth/register") || path.startsWith("/api/auth/verify-email") 
                 || path.startsWith("/api/auth/send-otp") || path.startsWith("/api/auth/forgot-password")
                 || path.startsWith("/api/auth/reset-password") || path.startsWith("/api/auth/verify-otp")
-                || path.startsWith("/api/auth/resend-otp")) {
+                || path.startsWith("/api/auth/resend-otp") || path.startsWith("/api/auth/sync-supabase-user")
+                || path.startsWith("/api/auth/sync-password") || path.startsWith("/api/auth/change-password")
+                || path.startsWith("/api/auth/password/request-otp") || path.startsWith("/api/auth/admin-password/request-otp")
+                || path.startsWith("/api/auth/staff/activate")) {
             maxAllowed = MAX_AUTH_REQUESTS_PER_MINUTE;
             bucketCategory = "auth-action";
         } else if (path.startsWith("/api/contact") && "POST".equalsIgnoreCase(method)) {

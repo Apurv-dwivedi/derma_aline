@@ -15,16 +15,16 @@ public class AdminBootstrap {
 
     private static final Logger logger = LoggerFactory.getLogger(AdminBootstrap.class);
 
-    @Value("${app.admin.email:dermaalineaesthetics@gmail.com}")
+    @Value("${app.admin.email:}")
     private String adminEmail;
 
-    @Value("${app.admin.password:DermaAline#Master2026!}")
+    @Value("${app.admin.password:}")
     private String adminPassword;
 
-    @Value("${app.staff.email:staff@dermaaline.com}")
+    @Value("${app.staff.email:}")
     private String staffEmail;
 
-    @Value("${app.staff.password:Staff@2026!}")
+    @Value("${app.staff.password:}")
     private String staffPassword;
 
     @Bean

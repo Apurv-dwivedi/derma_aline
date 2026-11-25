@@ -11,6 +11,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -18,6 +19,9 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/admin/staff")
 public class StaffManagementController {
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String TEMP_PASS_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
 
     @Autowired
     private StaffInvitationRepository staffInvitationRepository;
@@ -76,9 +80,12 @@ public class StaffManagementController {
             }
 
             String cleanEmail = email.trim().toLowerCase();
-            String dummyPassword = (customPassword != null && !customPassword.trim().isEmpty()) 
-                    ? customPassword.trim() 
-                    : "Staff@12345";
+            if (customPassword != null && !customPassword.trim().isEmpty() && customPassword.trim().length() < 6) {
+                return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Initial password must be at least 6 characters long."));
+            }
+            String initialPassword = (customPassword != null && !customPassword.trim().isEmpty())
+                    ? customPassword.trim()
+                    : generateRandomInitialPassword();
 
             // Immediately create or activate staff account in users table
             User staffUser = userRepository.findByEmail(cleanEmail).orElseGet(User::new);
@@ -87,7 +94,7 @@ public class StaffManagementController {
             staffUser.setPhone(phone != null && !phone.trim().isEmpty() ? phone.trim() : staffUser.getPhone());
             staffUser.setRole(User.Role.STAFF);
             staffUser.setStatus(User.AccountStatus.ACTIVE);
-            staffUser.setPassword(passwordEncoder.encode(dummyPassword));
+            staffUser.setPassword(passwordEncoder.encode(initialPassword));
             userRepository.save(staffUser);
 
             // Record in staff invitations as ACTIVE (no token/activation required)
@@ -111,7 +118,7 @@ public class StaffManagementController {
                     + "Your Staff Workspace credentials are:\n"
                     + "• Portal Login URL: " + loginUrl + "\n"
                     + "• Email: " + cleanEmail + "\n"
-                    + "• Initial Password: " + dummyPassword + "\n\n"
+                    + "• Initial Password: " + initialPassword + "\n\n"
                     + "You can log in directly at " + loginUrl + " without needing any OTP code or activation token.\n"
                     + "Once logged in, you can update your password anytime through your portal.\n\n"
                     + "Warm regards,\n"
@@ -126,11 +133,19 @@ public class StaffManagementController {
                 "email", cleanEmail,
                 "fullName", staffUser.getFullName(),
                 "designation", invitation.getDesignation(),
-                "initialPassword", dummyPassword
+                "initialPassword", initialPassword
             ));
         } catch (Exception e) {
             return ResponseEntity.status(500).body(Map.of("success", false, "message", "Failed to enroll staff member: " + e.getMessage()));
         }
+    }
+
+    private String generateRandomInitialPassword() {
+        StringBuilder sb = new StringBuilder(14);
+        for (int i = 0; i < 14; i++) {
+            sb.append(TEMP_PASS_CHARS.charAt(SECURE_RANDOM.nextInt(TEMP_PASS_CHARS.length())));
+        }
+        return sb.toString();
     }
 
     @PutMapping("/members/{id}/password")

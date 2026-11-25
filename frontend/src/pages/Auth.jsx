@@ -53,7 +53,12 @@ const Auth = () => {
           portal: 'public' 
         });
         const { token, role, fullName } = response.data;
-        const tokenToStore = token || response.data.accessToken || 'authenticated';
+        const tokenToStore = token || response.data.accessToken;
+        if (!tokenToStore) {
+          setError('Authentication token missing from server response.');
+          setLoading(false);
+          return;
+        }
         localStorage.setItem('token', tokenToStore);
         if (role) localStorage.setItem('role', role);
         if (fullName) localStorage.setItem('fullName', fullName);

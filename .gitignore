@@ -26,3 +26,13 @@ build/
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Frontend local env (never commit real keys)
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
+# Backend local env (never commit real credentials)
+backend/.env
+backend/.env.local
+backend/.env.production

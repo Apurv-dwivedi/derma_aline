@@ -22,7 +22,7 @@ public class SystemCleanupController {
 
     /**
      * Purge all records across Client, Staff, and Admin portals.
-     * Strictly preserves master administrator account (dermaalineaesthetics@gmail.com) and core treatments.
+     * Strictly preserves administrator accounts and core treatments.
      */
     @DeleteMapping("/purge-all-data")
     public ResponseEntity<?> purgeAllPortalData() {
@@ -35,7 +35,7 @@ public class SystemCleanupController {
             "DELETE FROM email_verification_otps;",
             "DELETE FROM audit_logs;",
             "DELETE FROM staff_invitations;",
-            "DELETE FROM users WHERE LOWER(email) NOT IN ('dermaalineaesthetics@gmail.com');",
+            "DELETE FROM users WHERE role NOT IN ('SUPER_ADMIN', 'ADMIN');",
             "DELETE FROM treatments WHERE category = 'Clinical Treatment' OR price IS NULL;"
         };
 

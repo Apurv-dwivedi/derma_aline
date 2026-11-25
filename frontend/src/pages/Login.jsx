@@ -36,7 +36,12 @@ const Login = () => {
         return;
       }
 
-      localStorage.setItem('token', token || 'authenticated');
+      if (!token) {
+        setError('Authentication failed: missing security token.');
+        setLoading(false);
+        return;
+      }
+      localStorage.setItem('token', token);
       localStorage.setItem('role', role);
       localStorage.setItem('fullName', fullName || '');
       localStorage.setItem('email', email);

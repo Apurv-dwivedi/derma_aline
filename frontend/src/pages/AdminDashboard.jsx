@@ -50,7 +50,7 @@ const AdminDashboard = () => {
     email: '',
     designation: 'Skin Therapist',
     phone: '',
-    password: 'Staff@12345'
+    password: ''
   });
   const [staffActionLoading, setStaffActionLoading] = useState(false);
   const [staffSuccess, setStaffSuccess] = useState('');
@@ -524,7 +524,7 @@ const AdminDashboard = () => {
     try {
       const response = await API.post('/admin/staff/invitations', newStaff);
       setStaffSuccess(response.data.message || 'Staff member enrolled successfully with login credentials!');
-      setNewStaff({ fullName: '', email: '', designation: 'Skin Therapist', phone: '', password: 'Staff@12345' });
+      setNewStaff({ fullName: '', email: '', designation: 'Skin Therapist', phone: '', password: '' });
       fetchData();
       setTimeout(() => setStaffSuccess(''), 4000);
     } catch (err) {
@@ -538,7 +538,7 @@ const AdminDashboard = () => {
 
   // Staff Management: Admin updates staff password directly
   const handleResetStaffPassword = async (id, name, email) => {
-    const newPass = window.prompt(`Enter new password for ${name || email}:`, "Staff@12345");
+    const newPass = window.prompt(`Enter new password for ${name || email} (min 6 characters):`, "");
     if (!newPass || !newPass.trim()) return;
     if (newPass.trim().length < 6) {
       alert("Password must be at least 6 characters long.");
@@ -620,7 +620,7 @@ const AdminDashboard = () => {
 
   // System: Purge All Portal Data (Client, Staff, and Admin portals)
   const handlePurgeAllPortalData = async () => {
-    if (window.confirm("WARNING: Are you sure you want to permanently delete ALL data across Client Portal, Staff Portal, and Admin Portal (appointments, treatment records, clients, enquiries, staff accounts, OTPs)?\n\nOnly your admin account (dermaalineaesthetics@gmail.com) and core treatments will be kept.")) {
+    if (window.confirm("WARNING: Are you sure you want to permanently delete ALL data across Client Portal, Staff Portal, and Admin Portal (appointments, treatment records, clients, enquiries, staff accounts, OTPs)?\n\nOnly your clinic administrator account and core treatments will be kept.")) {
       try {
         await API.delete('/admin/system/purge-all-data');
         setRefreshToast('All portal data has been completely wiped. Admin credentials preserved.');
@@ -667,7 +667,11 @@ const AdminDashboard = () => {
       return;
     }
 
-    const currentEmail = localStorage.getItem('email') || 'dermaalineaesthetics@gmail.com';
+    const currentEmail = localStorage.getItem('email') || '';
+    if (!currentEmail) {
+      setPasswordError('Admin email not found in active session. Please sign in again.');
+      return;
+    }
     setOtpLoading(true);
 
     try {
@@ -706,7 +710,11 @@ const AdminDashboard = () => {
       return;
     }
 
-    const currentEmail = localStorage.getItem('email') || 'dermaalineaesthetics@gmail.com';
+    const currentEmail = localStorage.getItem('email') || '';
+    if (!currentEmail) {
+      setPasswordError('Admin email not found in active session. Please sign in again.');
+      return;
+    }
     setPasswordLoading(true);
 
     try {
@@ -879,7 +887,7 @@ const AdminDashboard = () => {
             </h2>
 
             <div className="client-sidebar-user-meta">
-              dermaalineaesthetics@gmail.com
+              {localStorage.getItem('email') || 'Master Administrator'}
             </div>
 
             <div className="client-sidebar-actions">
@@ -1401,10 +1409,10 @@ const AdminDashboard = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Initial Dummy Password</label>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: '600', marginBottom: '6px', color: 'var(--color-primary)' }}>Initial Temporary Password</label>
                 <input 
                   type="text" 
-                  placeholder="Staff@12345" 
+                  placeholder="Min 6 chars (auto-generated if blank)" 
                   value={newStaff.password || ''}
                   onChange={(e) => setNewStaff({ ...newStaff, password: e.target.value })}
                   style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-light)', boxSizing: 'border-box' }}
@@ -1751,7 +1759,7 @@ const AdminDashboard = () => {
                       <Shield size={16} color="var(--color-accent)" /> Admin Security OTP Verification *
                     </span>
                     <span style={{ fontSize: '0.8rem', color: 'var(--text-light)' }}>
-                      OTP is dispatched to admin email ({localStorage.getItem('email') || 'dermaalineaesthetics@gmail.com'})
+                      OTP will be dispatched to your admin email ({localStorage.getItem('email') || 'active session'})
                     </span>
                   </div>
                   <button

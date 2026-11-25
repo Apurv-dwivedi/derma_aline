@@ -45,6 +45,9 @@ public class SecurityConfig {
                 // Allow browser preflight OPTIONS
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
+                // Require valid JWT authentication before attempting password change
+                .requestMatchers("/api/auth/change-password").authenticated()
+
                 // Public Authentication, Registration & Verification
                 .requestMatchers("/api/auth/**").permitAll()
 

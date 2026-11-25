@@ -17,9 +17,10 @@ public class JwtTokenProviderTest {
     @BeforeEach
     void setUp() {
         jwtTokenProvider = new JwtTokenProvider();
-        // Inject mock configuration
-        ReflectionTestUtils.setField(jwtTokenProvider, "jwtSecret", "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
+        // Inject synthetic unit-test-only key (never a real or production secret)
+        ReflectionTestUtils.setField(jwtTokenProvider, "jwtSecret", "SyntheticUnitTestSigningKeyForJUnitValidation1234567890");
         ReflectionTestUtils.setField(jwtTokenProvider, "jwtExpirationDate", 86400000L); // 1 day
+        jwtTokenProvider.init();
     }
 
     @Test

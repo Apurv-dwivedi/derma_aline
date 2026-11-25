@@ -2,6 +2,7 @@ package com.dermaaline.backend.config;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,6 +12,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 public class DatabaseFixRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(DatabaseFixRunner.class);
+
+    @Value("${app.admin.email:}")
+    private String adminEmail;
 
     @Bean
     public CommandLineRunner ensureDatabaseSchemaConsistency(JdbcTemplate jdbcTemplate) {
@@ -31,7 +35,6 @@ public class DatabaseFixRunner {
                 "UPDATE users SET status = 'ACTIVE' WHERE status IS NULL;",
                 "UPDATE users SET status = 'ACTIVE' WHERE role = 'STAFF';",
                 "UPDATE users SET role = 'CUSTOMER' WHERE role IS NULL;",
-                "UPDATE users SET role = 'SUPER_ADMIN' WHERE email IN ('dermaalineaesthetics@gmail.com', 'apurvdwivedi2205@gmail.com');",
 
                 // 2. Appointments table backward-compatible column mappings
                 "ALTER TABLE appointments ADD COLUMN IF NOT EXISTS customer_name VARCHAR(255);",
@@ -149,9 +152,7 @@ public class DatabaseFixRunner {
                     "is_read BOOLEAN DEFAULT FALSE, " +
                     "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP);",
 
-                // 10. Core client user auto-registration
-                "INSERT INTO users (email, full_name, role, status) SELECT 'apurvdwivedi12345@gmail.com', 'Apurv Dwivedi', 'CUSTOMER', 'ACTIVE' WHERE NOT EXISTS (SELECT 1 FROM users WHERE LOWER(email) = 'apurvdwivedi12345@gmail.com');",
-                "INSERT INTO customers (email, full_name) SELECT 'apurvdwivedi12345@gmail.com', 'Apurv Dwivedi' WHERE NOT EXISTS (SELECT 1 FROM customers WHERE LOWER(email) = 'apurvdwivedi12345@gmail.com');"
+                // 10. Core client user auto-registration (email loaded from env, not hardcoded)
             };
 
             for (String sql : ddlStatements) {
@@ -159,6 +160,16 @@ public class DatabaseFixRunner {
                     jdbcTemplate.execute(sql);
                 } catch (Exception e) {
                     logger.debug("Database migration step notice for query [{}]: {}", sql, e.getMessage());
+                }
+            }
+            if (adminEmail != null && !adminEmail.trim().isEmpty()) {
+                try {
+                    jdbcTemplate.update(
+                        "UPDATE users SET role = 'SUPER_ADMIN' WHERE LOWER(email) = ?;",
+                        adminEmail.trim().toLowerCase()
+                    );
+                } catch (Exception e) {
+                    logger.debug("Admin role sync notice: {}", e.getMessage());
                 }
             }
             logger.info("Database schema synchronization finished successfully.");

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://atupxmpyhednaigfvgfi.supabase.co';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const isSupabaseConfigured = () => {
@@ -9,8 +9,8 @@ export const isSupabaseConfigured = () => {
 
 // Create a singleton Supabase client
 export const supabase = createClient(
-  supabaseUrl,
-  supabaseAnonKey && supabaseAnonKey.trim().length > 0 ? supabaseAnonKey : 'sb_anon_placeholder',
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey && supabaseAnonKey.trim().length > 0 ? supabaseAnonKey : 'unconfigured',
   {
     auth: {
       persistSession: true,
@@ -58,6 +58,19 @@ export const signUpWithSupabase = async (email, password, fullName, phone) => {
         phone: phone ? phone.trim() : ''
       }
     }
+  });
+
+  if (error) throw error;
+  return data;
+};
+
+/**
+ * Resend Signup Verification OTP via Supabase Auth (without passing any password)
+ */
+export const resendSupabaseSignupOtp = async (email) => {
+  const { data, error } = await supabase.auth.resend({
+    type: 'signup',
+    email: email.trim().toLowerCase()
   });
 
   if (error) throw error;

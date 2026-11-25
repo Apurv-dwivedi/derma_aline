@@ -11,6 +11,9 @@ import com.dermaaline.backend.service.AuditLogService;
 import com.dermaaline.backend.service.EmailService;
 import com.dermaaline.backend.service.OtpService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.security.Keys;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,9 +23,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Date;
 import java.util.Map;
 import java.util.Optional;
 
@@ -68,9 +74,23 @@ public class AuthControllerTest {
 
     private ObjectMapper objectMapper = new ObjectMapper();
 
+    private static final String TEST_SUPABASE_JWT_SECRET = "SyntheticSupabaseTestJwtSecretKeyAtLeast32BytesLongForJUnit!";
+
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(authController, "supabaseJwtSecret", TEST_SUPABASE_JWT_SECRET);
         mockMvc = MockMvcBuilders.standaloneSetup(authController).build();
+    }
+
+    private String createSignedSupabaseTestToken(String email) {
+        return Jwts.builder()
+                .setSubject("sub-" + email)
+                .claim("email", email)
+                .setAudience("authenticated")
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 300_000L))
+                .signWith(Keys.hmacShaKeyFor(TEST_SUPABASE_JWT_SECRET.getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256)
+                .compact();
     }
 
     @Test
@@ -185,12 +205,12 @@ public class AuthControllerTest {
         staffUser.setStatus(User.AccountStatus.ACTIVE);
 
         when(userRepository.findByEmail("staff@dermaaline.com")).thenReturn(Optional.of(staffUser));
-        when(passwordEncoder.matches("Staff@2026", "encodedPassword")).thenReturn(true);
+        when(passwordEncoder.matches("MockStaffPass123", "encodedPassword")).thenReturn(true);
         when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("mock-staff-jwt");
 
         Map<String, String> credentials = Map.of(
                 "email", "staff@dermaaline.com",
-                "password", "Staff@2026");
+                "password", "MockStaffPass123");
 
         mockMvc.perform(post("/api/auth/internal-login")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -328,9 +348,36 @@ public class AuthControllerTest {
     // ==========================================
 
     @Test
-    void testSyncSupabaseUserNewCustomer() throws Exception {
+    void testSyncSupabaseUserRejectsMissingAccessToken() throws Exception {
         Map<String, String> payload = Map.of(
-                "email", "googleclient@example.com",
+                "email", "attacker@example.com",
+                "provider", "google");
+
+        mockMvc.perform(post("/api/auth/sync-supabase-user")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void testSyncSupabaseUserRejectsForgedToken() throws Exception {
+        Map<String, String> payload = Map.of(
+                "accessToken", "eyJhbGciOiJIUzI1NiJ9.eyJlbWFpbCI6ImFkbWluQGRlcm1hYWxpbmUuY29tIn0.forgedsignature",
+                "provider", "google");
+
+        mockMvc.perform(post("/api/auth/sync-supabase-user")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(payload)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void testSyncSupabaseUserNewCustomer() throws Exception {
+        String validToken = createSignedSupabaseTestToken("googleclient@example.com");
+        Map<String, String> payload = Map.of(
+                "accessToken", validToken,
                 "fullName", "Google Client",
                 "phone", "+919988776655",
                 "provider", "google");
@@ -365,8 +412,9 @@ public class AuthControllerTest {
 
     @Test
     void testSyncSupabaseUserExistingPendingCustomerActivates() throws Exception {
+        String validToken = createSignedSupabaseTestToken("pendingclient@example.com");
         Map<String, String> payload = Map.of(
-                "email", "pendingclient@example.com",
+                "accessToken", validToken,
                 "fullName", "Pending Client",
                 "provider", "supabase_email_otp");
 
@@ -396,9 +444,10 @@ public class AuthControllerTest {
     }
 
     @Test
-    void testSyncSupabaseUserPreservesAdminStaffRole() throws Exception {
+    void testSyncSupabaseUserBlocksAdminAndStaffSso() throws Exception {
+        String validAdminToken = createSignedSupabaseTestToken("admin@dermaaline.com");
         Map<String, String> payload = Map.of(
-                "email", "admin@dermaaline.com",
+                "accessToken", validAdminToken,
                 "provider", "google");
 
         User adminUser = new User();
@@ -408,26 +457,25 @@ public class AuthControllerTest {
         adminUser.setStatus(User.AccountStatus.ACTIVE);
 
         when(userRepository.findByEmail("admin@dermaaline.com")).thenReturn(Optional.of(adminUser));
-        when(userRepository.save(adminUser)).thenReturn(adminUser);
-        when(customerRepository.findByEmail("admin@dermaaline.com")).thenReturn(Optional.of(new Customer()));
-        when(jwtTokenProvider.generateToken(any(Authentication.class))).thenReturn("admin-sso-jwt");
 
         mockMvc.perform(post("/api/auth/sync-supabase-user")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.role").value("ADMIN"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Restricted")));
     }
 
     @Test
     void testSyncSupabaseUserRejectsDisabledAccount() throws Exception {
+        String validToken = createSignedSupabaseTestToken("deactivated@example.com");
         Map<String, String> payload = Map.of(
-                "email", "deactivated@example.com",
+                "accessToken", validToken,
                 "provider", "google");
 
         User deactivatedUser = new User();
         deactivatedUser.setEmail("deactivated@example.com");
+        deactivatedUser.setRole(User.Role.CUSTOMER);
         deactivatedUser.setStatus(User.AccountStatus.DISABLED);
 
         when(userRepository.findByEmail("deactivated@example.com")).thenReturn(Optional.of(deactivatedUser));
@@ -441,15 +489,7 @@ public class AuthControllerTest {
     }
 
     @Test
-    void testSyncPasswordSuccess() throws Exception {
-        User user = new User();
-        user.setId(55L);
-        user.setEmail("user@example.com");
-        user.setRole(User.Role.CUSTOMER);
-
-        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(passwordEncoder.encode("NewSecret2026")).thenReturn("hashedNewSecret2026");
-
+    void testSyncPasswordDisabledForSecurity() throws Exception {
         Map<String, String> payload = Map.of(
                 "email", "user@example.com",
                 "newPassword", "NewSecret2026");
@@ -457,24 +497,9 @@ public class AuthControllerTest {
         mockMvc.perform(post("/api/auth/sync-password")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("successfully updated")));
-
-        verify(userRepository, times(1)).save(user);
-        verify(passwordEncoder, times(1)).encode("NewSecret2026");
-    }
-
-    @Test
-    void testSyncPasswordRejectsShortPassword() throws Exception {
-        Map<String, String> payload = Map.of(
-                "email", "user@example.com",
-                "newPassword", "123");
-
-        mockMvc.perform(post("/api/auth/sync-password")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isGone())
                 .andExpect(jsonPath("$.success").value(false));
+
+        verify(userRepository, never()).save(any());
     }
 }

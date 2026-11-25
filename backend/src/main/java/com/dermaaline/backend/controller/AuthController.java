@@ -11,6 +11,11 @@ import com.dermaaline.backend.security.JwtTokenProvider;
 import com.dermaaline.backend.service.EmailService;
 import com.dermaaline.backend.service.OtpService;
 import com.dermaaline.backend.security.SecuritySanitizer;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,10 +23,19 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.security.Key;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -57,6 +71,17 @@ public class AuthController {
 
     @Value("${app.frontend.url:https://derma-aline.vercel.app}")
     private String frontendUrl;
+
+    @Value("${app.supabase.url:}")
+    private String supabaseUrl;
+
+    @Value("${app.supabase.anon-key:}")
+    private String supabaseAnonKey;
+
+    @Value("${app.supabase.jwt-secret:}")
+    private String supabaseJwtSecret;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * Customer Self-Registration
@@ -229,17 +254,41 @@ public class AuthController {
 
     /**
      * Supabase User Synchronization (Google SSO & Email OTP Verified)
-     * Securely links or provisions active customer record, links customer profile, and issues application JWT.
+     * Cryptographically verifies the Supabase session token before provisioning or authenticating a CUSTOMER account.
+     * Never trusts unverified client-supplied email claims and never issues ADMIN or STAFF tokens.
      */
     @PostMapping("/sync-supabase-user")
-    public ResponseEntity<?> syncSupabaseUser(@RequestBody Map<String, String> payload) {
-        if (payload == null || payload.get("email") == null || payload.get("email").trim().isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Email is required."));
+    public ResponseEntity<?> syncSupabaseUser(@RequestBody(required = false) Map<String, String> payload) {
+        if (payload == null) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Request payload is required."));
         }
 
-        String email = SecuritySanitizer.sanitizeEmail(payload.get("email"));
+        String accessToken = payload.get("accessToken");
+        if (accessToken == null || accessToken.trim().isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                "success", false,
+                "message", "Verified Supabase session token is required."
+            ));
+        }
+
+        boolean hasApiConfig = supabaseUrl != null && !supabaseUrl.trim().isEmpty()
+                && supabaseAnonKey != null && !supabaseAnonKey.trim().isEmpty();
+        boolean hasJwtConfig = supabaseJwtSecret != null && !supabaseJwtSecret.trim().isEmpty();
+
+        if (!hasApiConfig && !hasJwtConfig) {
+            logger.warn("Supabase user sync rejected: SUPABASE_JWT_SECRET or SUPABASE_URL/SUPABASE_ANON_KEY is not configured.");
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "success", false,
+                "message", "Supabase SSO verification is not configured on the server."
+            ));
+        }
+
+        String email = verifySupabaseTokenAndExtractEmail(accessToken.trim(), hasApiConfig, hasJwtConfig);
         if (email == null) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "A valid email address is required."));
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                "success", false,
+                "message", "Invalid or expired Supabase session token."
+            ));
         }
 
         String rawFullName = payload.get("fullName");
@@ -255,13 +304,22 @@ public class AuthController {
         User user;
         if (existingUserOpt.isPresent()) {
             user = existingUserOpt.get();
+            if (user.getRole() == User.Role.SUPER_ADMIN || user.getRole() == User.Role.ADMIN || user.getRole() == User.Role.STAFF) {
+                auditLogService.record("SUPABASE_SSO_BLOCKED", user.getEmail(), user.getRole().name(), "USER",
+                        user.getId() != null ? user.getId().toString() : "N/A",
+                        "Blocked SSO login attempt for internal privileged account");
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "success", false,
+                    "message", "Access Restricted: Staff and Clinic Administrators must sign in through the internal portal."
+                ));
+            }
             if (user.getStatus() == User.AccountStatus.DISABLED) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
                     "success", false,
                     "message", "Your account has been deactivated. Please contact clinic management."
                 ));
             }
-            // Supabase verified the email: activate account
+            // Supabase verified the email: activate customer account
             user.setStatus(User.AccountStatus.ACTIVE);
             if (phone != null && !phone.isEmpty() && (user.getPhone() == null || user.getPhone().isEmpty())) {
                 user.setPhone(phone);
@@ -291,8 +349,7 @@ public class AuthController {
             customerRepository.save(c);
         }
 
-        String roleStr = (user.getRole() == User.Role.SUPER_ADMIN || user.getRole() == User.Role.ADMIN) 
-                ? "ADMIN" : user.getRole().name();
+        String roleStr = user.getRole() == User.Role.PATIENT ? "PATIENT" : "CUSTOMER";
 
         String token = jwtTokenProvider.generateToken(
             new UsernamePasswordAuthenticationToken(user.getEmail(), null, 
@@ -314,38 +371,81 @@ public class AuthController {
         return ResponseEntity.ok(resp);
     }
 
+    private String verifySupabaseTokenAndExtractEmail(String accessToken, boolean hasApiConfig, boolean hasJwtConfig) {
+        if (hasJwtConfig) {
+            String trimmedSecret = supabaseJwtSecret.trim();
+            String email = parseSupabaseJwtEmail(accessToken, trimmedSecret.getBytes(StandardCharsets.UTF_8));
+            if (email != null) {
+                return email;
+            }
+            try {
+                byte[] decoded = Base64.getDecoder().decode(trimmedSecret);
+                email = parseSupabaseJwtEmail(accessToken, decoded);
+                if (email != null) {
+                    return email;
+                }
+            } catch (IllegalArgumentException ignored) {}
+        }
+
+        if (hasApiConfig) {
+            try {
+                String baseUrl = supabaseUrl.trim().replaceAll("/+$", "");
+                HttpClient client = HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofSeconds(5))
+                        .build();
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(baseUrl + "/auth/v1/user"))
+                        .timeout(Duration.ofSeconds(6))
+                        .header("Authorization", "Bearer " + accessToken)
+                        .header("apikey", supabaseAnonKey.trim())
+                        .GET()
+                        .build();
+                HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() == 200) {
+                    JsonNode root = objectMapper.readTree(response.body());
+                    String verifiedEmail = root.path("email").asText("");
+                    String userId = root.path("id").asText("");
+                    if (!userId.isEmpty() && !verifiedEmail.isEmpty()) {
+                        return SecuritySanitizer.sanitizeEmail(verifiedEmail);
+                    }
+                }
+            } catch (Exception e) {
+                logger.warn("Supabase API token verification notice: {}", e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    private String parseSupabaseJwtEmail(String token, byte[] keyBytes) {
+        if (keyBytes == null || keyBytes.length < 32) {
+            return null;
+        }
+        try {
+            Key key = Keys.hmacShaKeyFor(keyBytes);
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(key)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+            String aud = claims.getAudience();
+            if (aud != null && !"authenticated".equalsIgnoreCase(aud)) {
+                return null;
+            }
+            return SecuritySanitizer.sanitizeEmail(claims.get("email", String.class));
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
     /**
-     * Synchronize Password with Supabase Reset
+     * Legacy unauthenticated password synchronization endpoint — permanently disabled for security.
+     * Clients must reset passwords via the 6-digit email OTP verification flow (/api/auth/reset-password).
      */
     @PostMapping("/sync-password")
-    public ResponseEntity<?> syncPassword(@RequestBody Map<String, String> payload) {
-        if (payload == null || payload.get("email") == null || payload.get("newPassword") == null) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Email and new password are required."));
-        }
-
-        String cleanEmail = payload.get("email").trim().toLowerCase();
-        String newPassword = payload.get("newPassword").trim();
-
-        if (cleanEmail.isEmpty() || newPassword.length() < 6) {
-            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "Valid email and new password (min 6 characters) are required."));
-        }
-
-        Optional<User> userOpt = userRepository.findByEmail(cleanEmail);
-        if (userOpt.isEmpty()) {
-            return ResponseEntity.status(404).body(Map.of("success", false, "message", "User account not found."));
-        }
-
-        User user = userOpt.get();
-        user.setPassword(passwordEncoder.encode(newPassword));
-        user.setResetToken(null);
-        user.setResetTokenExpiry(null);
-        userRepository.save(user);
-
-        auditLogService.record("PASSWORD_RESET_SYNC", cleanEmail, user.getRole().name(), "USER", user.getId() != null ? user.getId().toString() : "N/A", "Password reset updated via Supabase");
-
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "message", "Password successfully updated in clinic database."
+    public ResponseEntity<?> syncPassword(@RequestBody(required = false) Map<String, String> payload) {
+        return ResponseEntity.status(HttpStatus.GONE).body(Map.of(
+            "success", false,
+            "message", "Direct password synchronization has been disabled. Please use the 6-digit email OTP reset flow."
         ));
     }
 
@@ -729,6 +829,15 @@ public class AuthController {
         }
 
         String cleanEmail = email.trim().toLowerCase();
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && !"anonymousUser".equalsIgnoreCase(auth.getName())) {
+            if (!auth.getName().trim().equalsIgnoreCase(cleanEmail)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                    "success", false,
+                    "message", "You can only change the password for your own authenticated account."
+                ));
+            }
+        }
         Optional<User> userOpt = userRepository.findByEmail(cleanEmail);
         if (userOpt.isEmpty()) {
             return ResponseEntity.status(404).body(Map.of("success", false, "message", "User not found."));
